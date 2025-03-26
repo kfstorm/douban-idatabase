@@ -5,6 +5,7 @@ import logging
 from . import models, schemas, crawler
 from .database import get_db, init_db
 from .logging_config import setup_logging
+from .scheduler import start_scheduler, stop_scheduler
 
 # Initialize logging
 logger = setup_logging()
@@ -17,6 +18,15 @@ def on_startup():
     logger.info("Starting up the application...")
     init_db()
     logger.info("Database initialized successfully")
+    # Start the scheduler
+    start_scheduler()
+
+
+@app.on_event("shutdown")
+def on_shutdown():
+    logger.info("Shutting down the application...")
+    # Stop the scheduler
+    stop_scheduler()
 
 
 @app.get("/api/item", response_model=List[schemas.Item])
