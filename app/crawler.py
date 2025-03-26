@@ -1,13 +1,13 @@
 import re
 import time
 import logging
-import json
 import requests
 from datetime import datetime
 from sqlalchemy.orm import Session
 from .models import Queue
 from urllib.parse import urlencode
 from .config import settings
+from .http import get_json
 
 # Get logger instead of configuring it locally
 logger = logging.getLogger(__name__)
@@ -21,7 +21,7 @@ DOUBAN_ID_PATTERN = r"movie\.douban\.com/subject/(\d+)"
 ZENROWS_API_URL = "https://serp.api.zenrows.com/v1/targets/google/search"
 
 
-def search_recent_douban_movies(db: Session):
+def search_recent_douban_movies(db: Session, http_session: requests.Session):
     """
     Search Google for recent Douban movie pages and add them to the queue.
     Continues to next page as long as there are more results.
@@ -29,6 +29,7 @@ def search_recent_douban_movies(db: Session):
 
     Args:
         db: Database session
+        http_session: HTTP session
     """
     # Check if ZenRows API key is configured
     if not settings.ZENROWS_API_KEY:
@@ -62,11 +63,9 @@ def search_recent_douban_movies(db: Session):
             logger.info(f"Searching Google (page {page+1}) via ZenRows API...")
 
             # Make request to ZenRows API
-            response = requests.get(ZENROWS_API_URL, params=zenrows_params, timeout=30)
-            response.raise_for_status()
-
-            # Parse JSON response
-            search_results = json.loads(response.text)
+            search_results = get_json(
+                http_session, ZENROWS_API_URL, params=zenrows_params
+            )
 
             # Check if we have organic results
             organic_results = search_results.get("organic_results", [])

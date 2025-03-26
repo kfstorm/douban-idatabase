@@ -1,0 +1,114 @@
+from collections import defaultdict
+from datetime import datetime
+import time
+import requests
+from urllib.parse import urlparse
+import logging
+from .config import settings
+
+
+class Throttler:
+    def __init__(self):
+        self.next_call_time = defaultdict(float)
+
+    def _check_rate_limit(self, url):
+        host = urlparse(url).netloc
+        next_call_time = self.next_call_time[host]
+        now = time.time()
+        if now < next_call_time:
+            raise Exception(
+                f"Rate limited. Need to wait at least {next_call_time - now}"
+                + f" seconds before the next call to {host}."
+            )
+
+    def _handle_response(self, response):
+        if response.status_code == 302 and "sec.douban.com" in response.headers.get(
+            "location", ""
+        ):
+            # Rate limited.
+            host = urlparse(response.url).netloc
+            self.next_call_time[host] = (
+                time.time() + settings.DOUBAN_RATE_LIMIT_DELAY_SECONDS
+            )
+            raise Exception(
+                "Rate limited. Need to wait at least "
+                + str(settings.DOUBAN_RATE_LIMIT_DELAY_SECONDS)
+                + " seconds before the next call."
+            )
+        return response
+
+    def get_info(self):
+        now = time.time()
+        return {
+            key: {
+                "is_rate_limited": now < value,
+                "wait_time": max(0, value - now),
+            }
+            for key, value in self.next_call_time.items()
+        }
+
+
+throttler = Throttler()
+
+
+def _get_extra_http_client_args():
+    return {}
+
+
+last_throttler_info_print = datetime.now()
+
+
+def get_response(http_session, url, **kwargs):
+    global last_throttler_info_print
+    now = datetime.now()
+    if (now - last_throttler_info_print).total_seconds() > 60:
+        last_throttler_info_print = now
+        logging.info(f"Throttler info: {throttler.get_info()}")
+
+    throttler._check_rate_limit(url)
+
+    headers = {
+        "User-Agent": (
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"
+            + " AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.3"
+        )
+    }
+
+    # Merge headers if provided in kwargs
+    if "headers" in kwargs:
+        headers.update(kwargs.pop("headers"))
+
+    response = http_session.get(url, headers=headers, timeout=60, **kwargs)
+
+    throttler._handle_response(response)
+
+    try:
+        response.raise_for_status()
+    except requests.HTTPError as e:
+        logging.error(f"Failed to fetch {url}: {e}")
+        raise e
+
+    return response
+
+
+def get_json(http_session, url, **kwargs):
+    response = get_response(http_session, url, **kwargs)
+    return response.json()
+
+
+def new_http_session():
+    http_session = requests.Session()
+
+    http_session.headers["User-Agent"] = (
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"
+        + " AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.3"
+    )
+
+    extra_args = _get_extra_http_client_args()
+    if "proxies" in extra_args:
+        http_session.proxies = extra_args["proxies"]
+    if "cookies" in extra_args:
+        for key, value in extra_args["cookies"].items():
+            http_session.cookies.set(key, value, domain=".douban.com")
+
+    return http_session

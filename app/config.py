@@ -13,6 +13,10 @@ class Settings(BaseSettings):
     # Queue processing settings
     QUEUE_BATCH_SIZE: int = int(os.getenv("QUEUE_BATCH_SIZE", "100"))
 
+    DOUBAN_RATE_LIMIT_DELAY_SECONDS: float = float(
+        os.getenv("DOUBAN_RATE_LIMIT_DELAY_SECONDS", "3600")
+    )
+
     class Config:
         env_file = ".env"
         env_file_encoding = "utf-8"

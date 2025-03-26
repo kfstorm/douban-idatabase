@@ -8,6 +8,7 @@ from datetime import datetime
 from sqlalchemy.orm import Session
 from .models import Queue, Item, History
 from .config import settings
+from .http import get_response, get_json
 
 logger = logging.getLogger(__name__)
 
@@ -22,7 +23,7 @@ COMMON_HEADERS = {
 }
 
 
-def process_queue_items(db: Session) -> None:
+def process_queue_items(db: Session, http_session: requests.Session) -> None:
     """
     Process multiple items from the queue, up to max_items.
     Supports different types of queue items.
@@ -53,7 +54,7 @@ def process_queue_items(db: Session) -> None:
 
             # Dispatch to appropriate handler based on queue item type
             if item_type == "douban_id":
-                process_douban_queue_item(db, queue_item)
+                process_douban_queue_item(db, http_session, queue_item)
             else:
                 logger.warning(f"Unsupported queue item type: {item_type}")
                 # Remove unsupported item from queue
@@ -80,7 +81,9 @@ def process_queue_items(db: Session) -> None:
     )
 
 
-def process_douban_queue_item(db: Session, queue_item: Queue) -> None:
+def process_douban_queue_item(
+    db: Session, http_session: requests.Session, queue_item: Queue
+) -> None:
     """
     Process a queue item of type 'douban_id'
     """
@@ -98,7 +101,7 @@ def process_douban_queue_item(db: Session, queue_item: Queue) -> None:
             return
 
     # Fetch data from Douban and create Item object
-    item = fetch_douban_item(douban_id)
+    item = fetch_douban_item(http_session, douban_id)
 
     if not item:
         logger.warning(f"Failed to fetch data for douban_id={douban_id}")
@@ -119,7 +122,7 @@ def process_douban_queue_item(db: Session, queue_item: Queue) -> None:
     )
 
 
-def fetch_imdb_id(douban_id: int) -> dict:
+def fetch_imdb_id(http_session: requests.Session, douban_id: int) -> dict:
     """
     Fetch IMDb ID for a Douban movie using a simple web scraping method
     """
@@ -128,9 +131,11 @@ def fetch_imdb_id(douban_id: int) -> dict:
     url = DOUBAN_IMDB_URL.format(douban_id)
 
     logger.info(f"Fetching IMDb ID for douban_id={douban_id}...")
-    response = requests.get(
-        url, headers=COMMON_HEADERS, timeout=10, allow_redirects=True
+
+    response = get_response(
+        http_session, url, headers=COMMON_HEADERS, allow_redirects=True
     )
+
     imdb_id = None
     match = IMDB_ID_PATTERN.search(response.text)
     if match:
@@ -146,22 +151,15 @@ def fetch_imdb_id(douban_id: int) -> dict:
     }
 
 
-def fetch_douban_item_detail(douban_id: int) -> Item:
+def fetch_douban_item_detail(http_session: requests.Session, douban_id: int) -> Item:
     """
     Fetch movie data from Douban Mobile API and return an Item object
     """
     # Construct the API URL with douban_id
     url = DOUBAN_API_URL.format(douban_id)
 
-    # Set proper headers including the required Referer
-
     # Make request with redirects enabled
-    response = requests.get(
-        url, headers=COMMON_HEADERS, timeout=10, allow_redirects=True
-    )
-    response.raise_for_status()
-
-    data = response.json()
+    data = get_json(http_session, url, headers=COMMON_HEADERS, allow_redirects=True)
 
     # Extract relevant fields from the more detailed API response
     if not data or "id" not in data:
@@ -207,16 +205,16 @@ def fetch_douban_item_detail(douban_id: int) -> Item:
     }
 
 
-def fetch_douban_item(douban_id: int) -> Item:
+def fetch_douban_item(http_session: requests.Session, douban_id: int) -> Item:
     """
     Fetch movie data from Douban API and return an Item object
     """
     try:
-        detail_info = fetch_douban_item_detail(douban_id)
+        detail_info = fetch_douban_item_detail(http_session, douban_id)
         if not detail_info:
             logger.warning(f"Failed to fetch detail for douban_id={douban_id}")
             return None
-        imdb_info = fetch_imdb_id(douban_id)
+        imdb_info = fetch_imdb_id(http_session, douban_id)
         if not imdb_info:
             logger.warning(f"Failed to fetch IMDb ID for douban_id={douban_id}")
             return None

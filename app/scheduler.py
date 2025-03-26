@@ -1,6 +1,7 @@
 import logging
 import threading
 import time
+import requests
 from datetime import datetime, timedelta
 from sqlalchemy.orm import Session
 
@@ -8,6 +9,7 @@ from .database import SessionLocal
 from .worker import process_queue_items
 from .crawler import search_recent_douban_movies
 from .models import Schedule
+from .http import new_http_session
 
 logger = logging.getLogger(__name__)
 
@@ -69,15 +71,17 @@ def get_next_schedule_run(db: Session):
     )
 
 
-def execute_scheduled_task(db: Session, schedule_type: str):
+def execute_scheduled_task(
+    db: Session, http_session: requests.Session, schedule_type: str
+):
     """Execute a specific scheduled task based on its type"""
     try:
         if schedule_type == SCHEDULE_TYPE_GOOGLE_SEARCH:
-            search_recent_douban_movies(db)
+            search_recent_douban_movies(db, http_session)
             return True
 
         elif schedule_type == SCHEDULE_TYPE_PROCESS_QUEUE:
-            process_queue_items(db)
+            process_queue_items(db, http_session)
             return True
 
         else:
@@ -98,6 +102,7 @@ def unified_scheduler():
     while running:
         try:
             db = SessionLocal()
+            http_session = new_http_session()
 
             # Initialize schedules if needed
             initialize_schedules(db)
@@ -109,7 +114,7 @@ def unified_scheduler():
                 logger.info(f"Running scheduled task: {schedule.type}")
 
                 # Execute the appropriate task based on schedule type
-                success = execute_scheduled_task(db, schedule.type)
+                success = execute_scheduled_task(db, http_session, schedule.type)
 
                 # Update the next run time
                 if success:
