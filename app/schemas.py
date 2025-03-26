@@ -7,9 +7,10 @@ class ItemBase(BaseModel):
     douban_id: int
     imdb_id: Optional[str] = None
     douban_title: str
-    year: int
-    rating: float
-    raw_data: Optional[str] = None
+    year: Optional[int] = None
+    rating: Optional[float] = None
+    # Not exposed in API responses
+    # raw_data: Optional[str] = None
     update_time: datetime
 
 
@@ -35,9 +36,10 @@ class HistoryBase(BaseModel):
     douban_id: int
     imdb_id: Optional[str] = None
     douban_title: str
-    year: int
-    rating: float
-    raw_data: Optional[str] = None
+    year: Optional[int] = None
+    rating: Optional[float] = None
+    # Not exposed in API responses
+    # raw_data: Optional[str] = None
     update_time: datetime
 
 
