@@ -10,13 +10,6 @@ fi
 
 cd "$(dirname "${BASH_SOURCE[0]}")/.."
 
-# Check or update README.md
-if [[ "$check" == "true" ]]; then
-  python scripts/update_readme.py --check
-else
-  python scripts/update_readme.py
-fi
-
 black_args=()
 if [[ "$check" == "true" ]]; then
   black_args+=(--check --diff)
