@@ -10,6 +10,9 @@ class Settings(BaseSettings):
     # ZenRows settings
     ZENROWS_API_KEY: str = os.getenv("ZENROWS_API_KEY", "")
 
+    # Queue processing settings
+    QUEUE_BATCH_SIZE: int = int(os.getenv("QUEUE_BATCH_SIZE", "100"))
+
     class Config:
         env_file = ".env"
         env_file_encoding = "utf-8"

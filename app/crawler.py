@@ -35,7 +35,7 @@ def search_recent_douban_movies(db: Session):
         logger.error(
             "ZenRows API key is not configured. Set ZENROWS_API_KEY environment variable."
         )
-        return 0
+        return
 
     added_count = 0
     page = 0
@@ -140,4 +140,4 @@ def search_recent_douban_movies(db: Session):
             has_more_results = False
 
     logger.info(f"Added {added_count} new Douban IDs to the queue")
-    return added_count
+    return

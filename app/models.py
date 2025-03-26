@@ -48,6 +48,13 @@ class History(Base):
     update_time = Column(DateTime)
 
 
+class Schedule(Base):
+    __tablename__ = "schedule"
+
+    type = Column(String(32), primary_key=True)  # Type of scheduled task
+    next_run = Column(DateTime, nullable=False, index=True)  # When to run next
+
+
 def get_items(db, douban_id: int = None, imdb_id: str = None, douban_title: str = None):
     query = db.query(Item)
     filters = []

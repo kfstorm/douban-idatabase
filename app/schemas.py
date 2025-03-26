@@ -46,3 +46,13 @@ class HistoryBase(BaseModel):
 class History(HistoryBase):
     class Config:
         orm_mode = True
+
+
+class ScheduleBase(BaseModel):
+    type: str
+    next_run: datetime
+
+
+class Schedule(ScheduleBase):
+    class Config:
+        orm_mode = True

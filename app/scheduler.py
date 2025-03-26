@@ -1,125 +1,151 @@
 import logging
 import threading
 import time
-from datetime import datetime
+from datetime import datetime, timedelta
 from sqlalchemy.orm import Session
 
 from .database import SessionLocal
-from .worker import process_queue_item
+from .worker import process_queue_items
 from .crawler import search_recent_douban_movies
+from .models import Schedule
 
 logger = logging.getLogger(__name__)
 
-# Flags to control the scheduler threads
+# Flags to control the scheduler thread
 running = False
 scheduler_thread = None
-google_scheduler_thread = None
 
-# Configuration
-GOOGLE_SEARCH_INTERVAL_SECONDS = 3600  # Run Google search every hour
+# Schedule types
+SCHEDULE_TYPE_GOOGLE_SEARCH = "google_search"
+SCHEDULE_TYPE_PROCESS_QUEUE = "process_queue"
 
-
-def queue_processor():
-    """Background thread that processes queue items periodically"""
-    global running
-
-    logger.info("Queue processor started")
-
-    while running:
-        try:
-            db = SessionLocal()
-            process_items_in_queue(db)
-            db.close()
-        except Exception as e:
-            logger.exception(f"Error in queue processor: {e}")
-
-        # Sleep for 10 seconds before checking queue again
-        time.sleep(10)
-
-    logger.info("Queue processor stopped")
+# Schedule intervals (in seconds)
+SCHEDULE_INTERVALS = {
+    SCHEDULE_TYPE_GOOGLE_SEARCH: 3600,  # 1 hour
+    SCHEDULE_TYPE_PROCESS_QUEUE: 60,  # 1 minute
+}
 
 
-def process_items_in_queue(db: Session):
-    """Process a batch of items from the queue"""
-    try:
-        # Process up to 5 items per batch
-        for _ in range(5):
-            # Try to process one item
-            processed = process_queue_item(db)
-            if not processed:
-                # No more items in queue
-                break
-    except Exception as e:
-        logger.exception(f"Error processing queue: {e}")
+def initialize_schedules(db: Session):
+    """Initialize default schedules if they don't exist"""
+    now = datetime.utcnow()
+
+    # Initialize all schedule types
+    for schedule_type in SCHEDULE_INTERVALS.keys():
+        schedule = db.query(Schedule).filter(Schedule.type == schedule_type).first()
+        if not schedule:
+            logger.info(f"Creating default schedule for {schedule_type}")
+            schedule = Schedule(type=schedule_type, next_run=now)
+            db.add(schedule)
+
+    db.commit()
 
 
-def google_search_processor():
-    """Background thread that runs Google search periodically"""
-    global running
-
-    logger.info("Google search processor started")
-
-    while running:
-        try:
-            logger.info("Running scheduled Google search...")
-            db = SessionLocal()
-            added_count = search_recent_douban_movies(db)
-            logger.info(
-                f"Scheduled Google search completed, added {added_count} items to queue"
-            )
-            db.close()
-        except Exception as e:
-            logger.exception(f"Error in scheduled Google search: {e}")
-
-        # Wait for the configured interval before running the next search
+def update_schedule_next_run(db: Session, schedule_type: str):
+    """Update the next run time for a scheduled task"""
+    schedule = db.query(Schedule).filter(Schedule.type == schedule_type).first()
+    if schedule:
+        now = datetime.utcnow()
+        interval = SCHEDULE_INTERVALS.get(
+            schedule_type, 3600
+        )  # Default to 1 hour if not found
+        schedule.next_run = now + timedelta(seconds=interval)
+        db.commit()
         logger.info(
-            f"Next Google search scheduled in {GOOGLE_SEARCH_INTERVAL_SECONDS} seconds"
+            f"Updated schedule for {schedule_type}, next run at {schedule.next_run}"
         )
+    else:
+        logger.error(f"Schedule {schedule_type} not found")
 
-        # Sleep in smaller increments to check for shutdown request
-        remaining_time = GOOGLE_SEARCH_INTERVAL_SECONDS
-        while remaining_time > 0 and running:
-            sleep_time = min(remaining_time, 10)  # Sleep max 10 seconds at a time
-            time.sleep(sleep_time)
-            remaining_time -= sleep_time
+
+def get_next_schedule_run(db: Session):
+    """Get the next scheduled task to run"""
+    now = datetime.utcnow()
+    return (
+        db.query(Schedule)
+        .filter(Schedule.next_run <= now)
+        .order_by(Schedule.next_run)
+        .first()
+    )
+
+
+def execute_scheduled_task(db: Session, schedule_type: str):
+    """Execute a specific scheduled task based on its type"""
+    try:
+        if schedule_type == SCHEDULE_TYPE_GOOGLE_SEARCH:
+            search_recent_douban_movies(db)
+            return True
+
+        elif schedule_type == SCHEDULE_TYPE_PROCESS_QUEUE:
+            process_queue_items(db)
+            return True
+
+        else:
+            logger.warning(f"Unknown schedule type: {schedule_type}")
+            return False
+
+    except Exception as e:
+        logger.exception(f"Error executing scheduled task {schedule_type}: {e}")
+        return False
+
+
+def unified_scheduler():
+    """Background thread that handles scheduled tasks"""
+    global running
+
+    logger.info("Unified scheduler started")
+
+    while running:
+        try:
+            db = SessionLocal()
+
+            # Initialize schedules if needed
+            initialize_schedules(db)
+
+            # Check for scheduled tasks that need to run
+            schedule = get_next_schedule_run(db)
+
+            if schedule:
+                logger.info(f"Running scheduled task: {schedule.type}")
+
+                # Execute the appropriate task based on schedule type
+                success = execute_scheduled_task(db, schedule.type)
+
+                # Update the next run time
+                if success:
+                    update_schedule_next_run(db, schedule.type)
+
+            db.close()
+        except Exception as e:
+            logger.exception(f"Error in unified scheduler: {e}")
+
+        # Sleep for a short time before checking again
+        # Using a short sleep time to be responsive to any tasks
+        time.sleep(1)
+
+    logger.info("Unified scheduler stopped")
 
 
 def start_scheduler():
-    """Start the background scheduler threads"""
-    global running, scheduler_thread, google_scheduler_thread
+    """Start the background scheduler thread"""
+    global running, scheduler_thread
 
-    # Start queue processor
+    # Start unified scheduler
     if scheduler_thread and scheduler_thread.is_alive():
-        logger.warning("Queue processor is already running")
+        logger.warning("Scheduler is already running")
     else:
         running = True
-        scheduler_thread = threading.Thread(target=queue_processor, daemon=True)
+        scheduler_thread = threading.Thread(target=unified_scheduler, daemon=True)
         scheduler_thread.start()
-        logger.info("Queue processor started")
-
-    # Start Google search scheduler
-    if google_scheduler_thread and google_scheduler_thread.is_alive():
-        logger.warning("Google search scheduler is already running")
-    else:
-        running = True
-        google_scheduler_thread = threading.Thread(
-            target=google_search_processor, daemon=True
-        )
-        google_scheduler_thread.start()
-        logger.info(
-            f"Google search scheduler started (interval: {GOOGLE_SEARCH_INTERVAL_SECONDS} seconds)"
-        )
 
 
 def stop_scheduler():
-    """Stop the background scheduler threads"""
+    """Stop the background scheduler thread"""
     global running
 
-    if not (scheduler_thread and scheduler_thread.is_alive()) and not (
-        google_scheduler_thread and google_scheduler_thread.is_alive()
-    ):
-        logger.warning("Schedulers are not running")
+    if not (scheduler_thread and scheduler_thread.is_alive()):
+        logger.warning("Scheduler is not running")
         return
 
     running = False
-    logger.info("Schedulers stopping (may take up to 10 seconds to complete)")
+    logger.info("Scheduler stopping (may take up to 10 seconds to complete)")

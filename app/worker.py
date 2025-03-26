@@ -7,6 +7,7 @@ import json
 from datetime import datetime
 from sqlalchemy.orm import Session
 from .models import Queue, Item, History
+from .config import settings
 
 logger = logging.getLogger(__name__)
 
@@ -21,65 +22,101 @@ COMMON_HEADERS = {
 }
 
 
-def process_queue_item(db: Session) -> bool:
+def process_queue_items(db: Session) -> None:
     """
-    Process one item from the queue.
-    Returns True if an item was processed, False if queue was empty.
+    Process multiple items from the queue, up to max_items.
+    Supports different types of queue items.
     """
-    # Get oldest douban_id from queue
-    queue_item = (
-        db.query(Queue)
-        .filter(Queue.type == "douban_id")
-        .order_by(Queue.upsert_time)
-        .first()
+    max_items = settings.QUEUE_BATCH_SIZE
+    processed_count = 0
+
+    # Log total queue size before processing
+    queue_size_before = db.query(Queue).count()
+    logger.info(
+        f"Starting queue processing with {queue_size_before} total items in queue"
     )
 
-    if not queue_item:
-        # Queue is empty
-        return False
+    for _ in range(max_items):
+        # Get oldest item from queue (any type)
+        queue_item = db.query(Queue).order_by(Queue.upsert_time).first()
 
-    try:
-        # Process this queue item
-        douban_id = queue_item.id
-        logger.info(f"Processing queue item: douban_id={douban_id}")
+        if not queue_item:
+            # Queue is empty
+            logger.info("Queue is empty, stopping processing")
+            break
 
-        # Check if item already exists and was updated within 1 day
-        existing_item = db.query(Item).filter(Item.douban_id == douban_id).first()
-        if existing_item and existing_item.update_time:
-            time_diff = datetime.utcnow() - existing_item.update_time
-            if time_diff.days < 1:
-                logger.info(f"Skipping douban_id={douban_id}, updated within 1 day")
-                # Remove from queue since it's too recent to update
+        try:
+            # Process this queue item based on its type
+            item_id = queue_item.id
+            item_type = queue_item.type
+            logger.info(f"Processing queue item: type={item_type}, id={item_id}")
+
+            # Dispatch to appropriate handler based on queue item type
+            if item_type == "douban_id":
+                process_douban_queue_item(db, queue_item)
+            else:
+                logger.warning(f"Unsupported queue item type: {item_type}")
+                # Remove unsupported item from queue
                 db.delete(queue_item)
                 db.commit()
-                return True
 
-        # Fetch data from Douban and create Item object
-        item = fetch_douban_item(douban_id)
+            processed_count += 1
 
-        if not item:
-            logger.warning(f"Failed to fetch data for douban_id={douban_id}")
-            # Remove from queue even if failed (to avoid endless retries)
+        except Exception as e:
+            logger.exception(
+                f"Error processing queue item {queue_item.id} of type {queue_item.type}: {e}"
+            )
+            db.rollback()
+            processed_count += 1  # Count as processed even if there's an error
+            # Continue with next item
+
+    if processed_count > 0:
+        logger.info(f"Processed {processed_count} items from queue")
+
+    # Log remaining queue size after processing
+    queue_size_after = db.query(Queue).count()
+    logger.info(
+        f"Queue processing completed. {queue_size_after} items remaining in queue"
+    )
+
+
+def process_douban_queue_item(db: Session, queue_item: Queue) -> None:
+    """
+    Process a queue item of type 'douban_id'
+    """
+    douban_id = queue_item.id
+
+    # Check if item already exists and was updated within 1 day
+    existing_item = db.query(Item).filter(Item.douban_id == douban_id).first()
+    if existing_item and existing_item.update_time:
+        time_diff = datetime.utcnow() - existing_item.update_time
+        if time_diff.days < 1:
+            logger.info(f"Skipping douban_id={douban_id}, updated within 1 day")
+            # Remove from queue since it's too recent to update
             db.delete(queue_item)
             db.commit()
-            return True
+            return
 
-        # Save the item to database
-        save_item_to_db(db, item)
+    # Fetch data from Douban and create Item object
+    item = fetch_douban_item(douban_id)
 
-        # Remove from queue
+    if not item:
+        logger.warning(f"Failed to fetch data for douban_id={douban_id}")
+        # Remove from queue even if failed (to avoid endless retries)
         db.delete(queue_item)
         db.commit()
+        return
 
-        logger.info(
-            f"Successfully processed douban_id={douban_id}, title={item.douban_title}"
-        )
-        return True
+    # Save the item to database
+    save_item_to_db(db, item)
 
-    except Exception as e:
-        logger.exception(f"Error processing queue item {queue_item.id}: {e}")
-        db.rollback()
-        return True  # Return True so the scheduler continues with next item
+    # Remove from queue
+    db.delete(queue_item)
+    db.commit()
+
+    logger.info(
+        f"Successfully processed douban_id={douban_id}, title={item.douban_title}"
+    )
 
 
 def fetch_imdb_id(douban_id: int) -> dict:
