@@ -1,3 +1,4 @@
+from datetime import datetime
 import logging
 import random
 import time
@@ -30,10 +31,11 @@ def read_pages(read_one_page, get_total, get_items, items_per_page) -> Iterator[
 
 
 class BaseApi:
-    def __init__(self, http_session: requests.Session, sub_path: str):
+    def __init__(self, http_session: requests.Session, sub_path: str, items_key: str):
         self.http_session = http_session
         self.base_url = f"https://m.douban.com/rexxar/api/v2/{sub_path}"
         self.headers = {"Referer": f"https://m.douban.com/{sub_path}"}
+        self.items_key = items_key
 
     def get_info(self, id: str) -> Any:
         return get_json(
@@ -67,12 +69,12 @@ class BaseApi:
 
 class CollectionApi(BaseApi):
     def __init__(self, http_session: requests.Session):
-        super().__init__(http_session, "subject_collection")
+        super().__init__(http_session, "subject_collection", "subject_collection_items")
 
 
 class DoulistApi(BaseApi):
     def __init__(self, http_session: requests.Session):
-        super().__init__(http_session, "doulist")
+        super().__init__(http_session, "doulist", "items")
 
 
 # Reference:
@@ -106,36 +108,11 @@ class ListsApi:
 
 
 def bootstrap_lists(db: Session, http_session: requests.Session):
-    collection_api = CollectionApi(http_session)
-    doulist_api = DoulistApi(http_session)
-    list_apis = {
-        "collection": collection_api,
-        "doulist": doulist_api,
-    }
+    logger.info("Adding lists to queue...")
 
-    logger.info("Fetching lists...")
-    lists = get_lists_to_bootstrap(http_session)
-    logger.info(f"Got {len(lists)} lists.")
-    for type, id in lists:
-        try:
-            logger.info(f"Processing list {type} {id} ...")
-            list_api = list_apis[type]
-            items = list_api.get_items(id)
-            for item in items:
-                parsed_url = urlparse(item["url"])
-                douban_id = [_ for _ in parsed_url.path.split("/") if _][-1]
-                db.add(Queue(type="douban_id", id=douban_id))
-            db.commit()
-        except Exception:
-            logger.exception(f"Failed to process list {type} {id}.")
-
-        time.sleep(random.uniform(0, settings.DOUBAN_API_REQUEST_DELAY_MAX_SECONDS))
-    logger.info("Processed all lists.")
-
-
-def get_lists_to_bootstrap(http_session: requests.Session) -> List[Tuple[str, str]]:
+    count = 0
+    last_print = datetime.now()
     lists_api = ListsApi(http_session)
-    lists = set()
     for item in lists_api.iter_lists():
         parsed_url = urlparse(item["sharing_url"])
         url_parts = [_ for _ in parsed_url.path.split("/") if _][-2:]
@@ -148,10 +125,15 @@ def get_lists_to_bootstrap(http_session: requests.Session) -> List[Tuple[str, st
                 url_parts = [_ for _ in uri.split("/") if _][-2:]
                 list_type = url_parts[0]
             list_id = url_parts[1]
-        if list_type == "subject_collection":
-            lists.add(("collection", list_id))
-        elif list_type == "doulist":
-            lists.add(("doulist", list_id))
+        if list_type == "subject_collection" or list_type == "doulist":
+            # Check if list is already in queue
+            existing = db.query(Queue).get((list_type, list_id))
+            if not existing:
+                db.add(Queue(type=list_type, id=list_id))
+                db.commit()
         else:
             logger.warning(f"Unknown list type: {list_type}")
-    return lists
+        count += 1
+        if (datetime.now() - last_print).total_seconds() >= 60:
+            logger.info(f"Processed {count} lists.")
+            last_print = datetime.now()

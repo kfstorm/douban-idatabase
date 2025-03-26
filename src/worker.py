@@ -2,10 +2,13 @@ import logging
 import random
 import re
 import time
+from urllib.parse import urlparse
 import requests
 import json
 from datetime import datetime
 from sqlalchemy.orm import Session
+
+from .lists import CollectionApi, DoulistApi
 from .models import Queue, Item, History
 from .config import settings
 from .http import get_response, get_json
@@ -54,7 +57,9 @@ def process_queue_items(db: Session, http_session: requests.Session) -> None:
 
             # Dispatch to appropriate handler based on queue item type
             if item_type == "douban_id":
-                process_douban_queue_item(db, http_session, queue_item)
+                process_douban_id(db, http_session, queue_item)
+            elif item_type == "subject_collection" or item_type == "doulist":
+                process_list(db, http_session, queue_item)
             else:
                 logger.warning(f"Unsupported queue item type: {item_type}")
                 # Remove unsupported item from queue
@@ -81,7 +86,7 @@ def process_queue_items(db: Session, http_session: requests.Session) -> None:
     )
 
 
-def process_douban_queue_item(
+def process_douban_id(
     db: Session, http_session: requests.Session, queue_item: Queue
 ) -> None:
     """
@@ -120,6 +125,39 @@ def process_douban_queue_item(
     logger.info(
         f"Successfully processed douban_id={douban_id}, title={item.douban_title}"
     )
+
+
+def process_list(
+    db: Session, http_session: requests.Session, queue_item: Queue
+) -> None:
+    """
+    Process a queue item of type 'subject_collection' or 'doulist'
+    """
+
+    list_type = queue_item.type
+    list_id = queue_item.id
+    logger.info(f"Processing list {list_type} {list_id} ...")
+    collection_api = CollectionApi(http_session)
+    doulist_api = DoulistApi(http_session)
+    list_apis = {
+        "subject_collection": collection_api,
+        "doulist": doulist_api,
+    }
+    list_api = list_apis[list_type]
+    items = list_api.get_items(list_id)
+    known_ids = set()
+    for item in items:
+        parsed_url = urlparse(item["url"])
+        douban_id = int([_ for _ in parsed_url.path.split("/") if _][-1])
+        # Check if already in queue
+        if douban_id in known_ids:
+            continue
+        known_ids.add(douban_id)
+        existing = db.query(Queue).get(("douban_id", douban_id))
+        if not existing:
+            db.add(Queue(type="douban_id", id=douban_id))
+    db.delete(queue_item)
+    db.commit()
 
 
 def fetch_imdb_id(http_session: requests.Session, douban_id: int) -> dict:
