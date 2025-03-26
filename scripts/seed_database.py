@@ -1,6 +1,7 @@
 import sys
 import os
 import datetime
+import logging
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
@@ -9,6 +10,10 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")
 
 from app.models import Item
 from app.database import Base, engine
+from app.logging_config import setup_logging
+
+# Setup logging
+logger = setup_logging()
 
 
 def seed_database():
@@ -22,7 +27,7 @@ def seed_database():
     # Check if we already have items
     existing_count = session.query(Item).count()
     if existing_count > 0:
-        print(f"Database already contains {existing_count} items. Skipping seed.")
+        logger.info(f"Database already contains {existing_count} items. Skipping seed.")
         return
 
     # Sample movie data with Chinese titles
@@ -156,7 +161,7 @@ def seed_database():
 
     # Commit the changes
     session.commit()
-    print(f"Added {len(movies)} sample movies to the database.")
+    logger.info(f"Added {len(movies)} sample movies to the database.")
     session.close()
 
 
