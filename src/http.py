@@ -58,7 +58,7 @@ def _get_extra_http_client_args():
 last_throttler_info_print = datetime.now()
 
 
-def get_response(http_session, url, **kwargs):
+def get_response(http_session: requests.Session, url: str, **kwargs):
     global last_throttler_info_print
     now = datetime.now()
     if (now - last_throttler_info_print).total_seconds() > 60:

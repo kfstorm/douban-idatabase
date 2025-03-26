@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 from .database import SessionLocal
 from .worker import process_queue_items
 from .crawler import search_recent_douban_movies
+from .lists import bootstrap_lists
 from .models import Schedule
 from .http import new_http_session
 
@@ -20,11 +21,13 @@ scheduler_thread = None
 # Schedule types
 SCHEDULE_TYPE_GOOGLE_SEARCH = "google_search"
 SCHEDULE_TYPE_PROCESS_QUEUE = "process_queue"
+SCHEDULE_TYPE_BOOTSTRAP_LISTS = "bootstrap_lists"
 
 # Schedule intervals (in seconds)
 SCHEDULE_INTERVALS = {
     SCHEDULE_TYPE_GOOGLE_SEARCH: 3600,  # 1 hour
     SCHEDULE_TYPE_PROCESS_QUEUE: 60,  # 1 minute
+    SCHEDULE_TYPE_BOOTSTRAP_LISTS: 86400,  # 1 day
 }
 
 
@@ -82,6 +85,10 @@ def execute_scheduled_task(
 
         elif schedule_type == SCHEDULE_TYPE_PROCESS_QUEUE:
             process_queue_items(db, http_session)
+            return True
+
+        elif schedule_type == SCHEDULE_TYPE_BOOTSTRAP_LISTS:
+            bootstrap_lists(db, http_session)
             return True
 
         else:

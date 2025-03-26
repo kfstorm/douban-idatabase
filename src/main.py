@@ -1,116 +1,48 @@
-import asyncio
-import logging
-import time
-import traceback
-from typing import Any, List
-from fastapi import FastAPI, HTTPException
-import fastapi
-from .bootstrap import bootstrap
-from .sync import sync
+from fastapi import FastAPI, HTTPException, Query, Depends, BackgroundTasks
+from sqlalchemy.orm import Session
+from typing import List
+from . import models, schemas
+from .database import get_db, init_db
+from .logging_config import setup_logging
+from .scheduler import start_scheduler, stop_scheduler
 
-from .lists import BaseApi, CollectionApi, DoulistApi
-from .imdb import get_imdb_api
-from .throttler import throttler
-from .utils import get_douban_id
-from .config import app_config
-
-
-logging.basicConfig(
-    format="%(asctime)s - %(levelname)s - %(message)s", level=logging.INFO
-)
+# Initialize logging
+logger = setup_logging()
 
 app = FastAPI()
-collection_api = CollectionApi()
-doulist_api = DoulistApi()
-imdb_api = get_imdb_api()
-
-asyncio.create_task(bootstrap(collection_api, doulist_api, imdb_api))
-asyncio.create_task(sync(imdb_api))
 
 
-@app.exception_handler(500)
-async def internal_exception_handler(request: fastapi.Request, exc: Exception):
-    content = "".join(traceback.format_exception(exc))
-    return fastapi.responses.PlainTextResponse(status_code=500, content=content)
+@app.on_event("startup")
+def on_startup():
+    logger.info("Starting up the application...")
+    init_db()
+    logger.info("Database initialized successfully")
+    # Start the scheduler
+    start_scheduler()
 
 
-@app.get("/")
-@app.get("/stats")
-async def stats() -> Any:
-    return {
-        "cache_size": {
-            "collection": len(collection_api.get_cache()),
-            "doulist": len(doulist_api.get_cache()),
-            "imdb": len(imdb_api.get_cache()),
-        },
-        "throttler_info": throttler.get_info(),
-    }
+@app.on_event("shutdown")
+def on_shutdown():
+    logger.info("Shutting down the application...")
+    # Stop the scheduler
+    stop_scheduler()
 
 
-@app.post("/sync")
-async def sync(apikey: str, items: List[Any]) -> Any:
-    if not apikey or not app_config.apikey or apikey != app_config.apikey:
-        raise HTTPException(status_code=403, detail="Invalid API key.")
-    cache = imdb_api.get_cache()
-    now = time.time()
-    count = 0
-    new_count = 0
-    for item in items:
-        key = item["key"]
-        value = item["value"]
-        expire_time = item["expire_time"]
-        if expire_time and expire_time <= now:
-            continue
-        old_value, old_expire_time = cache.get(
-            key, default="not_found", expire_time=True
+@app.get("/api/item", response_model=List[schemas.Item])
+def get_items(
+    douban_id: int = Query(None),
+    imdb_id: str = Query(None),
+    douban_title: str = Query(None),
+    db: Session = Depends(get_db),
+):
+    if not any([douban_id, imdb_id, douban_title]):
+        raise HTTPException(
+            status_code=400,
+            detail="At least one of douban_id, imdb_id, or douban_title must be provided",
         )
-        if (
-            old_value == "not_found"
-            or not expire_time
-            or (old_expire_time and expire_time > old_expire_time)
-        ):
-            expire = expire_time - now if expire_time else None
-            cache.set(key, value, expire=expire)
-            count += 1
-            if old_value == "not_found":
-                new_count += 1
-    logging.info(f"Synced {count} IMDb items from remote. New items: {new_count}.")
 
+    items = models.get_items(db, douban_id, imdb_id, douban_title)
+    if not items:
+        raise HTTPException(status_code=404, detail="No items found")
 
-async def list(list_api: BaseApi, id: str, min_rating: float) -> List[Any]:
-    items = await list_api.get_items(id)
-    # Keep only movies
-    items = [item for item in items if item["type"] == "movie"]
-    # Keep only items with a minimum score
-    if min_rating:
-        items = [
-            item
-            for item in items
-            if "rating" in item
-            and "value" in item["rating"]
-            and item["rating"]["value"] >= min_rating
-        ]
-    items = [await convert_item(item) for item in items]
-    # Keep only items with IMDb ID
-    items = [item for item in items if item["imdb_id"]]
     return items
-
-
-@app.get("/collection/{id}")
-async def collection(id: str, min_rating: float = None) -> List[Any]:
-    return await list(collection_api, id, min_rating)
-
-
-@app.get("/doulist/{id}")
-async def doulist(id: str, min_rating: float = None) -> List[Any]:
-    return await list(doulist_api, id, min_rating)
-
-
-async def convert_item(item: Any) -> Any:
-    douban_id = get_douban_id(item)
-    imdb_id = await imdb_api.get_imdb_id(douban_id, item)
-    return {
-        "douban_id": douban_id,
-        "title": item["title"],
-        "imdb_id": imdb_id,
-    }
