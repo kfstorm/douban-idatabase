@@ -1,0 +1,23 @@
+{
+  "manifest_version": 3,
+  "name": "Douban Ratings for Radarr",
+  "version": "1.0",
+  "description": "Displays Douban ratings for movies in Radarr",
+  "permissions": ["storage", "activeTab"],
+  "host_permissions": ["<all_urls>"],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "action": {
+    "default_popup": "popup.html",
+    "default_icon": "images/icon.png"
+  },
+  "content_scripts": [
+    {
+      "matches": ["https://home.kfstorm.com/radarr/*", "*://*.radarr.video/*", "*://localhost:*/*"],
+      "js": ["content.js"],
+      "css": ["styles.css"]
+    }
+  ],
+  "options_page": "options.html"
+}
