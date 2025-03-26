@@ -7,6 +7,9 @@ load_dotenv()
 
 
 class Settings(BaseSettings):
+    SQLALCHEMY_DATABASE_URL: str = os.getenv(
+        "SQLALCHEMY_DATABASE_URL", "sqlite:///db.sqlite3"
+    )
     # ZenRows settings
     ZENROWS_API_KEY: str = os.getenv("ZENROWS_API_KEY", "")
 
