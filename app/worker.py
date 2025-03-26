@@ -1,4 +1,7 @@
 import logging
+import random
+import re
+import time
 import requests
 import json
 from datetime import datetime
@@ -9,6 +12,13 @@ logger = logging.getLogger(__name__)
 
 # Updated Douban API URL for fetching movie details (mobile API)
 DOUBAN_API_URL = "https://m.douban.com/rexxar/api/v2/movie/{}"
+DOUBAN_IMDB_URL = "https://movie.douban.com/subject/{}/"
+IMDB_ID_PATTERN = re.compile(r"IMDb:.*?(\btt\d+\b)")
+
+COMMON_HEADERS = {
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.3",
+    "Referer": "https://m.douban.com/movie",
+}
 
 
 def process_queue_item(db: Session) -> bool:
@@ -61,81 +71,127 @@ def process_queue_item(db: Session) -> bool:
         return True  # Return True so the scheduler continues with next item
 
 
-def fetch_douban_item(douban_id: int) -> Item:
+def fetch_imdb_id(douban_id: int) -> dict:
+    """
+    Fetch IMDb ID for a Douban movie using a simple web scraping method
+    """
+    time.sleep(random.uniform(0.0, 1.0))
+
+    url = DOUBAN_IMDB_URL.format(douban_id)
+
+    logger.info(f"Fetching IMDb ID for douban_id={douban_id}...")
+    response = requests.get(
+        url, headers=COMMON_HEADERS, timeout=10, allow_redirects=True
+    )
+    imdb_id = None
+    match = IMDB_ID_PATTERN.search(response.text)
+    if match:
+        imdb_id = match.group(1)
+    logger.info(f"IMDb ID for douban_id={douban_id} is {imdb_id}.")
+
+    return {
+        "imdb_id": imdb_id,
+        "raw_data": {
+            "imdb_id": imdb_id,
+            "imdb_source": url,
+        },
+    }
+
+
+def fetch_douban_item_detail(douban_id: int) -> Item:
     """
     Fetch movie data from Douban Mobile API and return an Item object
     """
-    try:
-        # Construct the API URL with douban_id
-        url = DOUBAN_API_URL.format(douban_id)
+    # Construct the API URL with douban_id
+    url = DOUBAN_API_URL.format(douban_id)
 
-        # Set proper headers including the required Referer
-        headers = {
-            "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 14_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148",
-            "Referer": "https://m.douban.com/movie",
-            "Accept": "application/json",
-            "Accept-Language": "zh-CN,zh;q=0.9,en;q=0.8",
-        }
+    # Set proper headers including the required Referer
 
-        # Make request with redirects enabled
-        response = requests.get(url, headers=headers, timeout=10, allow_redirects=True)
-        response.raise_for_status()
+    # Make request with redirects enabled
+    response = requests.get(
+        url, headers=COMMON_HEADERS, timeout=10, allow_redirects=True
+    )
+    response.raise_for_status()
 
-        data = response.json()
+    data = response.json()
 
-        # Extract relevant fields from the more detailed API response
-        if not data or "id" not in data:
-            logger.error(
-                f"Invalid response from Douban API for douban_id={douban_id}: {data}"
-            )
-            return None
+    # Extract relevant fields from the more detailed API response
+    if not data or "id" not in data:
+        logger.error(
+            f"Invalid response from Douban API for douban_id={douban_id}: {data}"
+        )
+        return None
 
-        # Check if the ID matches the requested douban_id
-        if str(data["id"]) != str(douban_id):
-            logger.error(
-                f"ID mismatch in response from Douban API for douban_id={douban_id}: {data}"
-            )
-            return None
+    # Check if the ID matches the requested douban_id
+    if str(data["id"]) != str(douban_id):
+        logger.error(
+            f"ID mismatch in response from Douban API for douban_id={douban_id}: {data}"
+        )
+        return None
 
-        title = data.get("title")
+    title = data.get("title")
 
-        # Try to extract year
-        year = None
-        if data.get("year"):
-            try:
-                year = int(data.get("year"))
-            except (ValueError, TypeError):
-                pass
+    # Try to extract year
+    year = None
+    if data.get("year"):
+        try:
+            year = int(data.get("year"))
+        except (ValueError, TypeError):
+            pass
 
-        # Get rating
-        rating = None
-        if data.get("rating") and data["rating"].get("value"):
-            try:
-                rating = float(data["rating"]["value"])
-            except (ValueError, TypeError):
-                pass
+    # Get rating
+    rating = None
+    if data.get("rating") and data["rating"].get("value"):
+        try:
+            rating = float(data["rating"]["value"])
+        except (ValueError, TypeError):
+            pass
 
-        imdb_id = None  # We'll extract this in future
-
-        raw_data_obj = {
+    logger.info(f"Successfully fetched detail for douban_id={douban_id}: {title}")
+    return {
+        "douban_title": title,
+        "year": year,
+        "rating": rating,
+        "raw_data": {
             "detail": data,
             "detail_source": url,
-            "imdb_id": imdb_id,
-            "imdb_source": None,
+        },
+    }
+
+
+def fetch_douban_item(douban_id: int) -> Item:
+    """
+    Fetch movie data from Douban API and return an Item object
+    """
+    try:
+        detail_info = fetch_douban_item_detail(douban_id)
+        if not detail_info:
+            logger.warning(f"Failed to fetch detail for douban_id={douban_id}")
+            return None
+        imdb_info = fetch_imdb_id(douban_id)
+        if not imdb_info:
+            logger.warning(f"Failed to fetch IMDb ID for douban_id={douban_id}")
+            return None
+
+        raw_data_obj = {
+            **detail_info["raw_data"],
+            **imdb_info["raw_data"],
         }
 
         # Create an Item object
         item = Item(
             douban_id=int(douban_id),
-            imdb_id=imdb_id,
-            douban_title=title,
-            year=year,
-            rating=rating,
+            imdb_id=imdb_info["imdb_id"],
+            douban_title=detail_info["douban_title"],
+            year=detail_info["year"],
+            rating=detail_info["rating"],
             raw_data=json.dumps(raw_data_obj, ensure_ascii=False),
             update_time=datetime.utcnow(),
         )
 
-        logger.info(f"Successfully fetched data for douban_id={douban_id}: {title}")
+        logger.info(
+            f"Successfully fetched data for douban_id={douban_id}: {item.douban_title}"
+        )
         return item
 
     except Exception as e:
