@@ -6,6 +6,7 @@ from sqlalchemy import (
     DateTime,
     UniqueConstraint,
     ForeignKey,
+    Text,
 )
 from sqlalchemy.orm import relationship
 from datetime import datetime
@@ -21,6 +22,7 @@ class Item(Base):
     douban_title = Column(String(128), index=True)
     year = Column(Integer)
     rating = Column(Float)
+    raw_data = Column(Text, nullable=True)
     update_time = Column(DateTime, default=datetime.utcnow)
 
 
@@ -42,6 +44,7 @@ class History(Base):
     douban_title = Column(String(128))
     year = Column(Integer)
     rating = Column(Float)
+    raw_data = Column(Text, nullable=True)
     update_time = Column(DateTime)
 
 

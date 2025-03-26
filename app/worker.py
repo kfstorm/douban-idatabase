@@ -115,13 +115,23 @@ def fetch_douban_item(douban_id: int) -> Item:
             except (ValueError, TypeError):
                 pass
 
+        imdb_id = None  # We'll extract this in future
+
+        raw_data_obj = {
+            "detail": data,
+            "detail_source": url,
+            "imdb_id": imdb_id,
+            "imdb_source": None,
+        }
+
         # Create an Item object
         item = Item(
             douban_id=int(douban_id),
-            imdb_id=None,  # We'll extract this in future
+            imdb_id=imdb_id,
             douban_title=title,
             year=year,
             rating=rating,
+            raw_data=json.dumps(raw_data_obj, ensure_ascii=False),
             update_time=datetime.utcnow(),
         )
 
@@ -149,6 +159,7 @@ def save_item_to_db(db: Session, item: Item):
         year=item.year,
         rating=item.rating,
         update_time=item.update_time,
+        raw_data=item.raw_data,
     )
     db.add(history)
 
@@ -162,6 +173,7 @@ def save_item_to_db(db: Session, item: Item):
         existing_item.rating = item.rating
         existing_item.update_time = item.update_time
         existing_item.imdb_id = item.imdb_id
+        existing_item.raw_data = item.raw_data
 
         logger.info(
             f"Updated item: douban_id={item.douban_id}, title={item.douban_title}"

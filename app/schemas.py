@@ -9,6 +9,7 @@ class ItemBase(BaseModel):
     douban_title: str
     year: int
     rating: float
+    raw_data: Optional[str] = None
     update_time: datetime
 
 
@@ -36,6 +37,7 @@ class HistoryBase(BaseModel):
     douban_title: str
     year: int
     rating: float
+    raw_data: Optional[str] = None
     update_time: datetime
 
 
