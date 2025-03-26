@@ -1,5 +1,6 @@
 from fastapi import FastAPI, HTTPException, Query, Depends
 from sqlalchemy.orm import Session
+from typing import List
 from . import models, schemas
 from .database import get_db, init_db
 
@@ -11,20 +12,21 @@ def on_startup():
     init_db()
 
 
-@app.get("/api/item", response_model=schemas.Item)
-def get_item(
+@app.get("/api/item", response_model=List[schemas.Item])
+def get_items(
     douban_id: int = Query(None),
     imdb_id: str = Query(None),
+    douban_title: str = Query(None),
     db: Session = Depends(get_db),
 ):
-    if not douban_id and not imdb_id:
+    if not any([douban_id, imdb_id, douban_title]):
         raise HTTPException(
             status_code=400,
-            detail="At least one of douban_id or imdb_id must be provided",
+            detail="At least one of douban_id, imdb_id, or douban_title must be provided",
         )
 
-    item = models.get_item_detail(db, douban_id, imdb_id)
-    if not item:
-        raise HTTPException(status_code=404, detail="Item not found")
+    items = models.get_items(db, douban_id, imdb_id, douban_title)
+    if not items:
+        raise HTTPException(status_code=404, detail="No items found")
 
-    return item
+    return items

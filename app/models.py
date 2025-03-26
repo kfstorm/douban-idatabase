@@ -10,6 +10,7 @@ from sqlalchemy import (
 from sqlalchemy.orm import relationship
 from datetime import datetime
 from .database import Base
+from sqlalchemy import and_
 
 
 class Item(Base):
@@ -17,7 +18,7 @@ class Item(Base):
 
     douban_id = Column(Integer, primary_key=True, index=True)
     imdb_id = Column(String(16), index=True)
-    title = Column(String(128), index=True)
+    douban_title = Column(String(128), index=True)
     year = Column(Integer)
     rating = Column(Float)
     update_time = Column(DateTime, default=datetime.utcnow)
@@ -38,17 +39,26 @@ class History(Base):
     change_id = Column(Integer, primary_key=True, autoincrement=True)
     douban_id = Column(Integer, nullable=False)
     imdb_id = Column(String(16))
-    title = Column(String(128))
+    douban_title = Column(String(128))
     year = Column(Integer)
     rating = Column(Float)
     update_time = Column(DateTime)
 
 
-def get_item_detail(db, douban_id: int = None, imdb_id: str = None):
+def get_items(db, douban_id: int = None, imdb_id: str = None, douban_title: str = None):
     query = db.query(Item)
-    if douban_id:
-        query = query.filter(Item.douban_id == douban_id)
-    elif imdb_id:
-        query = query.filter(Item.imdb_id == imdb_id)
+    filters = []
 
-    return query.first()
+    if douban_id:
+        filters.append(Item.douban_id == douban_id)
+    if imdb_id:
+        filters.append(Item.imdb_id == imdb_id)
+    if douban_title:
+        # Use exact match for douban_title
+        filters.append(Item.douban_title == douban_title)
+
+    if filters:
+        # Apply filters with AND logic between them
+        query = query.filter(and_(*filters))
+
+    return query.limit(5).all()

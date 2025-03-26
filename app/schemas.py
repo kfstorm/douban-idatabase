@@ -6,7 +6,7 @@ from typing import Optional
 class ItemBase(BaseModel):
     douban_id: int
     imdb_id: Optional[str] = None
-    title: str
+    douban_title: str
     year: int
     rating: float
     update_time: datetime
@@ -33,7 +33,7 @@ class HistoryBase(BaseModel):
     change_id: int
     douban_id: int
     imdb_id: Optional[str] = None
-    title: str
+    douban_title: str
     year: int
     rating: float
     update_time: datetime
