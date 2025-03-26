@@ -90,14 +90,21 @@ def process_douban_id(
     """
     Process a queue item of type 'douban_id'
     """
-    douban_id = queue_item.id
+    douban_id = int(queue_item.id)
 
     # Check if item already exists and was updated within 1 day
     existing_item = db.query(Item).filter(Item.douban_id == douban_id).first()
     if existing_item and existing_item.update_time:
         time_diff = datetime.utcnow() - existing_item.update_time
-        if time_diff.days < 30:
-            logger.info(f"Skipping douban_id={douban_id}, updated within 30 days")
+        min_update_interval_days = settings.ITEM_REFRESH_INTERVAL_DAYS_DEFAULT * (
+            (douban_id % 100) / 100 + 0.5
+        )
+        if time_diff.days < min_update_interval_days:
+            logger.info(
+                f"Skipping douban_id={douban_id},"
+                f" already updated recently ({time_diff.days} days ago)."
+                f" Min interval: {min_update_interval_days} days."
+            )
             # Remove from queue since it's too recent to update
             db.delete(queue_item)
             db.commit()

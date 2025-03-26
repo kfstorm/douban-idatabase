@@ -26,7 +26,7 @@ SCHEDULE_TYPE_BOOTSTRAP_LISTS = "bootstrap_lists"
 # Schedule intervals (in seconds)
 SCHEDULE_INTERVALS = {
     SCHEDULE_TYPE_GOOGLE_SEARCH: 3600,  # 1 hour
-    SCHEDULE_TYPE_PROCESS_QUEUE: 60,  # 1 minute
+    SCHEDULE_TYPE_PROCESS_QUEUE: 1,  # 1 second
     SCHEDULE_TYPE_BOOTSTRAP_LISTS: 86400,  # 1 day
 }
 
@@ -118,7 +118,10 @@ def unified_scheduler():
             schedule = get_next_schedule_run(db)
 
             if schedule:
-                logger.info(f"Running scheduled task: {schedule.type}")
+                interval = SCHEDULE_INTERVALS[schedule.type]
+                if not interval or interval >= 3600:
+                    # Only print logs for schedules with long intervals
+                    logger.info(f"Running scheduled task: {schedule.type}")
 
                 # Execute the appropriate task based on schedule type
                 success = execute_scheduled_task(db, http_session, schedule.type)

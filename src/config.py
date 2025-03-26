@@ -21,6 +21,10 @@ class Settings(BaseSettings):
         os.getenv("REQUEST_DELAY_MAX_SECONDS", "3")
     )
 
+    ITEM_REFRESH_INTERVAL_DAYS_DEFAULT: int = int(
+        os.getenv("ITEM_REFRESH_INTERVAL_MINUTES", "30")
+    )
+
     class Config:
         env_file = ".env"
         env_file_encoding = "utf-8"
