@@ -14,7 +14,20 @@ logger = logging.getLogger(__name__)
 
 # Constants
 GOOGLE_SEARCH_URL = "https://www.google.com/search"
-SEARCH_QUERY = "site:movie.douban.com/subject/ inurl:/subject/ -inurl:celebrities -inurl:discussion -inurl:photos -inurl:reviews -inurl:comments -inurl:episode -inurl:tv_discuss -inurl:doulists -inurl:cinema -inurl:trailer"
+SEARCH_QUERY = (
+    "site:movie.douban.com/subject/"
+    + " inurl:/subject/"
+    + " -inurl:celebrities"
+    + " -inurl:discussion"
+    + " -inurl:photos"
+    + " -inurl:reviews"
+    + " -inurl:comments"
+    + " -inurl:episode"
+    + " -inurl:tv_discuss"
+    + " -inurl:doulists"
+    + " -inurl:cinema"
+    + " -inurl:trailer"
+)
 DOUBAN_ID_PATTERN = r"movie\.douban\.com/subject/(\d+)"
 
 # ZenRows configuration
@@ -34,7 +47,8 @@ def search_recent_douban_movies(db: Session, http_session: requests.Session):
     # Check if ZenRows API key is configured
     if not settings.ZENROWS_API_KEY:
         logger.error(
-            "ZenRows API key is not configured. Set ZENROWS_API_KEY environment variable."
+            "ZenRows API key is not configured."
+            + " Set ZENROWS_API_KEY environment variable."
         )
         return
 

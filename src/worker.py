@@ -21,7 +21,7 @@ DOUBAN_IMDB_URL = "https://movie.douban.com/subject/{}/"
 IMDB_ID_PATTERN = re.compile(r"IMDb:.*?(\btt\d+\b)")
 
 COMMON_HEADERS = {
-    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.3",
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.3",  # noqa: B950
     "Referer": "https://m.douban.com/movie",
 }
 
@@ -70,7 +70,7 @@ def process_queue_items(db: Session, http_session: requests.Session) -> None:
 
         except Exception as e:
             logger.exception(
-                f"Error processing queue item {queue_item.id} of type {queue_item.type}: {e}"
+                f"Error processing queue item {queue_item.id} of type {queue_item.type}: {e}"  # noqa: B950
             )
             db.rollback()
             processed_count += 1  # Count as processed even if there's an error

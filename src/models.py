@@ -4,11 +4,8 @@ from sqlalchemy import (
     String,
     Float,
     DateTime,
-    UniqueConstraint,
-    ForeignKey,
     Text,
 )
-from sqlalchemy.orm import relationship
 from datetime import datetime
 from .database import Base
 from sqlalchemy import and_

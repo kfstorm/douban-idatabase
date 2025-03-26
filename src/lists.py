@@ -5,7 +5,7 @@ import time
 from urllib.parse import urlparse, parse_qs
 import requests
 from sqlalchemy.orm import Session
-from typing import Any, Iterator, List, Tuple
+from typing import Any, Iterator, List
 from .config import settings
 from .http import get_json
 from .models import Queue
@@ -85,7 +85,7 @@ class ListsApi:
         self.base_url = "https://frodo.douban.com/api/v2"
         self.headers = {
             "User-Agent": "MicroMessenger/",
-            "Referer": "https://servicewechat.com/wx2f9b06c1de1ccfca/91/page-frame.html",
+            "Referer": "https://servicewechat.com/wx2f9b06c1de1ccfca/91/page-frame.html",  # noqa: B950
         }
         self.api_key = "0ac44ae016490db2204ce0a042db2916"
 

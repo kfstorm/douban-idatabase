@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException, Query, Depends, BackgroundTasks
+from fastapi import FastAPI, HTTPException, Query, Depends
 from sqlalchemy.orm import Session
 from typing import List
 from . import models, schemas
@@ -38,7 +38,7 @@ def get_items(
     if not any([douban_id, imdb_id, douban_title]):
         raise HTTPException(
             status_code=400,
-            detail="At least one of douban_id, imdb_id, or douban_title must be provided",
+            detail="At least one of douban_id, imdb_id, or douban_title must be provided",  # noqa: B950
         )
 
     items = models.get_items(db, douban_id, imdb_id, douban_title)
