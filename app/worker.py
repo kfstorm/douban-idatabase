@@ -43,6 +43,17 @@ def process_queue_item(db: Session) -> bool:
         douban_id = queue_item.id
         logger.info(f"Processing queue item: douban_id={douban_id}")
 
+        # Check if item already exists and was updated within 1 day
+        existing_item = db.query(Item).filter(Item.douban_id == douban_id).first()
+        if existing_item and existing_item.update_time:
+            time_diff = datetime.utcnow() - existing_item.update_time
+            if time_diff.days < 1:
+                logger.info(f"Skipping douban_id={douban_id}, updated within 1 day")
+                # Remove from queue since it's too recent to update
+                db.delete(queue_item)
+                db.commit()
+                return True
+
         # Fetch data from Douban and create Item object
         item = fetch_douban_item(douban_id)
 
