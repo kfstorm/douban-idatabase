@@ -1,5 +1,6 @@
 from collections import defaultdict
 from datetime import datetime
+import random
 import time
 import requests
 from urllib.parse import urlparse
@@ -20,19 +21,21 @@ class Throttler:
                 f"Rate limited. Need to wait at least {next_call_time - now}"
                 + f" seconds before the next call to {host}."
             )
+        time.sleep(random.uniform(0, settings.REQUEST_DELAY_MAX_SECONDS))
 
     def _handle_response(self, response):
-        if response.status_code == 302 and "sec.douban.com" in response.headers.get(
-            "location", ""
+        if (
+            response.status_code == 302
+            and "sec.douban.com" in response.headers.get("location", "")
+            or response.status_code == 400
+            and "subject_ip_rate_limit" in response.text
         ):
             # Rate limited.
             host = urlparse(response.url).netloc
-            self.next_call_time[host] = (
-                time.time() + settings.DOUBAN_RATE_LIMIT_DELAY_SECONDS
-            )
+            self.next_call_time[host] = time.time() + settings.RATE_LIMIT_DELAY_SECONDS
             raise Exception(
                 "Rate limited. Need to wait at least "
-                + str(settings.DOUBAN_RATE_LIMIT_DELAY_SECONDS)
+                + str(settings.RATE_LIMIT_DELAY_SECONDS)
                 + " seconds before the next call."
             )
         return response

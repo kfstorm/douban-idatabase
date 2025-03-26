@@ -13,12 +13,12 @@ class Settings(BaseSettings):
     # Queue processing settings
     QUEUE_BATCH_SIZE: int = int(os.getenv("QUEUE_BATCH_SIZE", "100"))
 
-    DOUBAN_RATE_LIMIT_DELAY_SECONDS: float = float(
-        os.getenv("DOUBAN_RATE_LIMIT_DELAY_SECONDS", "3600")
+    RATE_LIMIT_DELAY_SECONDS: float = float(
+        os.getenv("RATE_LIMIT_DELAY_SECONDS", "600")
     )
 
-    DOUBAN_API_REQUEST_DELAY_MAX_SECONDS: float = float(
-        os.getenv("DOUBAN_API_REQUEST_DELAY_MAX_SECONDS", "1")
+    REQUEST_DELAY_MAX_SECONDS: float = float(
+        os.getenv("REQUEST_DELAY_MAX_SECONDS", "3")
     )
 
     class Config:

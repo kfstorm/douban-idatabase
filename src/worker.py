@@ -1,7 +1,5 @@
 import logging
-import random
 import re
-import time
 from urllib.parse import urlparse
 import requests
 import json
@@ -98,8 +96,8 @@ def process_douban_id(
     existing_item = db.query(Item).filter(Item.douban_id == douban_id).first()
     if existing_item and existing_item.update_time:
         time_diff = datetime.utcnow() - existing_item.update_time
-        if time_diff.days < 1:
-            logger.info(f"Skipping douban_id={douban_id}, updated within 1 day")
+        if time_diff.days < 30:
+            logger.info(f"Skipping douban_id={douban_id}, updated within 30 days")
             # Remove from queue since it's too recent to update
             db.delete(queue_item)
             db.commit()
@@ -164,8 +162,6 @@ def fetch_imdb_id(http_session: requests.Session, douban_id: int) -> dict:
     """
     Fetch IMDb ID for a Douban movie using a simple web scraping method
     """
-    time.sleep(random.uniform(0.0, 1.0))
-
     url = DOUBAN_IMDB_URL.format(douban_id)
 
     logger.info(f"Fetching IMDb ID for douban_id={douban_id}...")

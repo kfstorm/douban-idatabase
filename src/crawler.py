@@ -1,5 +1,4 @@
 import re
-import time
 import logging
 import requests
 from datetime import datetime
@@ -144,9 +143,6 @@ def search_recent_douban_movies(db: Session, http_session: requests.Session):
             else:
                 logger.info("No new Douban IDs found, stopping pagination")
                 has_more_results = False
-
-            # Be nice to ZenRows and Google (still important to rate limit)
-            time.sleep(3)
 
         except Exception as e:
             logger.error(f"Error during Google search via ZenRows API: {e}")

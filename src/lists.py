@@ -1,12 +1,9 @@
 from datetime import datetime
 import logging
-import random
-import time
 from urllib.parse import urlparse, parse_qs
 import requests
 from sqlalchemy.orm import Session
 from typing import Any, Iterator, List
-from .config import settings
 from .http import get_json
 from .models import Queue
 
@@ -43,7 +40,6 @@ class BaseApi:
         )
 
     def _read_one_page(self, id: str, start: int, count: int) -> Any:
-        time.sleep(random.uniform(0, settings.DOUBAN_API_REQUEST_DELAY_MAX_SECONDS))
         return get_json(
             self.http_session,
             f"{self.base_url}/{id}/items?start={start}&count={count}",
@@ -90,7 +86,6 @@ class ListsApi:
         self.api_key = "0ac44ae016490db2204ce0a042db2916"
 
     def _read_one_page(self, start: int, count: int) -> Any:
-        time.sleep(random.uniform(0, settings.DOUBAN_API_REQUEST_DELAY_MAX_SECONDS))
         return get_json(
             self.http_session,
             f"{self.base_url}/skynet/new_playlists?apikey={self.api_key}&subject_type=movie&start={start}&count={count}",
