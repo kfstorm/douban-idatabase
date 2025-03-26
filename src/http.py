@@ -25,7 +25,8 @@ class Throttler:
 
     def _handle_response(self, response):
         if (
-            response.status_code == 302
+            response.status_code == 403
+            or response.status_code == 302
             and "sec.douban.com" in response.headers.get("location", "")
             or response.status_code == 400
             and "subject_ip_rate_limit" in response.text
