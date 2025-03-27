@@ -24,7 +24,7 @@ class Throttler:
     def _check_rate_limit(self, url):
         host = urlparse(url).netloc
         next_call_time = self.next_call_time[host]
-        now = datetime.now()
+        now = datetime.utcnow()
         if now < next_call_time:
             raise RateLimitException(next_call_time)
         time.sleep(random.uniform(0, settings.REQUEST_DELAY_MAX_SECONDS))
@@ -39,7 +39,7 @@ class Throttler:
         ):
             # Rate limited.
             host = urlparse(response.url).netloc
-            next_call_time = datetime.now() + timedelta(
+            next_call_time = datetime.utcnow() + timedelta(
                 seconds=settings.RATE_LIMIT_DELAY_SECONDS
             )
             self.next_call_time[host] = next_call_time
@@ -47,7 +47,7 @@ class Throttler:
         return response
 
     def get_info(self):
-        now = datetime.now()
+        now = datetime.utcnow()
         return {
             key: {
                 "is_rate_limited": now < value,
@@ -64,12 +64,12 @@ def _get_extra_http_client_args():
     return {}
 
 
-last_throttler_info_print = datetime.now()
+last_throttler_info_print = datetime.utcnow()
 
 
 def get_response(http_session: requests.Session, url: str, **kwargs):
     global last_throttler_info_print
-    now = datetime.now()
+    now = datetime.utcnow()
     if (now - last_throttler_info_print).total_seconds() > 60:
         last_throttler_info_print = now
         logging.info(f"Throttler info: {throttler.get_info()}")

@@ -106,7 +106,7 @@ def bootstrap_lists(db: Session, http_session: requests.Session):
     logger.info("Adding lists to queue...")
 
     count = 0
-    last_print = datetime.now()
+    last_print = datetime.utcnow()
     lists_api = ListsApi(http_session)
     for item in lists_api.iter_lists():
         parsed_url = urlparse(item["sharing_url"])
@@ -129,6 +129,6 @@ def bootstrap_lists(db: Session, http_session: requests.Session):
         else:
             logger.warning(f"Unknown list type: {list_type}")
         count += 1
-        if (datetime.now() - last_print).total_seconds() >= 60:
+        if (datetime.utcnow() - last_print).total_seconds() >= 60:
             logger.info(f"Processed {count} lists.")
-            last_print = datetime.now()
+            last_print = datetime.utcnow()
