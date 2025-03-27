@@ -1,4 +1,6 @@
+import csv
 import logging
+import os
 import re
 from urllib.parse import urlparse
 import requests
@@ -165,10 +167,41 @@ def process_list(
     db.commit()
 
 
+def fetch_imdb_id_from_csv(douban_id: int) -> dict:
+    if not settings.IDMB_CSV_PATH:
+        return None
+    if not os.path.exists(settings.IDMB_CSV_PATH):
+        logger.warning(f"IMDb CSV file not found: {settings.IDMB_CSV_PATH}")
+        return None
+    with open(settings.IDMB_CSV_PATH, "r") as f:
+        reader = csv.reader(f)
+        for row in reader:
+            if douban_id == int(row[0]):
+                imdb_id = row[1]
+                if not imdb_id:
+                    imdb_id = None
+                logger.info(
+                    f"Found IMDb ID for douban_id={douban_id} in CSV."
+                    f" IMDb ID: {imdb_id}"
+                )
+                return {
+                    "imdb_id": imdb_id,
+                    "raw_data": {
+                        "imdb_id": imdb_id,
+                        "imdb_source": os.path.basename(settings.IDMB_CSV_PATH),
+                    },
+                }
+    return None
+
+
 def fetch_imdb_id(http_session: requests.Session, douban_id: int) -> dict:
     """
     Fetch IMDb ID for a Douban movie using a simple web scraping method
     """
+    result = fetch_imdb_id_from_csv(douban_id)
+    if result:
+        return result
+
     url = DOUBAN_IMDB_URL.format(douban_id)
 
     logger.info(f"Fetching IMDb ID for douban_id={douban_id}...")
