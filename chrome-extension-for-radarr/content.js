@@ -336,20 +336,26 @@ function displayDoubanRating(ratingValue, url, movieElement) {
   // Determine color based on rating value and thresholds
   let ratingClass = 'low';
   let ratingColor = lowRatingColor;
+  // Create a separate string for display
+  let ratingStr;
 
   // Handle no rating case
-  if (!ratingValue || ratingValue === '?') {
+  if (ratingValue == null) {
     ratingClass = 'none';
     ratingColor = noRatingColor;
-    ratingValue = '?';
+    if (url) {
+      ratingStr = 'N/A';
+    } else {
+      ratingStr = '?';
+    }
   } else {
-    // Convert ratingValue to a number for comparison
-    const numericRating = parseFloat(ratingValue);
+    // Format the rating to always display with one decimal place
+    ratingStr = ratingValue.toFixed(1);
 
-    if (numericRating >= goodRatingThreshold) {
+    if (ratingValue >= goodRatingThreshold) {
       ratingClass = 'good';
       ratingColor = goodRatingColor;
-    } else if (numericRating >= mediumRatingThreshold) {
+    } else if (ratingValue >= mediumRatingThreshold) {
       ratingClass = 'medium';
       ratingColor = mediumRatingColor;
     }
@@ -359,7 +365,7 @@ function displayDoubanRating(ratingValue, url, movieElement) {
   let ratingHtml = `
     <div class="douban-score">
       <span class="douban-logo douban-logo-${ratingClass}" style="background-color: ${ratingColor}">豆</span>
-      <span class="douban-value douban-value-${ratingClass}" style="color: ${ratingColor}">${ratingValue}</span>
+      <span class="douban-value douban-value-${ratingClass}" style="color: ${ratingColor}">${ratingStr}</span>
     </div>
   `;
 
