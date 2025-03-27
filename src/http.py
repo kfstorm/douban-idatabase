@@ -47,11 +47,11 @@ class Throttler:
         return response
 
     def get_info(self):
-        now = time.time()
+        now = datetime.now()
         return {
             key: {
                 "is_rate_limited": now < value,
-                "wait_time": max(0, value - now),
+                "next_call_time": value,
             }
             for key, value in self.next_call_time.items()
         }
