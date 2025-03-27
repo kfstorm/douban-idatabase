@@ -10,7 +10,7 @@ from .worker import process_queue_items
 from .crawler import search_recent_douban_movies
 from .lists import bootstrap_lists
 from .models import Schedule
-from .http import new_http_session
+from .http import new_http_session, RateLimitException
 
 logger = logging.getLogger(__name__)
 
@@ -46,15 +46,18 @@ def initialize_schedules(db: Session):
     db.commit()
 
 
-def update_schedule_next_run(db: Session, schedule_type: str):
+def update_schedule_next_run(db: Session, schedule_type: str, next_run_time: datetime):
     """Update the next run time for a scheduled task"""
     schedule = db.query(Schedule).filter(Schedule.type == schedule_type).first()
     if schedule:
-        now = datetime.utcnow()
-        interval = SCHEDULE_INTERVALS.get(
-            schedule_type, 3600
-        )  # Default to 1 hour if not found
-        schedule.next_run = now + timedelta(seconds=interval)
+        if next_run_time:
+            schedule.next_run = next_run_time
+        else:
+            now = datetime.utcnow()
+            interval = SCHEDULE_INTERVALS.get(
+                schedule_type, 3600
+            )  # Default to 1 hour if not found
+            schedule.next_run = now + timedelta(seconds=interval)
         db.commit()
         logger.info(
             f"Updated schedule for {schedule_type}, next run at {schedule.next_run}"
@@ -76,28 +79,24 @@ def get_next_schedule_run(db: Session):
 
 def execute_scheduled_task(
     db: Session, http_session: requests.Session, schedule_type: str
-):
+) -> datetime:
     """Execute a specific scheduled task based on its type"""
     try:
         if schedule_type == SCHEDULE_TYPE_GOOGLE_SEARCH:
             search_recent_douban_movies(db, http_session)
-            return True
-
         elif schedule_type == SCHEDULE_TYPE_PROCESS_QUEUE:
             process_queue_items(db, http_session)
-            return True
-
         elif schedule_type == SCHEDULE_TYPE_BOOTSTRAP_LISTS:
             bootstrap_lists(db, http_session)
-            return True
-
         else:
             logger.warning(f"Unknown schedule type: {schedule_type}")
-            return False
-
+    except RateLimitException as e:
+        logger.warning(
+            f"Rate limited while executing scheduled task {schedule_type}: {str(e)}"
+        )
+        return e.next_call_time
     except Exception as e:
         logger.exception(f"Error executing scheduled task {schedule_type}: {e}")
-        return False
 
 
 def unified_scheduler():
@@ -107,8 +106,8 @@ def unified_scheduler():
     logger.info("Unified scheduler started")
 
     while running:
+        db = SessionLocal()
         try:
-            db = SessionLocal()
             http_session = new_http_session()
 
             # Initialize schedules if needed
@@ -124,15 +123,14 @@ def unified_scheduler():
                     logger.info(f"Running scheduled task: {schedule.type}")
 
                 # Execute the appropriate task based on schedule type
-                success = execute_scheduled_task(db, http_session, schedule.type)
+                next_run_time = execute_scheduled_task(db, http_session, schedule.type)
 
                 # Update the next run time
-                if success:
-                    update_schedule_next_run(db, schedule.type)
-
-            db.close()
+                update_schedule_next_run(db, schedule.type, next_run_time)
         except Exception as e:
             logger.exception(f"Error in unified scheduler: {e}")
+        finally:
+            db.close()
 
         # Sleep for a short time before checking again
         # Using a short sleep time to be responsive to any tasks

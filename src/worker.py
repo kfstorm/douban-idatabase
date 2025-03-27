@@ -11,7 +11,7 @@ from sqlalchemy.orm import Session
 from .lists import CollectionApi, DoulistApi
 from .models import Queue, Item, History
 from .config import settings
-from .http import get_response, get_json
+from .http import RateLimitException, get_response, get_json
 
 logger = logging.getLogger(__name__)
 
@@ -67,6 +67,9 @@ def process_queue_items(db: Session, http_session: requests.Session) -> None:
                 db.commit()
 
             processed_count += 1
+        except RateLimitException as e:
+            db.rollback()
+            raise e
 
         except Exception as e:
             logger.exception(
@@ -283,42 +286,35 @@ def fetch_douban_item(http_session: requests.Session, douban_id: int) -> Item:
     """
     Fetch movie data from Douban API and return an Item object
     """
-    try:
-        detail_info = fetch_douban_item_detail(http_session, douban_id)
-        if not detail_info:
-            logger.warning(f"Failed to fetch detail for douban_id={douban_id}")
-            return None
-        imdb_info = fetch_imdb_id(http_session, douban_id)
-        if not imdb_info:
-            logger.warning(f"Failed to fetch IMDb ID for douban_id={douban_id}")
-            return None
-
-        raw_data_obj = {
-            **detail_info["raw_data"],
-            **imdb_info["raw_data"],
-        }
-
-        # Create an Item object
-        item = Item(
-            douban_id=int(douban_id),
-            imdb_id=imdb_info["imdb_id"],
-            douban_title=detail_info["douban_title"],
-            year=detail_info["year"],
-            rating=detail_info["rating"],
-            raw_data=json.dumps(raw_data_obj, ensure_ascii=False),
-            update_time=datetime.utcnow(),
-        )
-
-        logger.info(
-            f"Successfully fetched data for douban_id={douban_id}: {item.douban_title}"
-        )
-        return item
-
-    except Exception as e:
-        logger.exception(
-            f"Error fetching data from Douban API for douban_id={douban_id}: {e}"
-        )
+    detail_info = fetch_douban_item_detail(http_session, douban_id)
+    if not detail_info:
+        logger.warning(f"Failed to fetch detail for douban_id={douban_id}")
         return None
+    imdb_info = fetch_imdb_id(http_session, douban_id)
+    if not imdb_info:
+        logger.warning(f"Failed to fetch IMDb ID for douban_id={douban_id}")
+        return None
+
+    raw_data_obj = {
+        **detail_info["raw_data"],
+        **imdb_info["raw_data"],
+    }
+
+    # Create an Item object
+    item = Item(
+        douban_id=int(douban_id),
+        imdb_id=imdb_info["imdb_id"],
+        douban_title=detail_info["douban_title"],
+        year=detail_info["year"],
+        rating=detail_info["rating"],
+        raw_data=json.dumps(raw_data_obj, ensure_ascii=False),
+        update_time=datetime.utcnow(),
+    )
+
+    logger.info(
+        f"Successfully fetched data for douban_id={douban_id}: {item.douban_title}"
+    )
+    return item
 
 
 def save_item_to_db(db: Session, item: Item):
