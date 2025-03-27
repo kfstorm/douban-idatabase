@@ -51,7 +51,7 @@ class Throttler:
         return {
             key: {
                 "is_rate_limited": now < value,
-                "next_call_time": value,
+                "next_call_time": str(value) if now < value else None,
             }
             for key, value in self.next_call_time.items()
         }

@@ -28,11 +28,14 @@ COMMON_HEADERS = {
 
 def process_queue_items(db: Session, http_session: requests.Session) -> None:
     """
-    Process multiple items from the queue, up to max_items.
+    Process items from the queue until reaching time limit (1 minute).
     Supports different types of queue items.
     """
-    max_items = settings.QUEUE_BATCH_SIZE
+    time_limit_seconds = settings.QUEUE_PROCESS_TIME_LIMIT_SECONDS
     processed_count = 0
+
+    # Record start time
+    start_time = datetime.utcnow()
 
     # Log total queue size before processing
     queue_size_before = db.query(Queue).count()
@@ -40,7 +43,16 @@ def process_queue_items(db: Session, http_session: requests.Session) -> None:
         f"Starting queue processing with {queue_size_before} total items in queue"
     )
 
-    for _ in range(max_items):
+    while True:
+        # Check if we've exceeded the time limit
+        elapsed_seconds = (datetime.utcnow() - start_time).total_seconds()
+        if elapsed_seconds >= time_limit_seconds:
+            logger.info(
+                f"Time limit reached ({time_limit_seconds} seconds)"
+                ", stopping processing"
+            )
+            break
+
         # Get oldest item from queue (any type)
         queue_item = db.query(Queue).order_by(Queue.upsert_time).first()
 
@@ -79,8 +91,14 @@ def process_queue_items(db: Session, http_session: requests.Session) -> None:
             processed_count += 1  # Count as processed even if there's an error
             # Continue with next item
 
+    # Calculate total elapsed time
+    total_elapsed_seconds = (datetime.utcnow() - start_time).total_seconds()
+
     if processed_count > 0:
-        logger.info(f"Processed {processed_count} items from queue")
+        logger.info(
+            f"Processed {processed_count} items from queue"
+            f" in {total_elapsed_seconds:.2f} seconds"
+        )
 
     # Log remaining queue size after processing
     queue_size_after = db.query(Queue).count()
