@@ -32,7 +32,6 @@ a.douban-rating {
 }
 
 .douban-logo {
-  background-color: #2e963d;
   color: white;
   border-radius: 2px;
   padding: 0 4px;
@@ -41,8 +40,46 @@ a.douban-rating {
   font-size: 12px;
 }
 
+/* Default logo background color (was green) */
+.douban-logo {
+  background-color: #2e963d;
+}
+
+/* Rating-specific background colors for the logo */
+.douban-logo-good {
+  background-color: #2e963d; /* green by default */
+}
+
+.douban-logo-medium {
+  background-color: #e09b24; /* yellow by default */
+}
+
+.douban-logo-low {
+  background-color: #e05924; /* red by default */
+}
+
+.douban-logo-none {
+  background-color: #888888; /* gray by default */
+}
+
 .douban-value {
-  color: #2e963d;
   font-weight: bold;
   font-size: 14px;
+}
+
+/* Rating-specific text colors */
+.douban-value-good {
+  color: #2e963d;
+}
+
+.douban-value-medium {
+  color: #e09b24;
+}
+
+.douban-value-low {
+  color: #e05924;
+}
+
+.douban-value-none {
+  color: #888888;
 }

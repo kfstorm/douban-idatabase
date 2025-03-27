@@ -3,7 +3,13 @@
 // Initialize default settings when extension is installed
 chrome.runtime.onInstalled.addListener(function() {
   chrome.storage.sync.set({
-    apiBaseUrl: 'http://localhost:8000'
+    apiBaseUrl: 'http://localhost:8000',
+    goodRatingThreshold: 8.0,
+    mediumRatingThreshold: 7.0,
+    goodRatingColor: '#2e963d', // green
+    mediumRatingColor: '#e09b24', // yellow
+    lowRatingColor: '#e05924',  // red
+    noRatingColor: '#888888'   // gray
   }, function() {
     console.log('Default settings initialized');
   });

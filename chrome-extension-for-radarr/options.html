@@ -17,10 +17,13 @@
       margin-bottom: 5px;
       font-weight: bold;
     }
-    input[type="text"] {
+    input[type="text"], input[type="number"], input[type="color"] {
       width: 100%;
       padding: 8px;
       box-sizing: border-box;
+    }
+    input[type="color"] {
+      height: 40px;
     }
     button {
       background-color: #4285f4;
@@ -43,6 +46,22 @@
       background-color: #f8d7da;
       color: #721c24;
     }
+    .rating-config {
+      border-top: 1px solid #ddd;
+      margin-top: 20px;
+      padding-top: 15px;
+    }
+    .color-label-container {
+      display: flex;
+      align-items: center;
+    }
+    .color-preview {
+      margin-left: 10px;
+      padding: 5px 10px;
+      border-radius: 4px;
+      color: white;
+      font-weight: bold;
+    }
   </style>
 </head>
 <body>
@@ -64,6 +83,55 @@
     <label for="radarrApiKey">Radarr API Key:</label>
     <input type="text" id="radarrApiKey" placeholder="Your Radarr API key">
     <small>Enter your Radarr API key (found in Settings > General)</small>
+  </div>
+
+  <div class="rating-config">
+    <h2>Rating Display Settings</h2>
+
+    <div class="form-group">
+      <label for="goodRatingThreshold">Good Rating Threshold:</label>
+      <input type="number" id="goodRatingThreshold" step="0.1" min="0" max="10" placeholder="8.0">
+      <small>Ratings above this value will be shown in green (default: 8.0)</small>
+    </div>
+
+    <div class="form-group">
+      <label for="mediumRatingThreshold">Medium Rating Threshold:</label>
+      <input type="number" id="mediumRatingThreshold" step="0.1" min="0" max="10" placeholder="7.0">
+      <small>Ratings above this value but below good threshold will be shown in yellow (default: 7.0)</small>
+    </div>
+
+    <div class="form-group">
+      <div class="color-label-container">
+        <label for="goodRatingColor">Good Rating Color:</label>
+        <span class="color-preview" id="goodColorPreview">Good</span>
+      </div>
+      <input type="color" id="goodRatingColor">
+    </div>
+
+    <div class="form-group">
+      <div class="color-label-container">
+        <label for="mediumRatingColor">Medium Rating Color:</label>
+        <span class="color-preview" id="mediumColorPreview">Medium</span>
+      </div>
+      <input type="color" id="mediumRatingColor">
+    </div>
+
+    <div class="form-group">
+      <div class="color-label-container">
+        <label for="lowRatingColor">Low Rating Color:</label>
+        <span class="color-preview" id="lowColorPreview">Low</span>
+      </div>
+      <input type="color" id="lowRatingColor">
+    </div>
+
+    <div class="form-group">
+      <div class="color-label-container">
+        <label for="noRatingColor">No Rating Color:</label>
+        <span class="color-preview" id="noColorPreview">No Rating</span>
+      </div>
+      <input type="color" id="noRatingColor">
+      <small>Color used for movies without a Douban rating</small>
+    </div>
   </div>
 
   <button id="save">Save</button>

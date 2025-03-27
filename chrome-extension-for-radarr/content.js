@@ -4,6 +4,13 @@
 let apiBaseUrl = 'http://localhost:8000';
 let radarrApiRoot = '';
 let radarrApiKey = '';
+// Rating threshold settings
+let goodRatingThreshold = 8.0;
+let mediumRatingThreshold = 7.0;
+let goodRatingColor = '#2e963d'; // green
+let mediumRatingColor = '#e09b24'; // yellow
+let lowRatingColor = '#e05924';  // red
+let noRatingColor = '#888888';   // gray
 // Add a variable to track the last time checkForMovieItems was called
 let lastCheckTime = 0;
 // Add a rating cache to avoid redundant API requests
@@ -14,7 +21,17 @@ let lastMovieCacheTime = 0;
 const MOVIE_CACHE_TTL = 5 * 60 * 1000; // 5 minutes cache validity
 
 // First, get the API settings from storage
-chrome.storage.sync.get(['apiBaseUrl', 'radarrApiRoot', 'radarrApiKey'], function(data) {
+chrome.storage.sync.get([
+  'apiBaseUrl',
+  'radarrApiRoot',
+  'radarrApiKey',
+  'goodRatingThreshold',
+  'mediumRatingThreshold',
+  'goodRatingColor',
+  'mediumRatingColor',
+  'lowRatingColor',
+  'noRatingColor'
+], function(data) {
   if (data.apiBaseUrl) {
     apiBaseUrl = data.apiBaseUrl;
   }
@@ -25,6 +42,31 @@ chrome.storage.sync.get(['apiBaseUrl', 'radarrApiRoot', 'radarrApiKey'], functio
 
   if (data.radarrApiKey) {
     radarrApiKey = data.radarrApiKey;
+  }
+
+  // Set rating thresholds and colors if available
+  if (data.goodRatingThreshold) {
+    goodRatingThreshold = data.goodRatingThreshold;
+  }
+
+  if (data.mediumRatingThreshold) {
+    mediumRatingThreshold = data.mediumRatingThreshold;
+  }
+
+  if (data.goodRatingColor) {
+    goodRatingColor = data.goodRatingColor;
+  }
+
+  if (data.mediumRatingColor) {
+    mediumRatingColor = data.mediumRatingColor;
+  }
+
+  if (data.lowRatingColor) {
+    lowRatingColor = data.lowRatingColor;
+  }
+
+  if (data.noRatingColor) {
+    noRatingColor = data.noRatingColor;
   }
 
   // Start processing once the DOM is fully loaded
@@ -202,12 +244,33 @@ function displayDoubanRating(ratingValue, url, movieElement) {
     movieElement.classList.add('movie-container');
   }
 
+  // Determine color based on rating value and thresholds
+  let ratingClass = 'low';
+  let ratingColor = lowRatingColor;
+
+  // Handle no rating case
+  if (!ratingValue || ratingValue === '?') {
+    ratingClass = 'none';
+    ratingColor = noRatingColor;
+    ratingValue = '?';
+  } else {
+    // Convert ratingValue to a number for comparison
+    const numericRating = parseFloat(ratingValue);
+
+    if (numericRating >= goodRatingThreshold) {
+      ratingClass = 'good';
+      ratingColor = goodRatingColor;
+    } else if (numericRating >= mediumRatingThreshold) {
+      ratingClass = 'medium';
+      ratingColor = mediumRatingColor;
+    }
+  }
+
   // Create rating content
-  ratingValue = ratingValue || '?';
   let ratingHtml = `
     <div class="douban-score">
-      <span class="douban-logo">豆</span>
-      <span class="douban-value">${ratingValue}</span>
+      <span class="douban-logo douban-logo-${ratingClass}" style="background-color: ${ratingColor}">豆</span>
+      <span class="douban-value douban-value-${ratingClass}" style="color: ${ratingColor}">${ratingValue}</span>
     </div>
   `;
 
