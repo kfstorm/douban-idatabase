@@ -62,6 +62,14 @@ class KnownDoubanId(Base):
     discover_time = Column(DateTime, default=datetime.utcnow)
 
 
+class List(Base):
+    __tablename__ = "list"
+
+    list_type = Column(String(32), primary_key=True)
+    list_id = Column(String(128), primary_key=True)
+    last_check_time = Column(DateTime, nullable=True)
+
+
 def get_items(db, douban_id: int = None, imdb_id: str = None, douban_title: str = None):
     query = db.query(Item)
     filters = []

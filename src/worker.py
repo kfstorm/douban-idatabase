@@ -9,7 +9,8 @@ from datetime import datetime
 from sqlalchemy.orm import Session
 
 from .lists import CollectionApi, DoulistApi
-from .models import Queue, Item, History
+from .utils import parse_douban_time
+from .models import Queue, Item, History, List, add_to_queue
 from .config import settings
 from .http import RateLimitException, get_response, get_json
 
@@ -172,6 +173,32 @@ def process_list(
         "doulist": doulist_api,
     }
     list_api = list_apis[list_type]
+
+    # Check if we've processed this list before
+    list_record = db.query(List).filter_by(list_type=list_type, list_id=list_id).first()
+
+    # Get list info to check update time
+    list_info = list_api.get_info(list_id)
+
+    # Look for update time field
+    update_time_str = list_info.get("update_time") or list_info.get("update_at")
+
+    if update_time_str:
+        list_update_time = parse_douban_time(update_time_str)
+
+        # If we have a record and the list hasn't been updated since our last check
+        if (
+            list_record
+            and list_record.last_check_time
+            and list_update_time <= list_record.last_check_time
+        ):
+            logger.info(
+                f"Skipping list {list_type}/{list_id}"
+                f" - no updates since last check at {list_record.last_check_time}"
+            )
+            return
+
+    # Fetch and process list items
     items = list_api.get_items(list_id)
     known_ids = set()
 
@@ -179,6 +206,9 @@ def process_list(
     for item in items:
         detail_info = extract_douban_item_detail(item, f"{list_type}/{list_id}")
         douban_id = detail_info["douban_id"]
+        # In case further processing fails, add to `queue` and `known_douban_id`
+        # to avoid losing it.
+        add_to_queue(db, "douban_id", str(douban_id))
 
         # Skip if already processed in this batch
         if douban_id in known_ids:
@@ -194,6 +224,20 @@ def process_list(
 
             item = merge_item(detail_info, imdb_info)
             save_item_to_db(db, item)
+
+    # Update or create list record with current check time
+    now = datetime.utcnow()
+    if list_record:
+        list_record.last_check_time = now
+    else:
+        list_record = List(list_type=list_type, list_id=list_id, last_check_time=now)
+        db.add(list_record)
+    db.commit()
+
+    logger.info(
+        f"Successfully processed list {list_type}/{list_id}"
+        f", updated last_check_time to {now}"
+    )
 
 
 def fetch_imdb_id_from_csv(douban_id: int) -> dict:
