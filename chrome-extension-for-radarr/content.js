@@ -13,6 +13,8 @@ let lowRatingColor = '#e05924';  // red
 let noRatingColor = '#888888';   // gray
 // Add a variable to track the last time checkForMovieItems was called
 let lastCheckTime = 0;
+let isScrolling = false;
+let scrollTimeout = null;
 // Add a rating cache to avoid redundant API requests
 let ratingCache = {}; // Maps TMDB IDs to {rating, url} objects
 // Add movie cache to avoid redundant Radarr API requests
@@ -93,13 +95,87 @@ function processRadarrPage() {
 
   // Initial check for movie items
   checkForMovieItems();
+
+  // Set up intersection observer to detect when movie elements come into view
+  setupIntersectionObserver();
+
+  // Set up periodic checks for missed elements
+  setInterval(checkForMovieItems, 3000);
+
+  // Add scroll event listener
+  window.addEventListener('scroll', handleScroll);
+}
+
+// Function to handle scroll events
+function handleScroll() {
+  isScrolling = true;
+
+  // Clear previous timeout
+  if (scrollTimeout) {
+    clearTimeout(scrollTimeout);
+  }
+
+  // Set a timeout to run after scrolling stops
+  scrollTimeout = setTimeout(function() {
+    isScrolling = false;
+    processUnprocessedElements();
+  }, 300);
+}
+
+// Function to set up intersection observer
+function setupIntersectionObserver() {
+  const options = {
+    root: null, // viewport
+    rootMargin: '0px',
+    threshold: 0.1 // trigger when at least 10% of the element is visible
+  };
+
+  const observer = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting) {
+        const element = entry.target;
+        if (element.getAttribute('douban-processed') !== 'true') {
+          // Process this element when it comes into view
+          processMovieElement(element);
+        }
+        // Unobserve after processing
+        observer.unobserve(element);
+      }
+    });
+  }, options);
+
+  // Observe all movie elements
+  function observeMovieElements() {
+    const movieElements = document.querySelectorAll('div[class^="MovieIndexPoster-content"]');
+    movieElements.forEach(element => {
+      if (element.getAttribute('douban-processed') !== 'true') {
+        observer.observe(element);
+      }
+    });
+  }
+
+  // Initial observation
+  observeMovieElements();
+
+  // Set up periodic checks for new elements to observe
+  setInterval(observeMovieElements, 2000);
+}
+
+// Function to process elements that weren't processed during scrolling
+function processUnprocessedElements() {
+  console.log('Scrolling stopped, processing any missed elements');
+  const movieElements = document.querySelectorAll('div[class^="MovieIndexPoster-content"]:not([douban-processed="true"])');
+  if (movieElements.length > 0) {
+    console.log(`Found ${movieElements.length} unprocessed movie elements`);
+    checkForMovieItems(true); // Force processing
+  }
 }
 
 // Function to check for movie items and extract IMDb IDs
-function checkForMovieItems() {
-  // Check if 0.5 seconds have passed since the last call
+function checkForMovieItems(force = false) {
+  // Check if enough time has passed since the last call or if forcing
   const currentTime = Date.now();
-  if (currentTime - lastCheckTime < 500) {
+  if (!force && currentTime - lastCheckTime < 500) {
     // Not enough time has passed, exit early
     return;
   }
@@ -146,47 +222,50 @@ function processMoviesFromAPI(movies) {
   // This selector needs to be adjusted based on Radarr's actual DOM structure
   const movieElements = document.querySelectorAll('div[class^="MovieIndexPoster-content"]');
 
-  movies.forEach(movie => {
-    // Look for IMDb ID in movie data
-    if (movie.imdbId) {
-      const imdbId = movie.imdbId;
-      const tmdbId = movie.tmdbId;
-
-      // Find the corresponding DOM element for this movie
-      const movieElement = findMovieElementById(movieElements, tmdbId);
-
-      if (movieElement && movieElement.getAttribute('douban-processed') !== 'true') {
-        // Mark as processed
-        movieElement.setAttribute('douban-processed', 'true');
-
-        // Check if rating is already in cache
-        if (ratingCache[tmdbId] !== undefined) {
-          // Use cached rating and url
-          const { rating, url } = ratingCache[tmdbId];
-          displayDoubanRating(rating, url, movieElement);
-        } else {
-          // Fetch rating and then display it
-          fetchDoubanRating(imdbId, tmdbId)
-            .then(({ rating, url }) => {
-              displayDoubanRating(rating, url, movieElement);
-            });
-        }
-      }
+  movieElements.forEach(element => {
+    if (element.getAttribute('douban-processed') !== 'true') {
+      processMovieElement(element);
     }
   });
 }
 
-// Helper function to find movie element by ID
-function findMovieElementById(movieElements, tmdbId) {
-  for (const element of movieElements) {
-    url = element.querySelector('a[class^="MovieIndexPoster-link"]')["href"];
-    parts = url.split("/");
-    elementMovieId = parts[parts.length - 1];
-    if (elementMovieId && elementMovieId == tmdbId) {
-      return element;
+// Function to process a single movie element
+function processMovieElement(movieElement) {
+  if (!movieCache || movieElement.getAttribute('douban-processed') === 'true') {
+    return;
+  }
+
+  // Extract TMDB ID from the element
+  const link = movieElement.querySelector('a[class^="MovieIndexPoster-link"]');
+  if (!link || !link.href) return;
+
+  const parts = link.href.split("/");
+  const tmdbId = parts[parts.length - 1];
+
+  if (!tmdbId) return;
+
+  // Find matching movie in our cache
+  const movie = movieCache.find(m => m.tmdbId == tmdbId);
+
+  if (movie && movie.imdbId) {
+    // Mark as being processed to prevent duplicates
+    movieElement.setAttribute('douban-processed', 'processing');
+
+    // Check if rating is already in cache
+    if (ratingCache[tmdbId] !== undefined) {
+      // Use cached rating and url
+      const { rating, url } = ratingCache[tmdbId];
+      displayDoubanRating(rating, url, movieElement);
+      movieElement.setAttribute('douban-processed', 'true');
+    } else {
+      // Fetch rating and then display it
+      fetchDoubanRating(movie.imdbId, tmdbId)
+        .then(({ rating, url }) => {
+          displayDoubanRating(rating, url, movieElement);
+          movieElement.setAttribute('douban-processed', 'true');
+        });
     }
   }
-  return null;
 }
 
 // Function to fetch Douban rating using the API
