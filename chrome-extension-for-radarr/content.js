@@ -190,26 +190,16 @@ function displayDoubanRating(ratingValue, url, movieElement) {
   const ratingElement = document.createElement(url ? 'a' : 'div');
   ratingElement.className = 'douban-rating';
 
-  // Style the rating element to appear at top right corner
-  ratingElement.style.position = 'absolute';
-  ratingElement.style.top = '5px';
-  ratingElement.style.right = '5px';
-  ratingElement.style.zIndex = '10';
-  ratingElement.style.padding = '3px 6px';
-  ratingElement.style.borderRadius = '4px';
-  ratingElement.style.backgroundColor = 'rgba(0, 0, 0, 0.7)';
-  ratingElement.style.color = 'white';
-  ratingElement.style.fontSize = '12px';
-  ratingElement.style.fontWeight = 'bold';
-  ratingElement.style.textDecoration = 'none'; // Remove underline for links
-  ratingElement.style.display = 'block'; // Ensure it's a block element like the div was
-
   // If we have a URL, set anchor-specific properties
   if (url) {
     ratingElement.href = url;
     ratingElement.target = '_blank'; // Open in new tab
     ratingElement.title = 'Click to view on Douban';
-    ratingElement.style.cursor = 'pointer';
+  }
+
+  // Ensure parent element has position relative for absolute positioning to work
+  if (getComputedStyle(movieElement).position === 'static') {
+    movieElement.classList.add('movie-container');
   }
 
   // Create rating content
@@ -222,11 +212,5 @@ function displayDoubanRating(ratingValue, url, movieElement) {
   `;
 
   ratingElement.innerHTML = ratingHtml;
-
-  // Ensure parent element has position relative for absolute positioning to work
-  if (getComputedStyle(movieElement).position === 'static') {
-    movieElement.style.position = 'relative';
-  }
-
   movieElement.appendChild(ratingElement);
 }

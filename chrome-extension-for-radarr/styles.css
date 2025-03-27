@@ -2,6 +2,24 @@
   display: inline-flex;
   align-items: center;
   margin-left: 10px;
+  position: absolute;
+  top: 5px;
+  right: 5px;
+  z-index: 10;
+  padding: 3px 6px;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: bold;
+  text-decoration: none;
+  display: block;
+}
+
+a.douban-rating {
+  cursor: pointer;
+}
+
+.movie-container {
+  position: relative;
 }
 
 .douban-score {
@@ -10,6 +28,7 @@
   background-color: #f9f9f9;
   border-radius: 4px;
   padding: 2px 6px;
+  border: 1px solid rgba(0, 0, 0, 0.5);
 }
 
 .douban-logo {
