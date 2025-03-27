@@ -134,10 +134,8 @@ function setupIntersectionObserver() {
     entries.forEach(entry => {
       if (entry.isIntersecting) {
         const element = entry.target;
-        if (element.getAttribute('douban-processed') !== 'true') {
-          // Process this element when it comes into view
-          processMovieElement(element);
-        }
+        // Process this element when it comes into view
+        processMovieElement(element);
         // Unobserve after processing
         observer.unobserve(element);
       }
@@ -148,9 +146,7 @@ function setupIntersectionObserver() {
   function observeMovieElements() {
     const movieElements = document.querySelectorAll('div[class^="MovieIndexPoster-content"]');
     movieElements.forEach(element => {
-      if (element.getAttribute('douban-processed') !== 'true') {
-        observer.observe(element);
-      }
+      observer.observe(element);
     });
   }
 
@@ -163,10 +159,8 @@ function setupIntersectionObserver() {
 
 // Function to process elements that weren't processed during scrolling
 function processUnprocessedElements() {
-  console.log('Scrolling stopped, processing any missed elements');
-  const movieElements = document.querySelectorAll('div[class^="MovieIndexPoster-content"]:not([douban-processed="true"])');
+  const movieElements = document.querySelectorAll('div[class^="MovieIndexPoster-content"]');
   if (movieElements.length > 0) {
-    console.log(`Found ${movieElements.length} unprocessed movie elements`);
     checkForMovieItems(true); // Force processing
   }
 }
@@ -195,12 +189,10 @@ function fetchMoviesFromRadarrAPI() {
 
   // Check if we have a valid cache
   if (movieCache && (currentTime - lastMovieCacheTime < MOVIE_CACHE_TTL)) {
-    console.log('Using cached movie data from Radarr API');
     processMoviesFromAPI(movieCache);
     return;
   }
 
-  console.log('Fetching fresh movie data from Radarr API');
   fetch(`${radarrApiRoot}/api/v3/movie?apikey=${radarrApiKey}`)
     .then(response => {
       if (!response.ok) {
@@ -223,9 +215,7 @@ function processMoviesFromAPI(movies) {
   const movieElements = document.querySelectorAll('div[class^="MovieIndexPoster-content"]');
 
   movieElements.forEach(element => {
-    if (element.getAttribute('douban-processed') !== 'true') {
-      processMovieElement(element);
-    }
+    processMovieElement(element);
   });
 }
 
@@ -248,7 +238,7 @@ function processMovieElement(movieElement) {
   const currentMovieId = movieElement.getAttribute('data-douban-tmdb-id');
 
   // If the element has been processed for this specific movie, no need to process again
-  if (movieElement.getAttribute('douban-processed') === 'true' && currentMovieId === tmdbId) {
+  if (currentMovieId === tmdbId) {
     return;
   }
 
@@ -258,15 +248,12 @@ function processMovieElement(movieElement) {
     if (existingRating) {
       existingRating.remove();
     }
-    movieElement.setAttribute('douban-processed', 'false');
   }
 
   // Find matching movie in our cache
   const movie = movieCache.find(m => m.tmdbId == tmdbId);
 
   if (movie && movie.imdbId) {
-    // Mark as being processed to prevent duplicates
-    movieElement.setAttribute('douban-processed', 'processing');
     // Store the current movie ID to detect changes
     movieElement.setAttribute('data-douban-tmdb-id', tmdbId);
 
@@ -275,13 +262,11 @@ function processMovieElement(movieElement) {
       // Use cached rating and url
       const { rating, url } = ratingCache[tmdbId];
       displayDoubanRating(rating, url, movieElement);
-      movieElement.setAttribute('douban-processed', 'true');
     } else {
       // Fetch rating and then display it
       fetchDoubanRating(movie.imdbId, tmdbId)
         .then(({ rating, url }) => {
           displayDoubanRating(rating, url, movieElement);
-          movieElement.setAttribute('douban-processed', 'true');
         });
     }
   }
