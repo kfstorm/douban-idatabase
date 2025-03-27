@@ -26,6 +26,8 @@ class Settings(BaseSettings):
         os.getenv("REQUEST_DELAY_MAX_SECONDS", "3")
     )
 
+    RATE_LIMIT_USE_ZENROWS: bool = bool(os.getenv("RATE_LIMIT_USE_ZENROWS", "false"))
+
     ITEM_REFRESH_INTERVAL_DAYS_DEFAULT: int = int(
         os.getenv("ITEM_REFRESH_INTERVAL_MINUTES", "30")
     )

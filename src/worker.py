@@ -310,11 +310,10 @@ def fetch_imdb_id_with_html_regex(
     url = url_pattern.format(douban_id)
     logger.info(f"Fetching IMDb ID from {html_type} page for douban_id={douban_id}...")
 
-    response = get_response(
+    with get_response(
         http_session, url, headers=COMMON_HEADERS, allow_redirects=True
-    )
-
-    match = imdb_id_pattern.search(response.text)
+    ) as response:
+        match = imdb_id_pattern.search(response.text)
     if match:
         imdb_id = match.group(1)
     else:
@@ -356,7 +355,7 @@ def fetch_imdb_id(http_session: requests.Session, douban_id: int) -> dict:
     except Exception as e:
         logger.warning(
             "Error fetching IMDb ID from mobile description page"
-            f"for douban_id={douban_id}: {str(e)}"
+            f" for douban_id={douban_id}: {str(e)}"
         )
         first_exception = first_exception or e
 
