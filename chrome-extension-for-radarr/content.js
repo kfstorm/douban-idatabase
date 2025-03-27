@@ -231,7 +231,7 @@ function processMoviesFromAPI(movies) {
 
 // Function to process a single movie element
 function processMovieElement(movieElement) {
-  if (!movieCache || movieElement.getAttribute('douban-processed') === 'true') {
+  if (!movieCache) {
     return;
   }
 
@@ -244,12 +244,31 @@ function processMovieElement(movieElement) {
 
   if (!tmdbId) return;
 
+  // Check if this element has already been processed for this specific movie
+  const currentMovieId = movieElement.getAttribute('data-douban-tmdb-id');
+
+  // If the element has been processed for this specific movie, no need to process again
+  if (movieElement.getAttribute('douban-processed') === 'true' && currentMovieId === tmdbId) {
+    return;
+  }
+
+  // If the element has a rating display but for a different movie, remove it
+  if (currentMovieId && currentMovieId !== tmdbId) {
+    const existingRating = movieElement.querySelector('.douban-rating');
+    if (existingRating) {
+      existingRating.remove();
+    }
+    movieElement.setAttribute('douban-processed', 'false');
+  }
+
   // Find matching movie in our cache
   const movie = movieCache.find(m => m.tmdbId == tmdbId);
 
   if (movie && movie.imdbId) {
     // Mark as being processed to prevent duplicates
     movieElement.setAttribute('douban-processed', 'processing');
+    // Store the current movie ID to detect changes
+    movieElement.setAttribute('data-douban-tmdb-id', tmdbId);
 
     // Check if rating is already in cache
     if (ratingCache[tmdbId] !== undefined) {
@@ -307,6 +326,12 @@ function fetchDoubanRating(imdbId, tmdbId) {
 
 // Function to display the Douban rating in the UI
 function displayDoubanRating(ratingValue, url, movieElement) {
+  // Remove any existing rating element first
+  const existingRating = movieElement.querySelector('.douban-rating');
+  if (existingRating) {
+    existingRating.remove();
+  }
+
   // Create base element - use an anchor if we have a URL, otherwise a div
   const ratingElement = document.createElement(url ? 'a' : 'div');
   ratingElement.className = 'douban-rating';
