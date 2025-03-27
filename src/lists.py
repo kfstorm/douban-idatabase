@@ -88,7 +88,7 @@ class ListsApi:
     def _read_one_page(self, start: int, count: int) -> Any:
         return get_json(
             self.http_session,
-            f"{self.base_url}/skynet/new_playlists?apikey={self.api_key}&subject_type=movie&start={start}&count={count}",
+            f"{self.base_url}/skynet/new_playlists?apikey={self.api_key}&start={start}&count={count}",
             headers=self.headers,
         )
 
