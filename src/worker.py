@@ -74,9 +74,9 @@ def process_queue_items(db: Session, http_session: requests.Session) -> None:
                 process_list(db, http_session, queue_item)
             else:
                 logger.warning(f"Unsupported queue item type: {item_type}")
-                # Remove unsupported item from queue
-                db.delete(queue_item)
-                db.commit()
+            # Remove the item from queue
+            db.delete(queue_item)
+            db.commit()
 
             processed_count += 1
         except RateLimitException as e:
@@ -87,7 +87,9 @@ def process_queue_items(db: Session, http_session: requests.Session) -> None:
             logger.exception(
                 f"Error processing queue item {queue_item.id} of type {queue_item.type}: {e}"  # noqa: B950
             )
-            db.rollback()
+            # Remove the item from queue even if there's an error
+            db.delete(queue_item)
+            db.commit()
             processed_count += 1  # Count as processed even if there's an error
             # Continue with next item
 
@@ -146,10 +148,6 @@ def process_douban_id(
     # Save the item to database
     save_item_to_db(db, item)
 
-    # Remove from queue
-    db.delete(queue_item)
-    db.commit()
-
     logger.info(
         f"Successfully processed douban_id={douban_id}, title={item.douban_title}"
     )
@@ -186,10 +184,6 @@ def process_list(
 
         # Add to queue and known_douban_id table
         add_to_queue(db, "douban_id", douban_id)
-
-    # Remove the processed list from queue
-    db.delete(queue_item)
-    db.commit()
 
 
 def fetch_imdb_id_from_csv(douban_id: int) -> dict:
