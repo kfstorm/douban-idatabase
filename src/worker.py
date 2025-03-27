@@ -9,7 +9,7 @@ from datetime import datetime
 from sqlalchemy.orm import Session
 
 from .lists import CollectionApi, DoulistApi
-from .models import Queue, Item, History
+from .models import Queue, Item, History, add_to_queue
 from .config import settings
 from .http import RateLimitException, get_response, get_json
 
@@ -161,7 +161,6 @@ def process_list(
     """
     Process a queue item of type 'subject_collection' or 'doulist'
     """
-
     list_type = queue_item.type
     list_id = queue_item.id
     logger.info(f"Processing list {list_type} {list_id} ...")
@@ -174,16 +173,21 @@ def process_list(
     list_api = list_apis[list_type]
     items = list_api.get_items(list_id)
     known_ids = set()
+
+    # Process items in list
     for item in items:
         parsed_url = urlparse(item["url"])
-        douban_id = int([_ for _ in parsed_url.path.split("/") if _][-1])
-        # Check if already in queue
+        douban_id = [_ for _ in parsed_url.path.split("/") if _][-1]
+
+        # Skip if already processed in this batch
         if douban_id in known_ids:
             continue
         known_ids.add(douban_id)
-        existing = db.query(Queue).get(("douban_id", douban_id))
-        if not existing:
-            db.add(Queue(type="douban_id", id=douban_id))
+
+        # Add to queue and known_douban_id table
+        add_to_queue(db, "douban_id", douban_id)
+
+    # Remove the processed list from queue
     db.delete(queue_item)
     db.commit()
 

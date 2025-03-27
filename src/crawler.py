@@ -1,9 +1,8 @@
 import re
 import logging
 import requests
-from datetime import datetime
 from sqlalchemy.orm import Session
-from .models import Queue
+from .models import add_to_queue
 from urllib.parse import urlencode
 from .config import settings
 from .http import get_json
@@ -114,23 +113,9 @@ def search_recent_douban_movies(db: Session, http_session: requests.Session):
             # Add all found Douban IDs to the queue
             for douban_id in douban_ids:
                 try:
-                    # Check if already in queue
-                    existing = (
-                        db.query(Queue)
-                        .filter(Queue.type == "douban_id", Queue.id == douban_id)
-                        .first()
-                    )
-
-                    if not existing:
-                        # Add to queue
-                        queue_item = Queue(
-                            type="douban_id",
-                            id=douban_id,
-                            params=None,
-                            upsert_time=datetime.utcnow(),
-                        )
-                        db.add(queue_item)
-                        db.commit()
+                    # Use common method to add to queue and known_douban_id
+                    was_added = add_to_queue(db, "douban_id", douban_id)
+                    if was_added:
                         added_count += 1
                         logger.info(f"Added Douban ID {douban_id} to queue")
                 except Exception as e:

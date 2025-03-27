@@ -9,7 +9,7 @@ from .database import SessionLocal
 from .worker import process_queue_items
 from .crawler import search_recent_douban_movies
 from .lists import bootstrap_lists
-from .models import Schedule
+from .models import Item, Schedule, KnownDoubanId, add_to_queue
 from .http import new_http_session, RateLimitException
 
 logger = logging.getLogger(__name__)
@@ -22,12 +22,14 @@ scheduler_thread = None
 SCHEDULE_TYPE_GOOGLE_SEARCH = "google_search"
 SCHEDULE_TYPE_PROCESS_QUEUE = "process_queue"
 SCHEDULE_TYPE_BOOTSTRAP_LISTS = "bootstrap_lists"
+SCHEDULE_TYPE_REFRESH_FROM_KNOWN_DOUBAN_ID = "refresh_from_known_douban_id"
 
 # Schedule intervals (in seconds)
 SCHEDULE_INTERVALS = {
     SCHEDULE_TYPE_GOOGLE_SEARCH: 3600,  # 1 hour
     SCHEDULE_TYPE_PROCESS_QUEUE: 1,  # 1 second
     SCHEDULE_TYPE_BOOTSTRAP_LISTS: 86400,  # 1 day
+    SCHEDULE_TYPE_REFRESH_FROM_KNOWN_DOUBAN_ID: 86400,  # 1 day
 }
 
 
@@ -77,6 +79,47 @@ def get_next_schedule_run(db: Session):
     )
 
 
+def refresh_from_known_douban_id(db: Session):
+    """
+    Periodically refresh data from known_douban_id by adding them back to the queue
+    Processes all known IDs (no sampling)
+    """
+    logger.info("Starting refresh from known_douban_id...")
+
+    # Add all douban IDs from `item` table to `known_douban_id` table
+    douban_ids_from_items = db.query(Item.douban_id).all()
+    for row in douban_ids_from_items:
+        douban_id = row[0]
+        if (
+            not db.query(KnownDoubanId)
+            .filter(KnownDoubanId.douban_id == douban_id)
+            .first()
+        ):
+            db.add(KnownDoubanId(douban_id=douban_id))
+    db.commit()
+
+    # Get all known douban IDs
+    known_ids = db.query(KnownDoubanId.douban_id).all()
+    total_ids = len(known_ids)
+
+    if total_ids == 0:
+        logger.info("No known Douban IDs found. Skipping refresh.")
+        return
+
+    logger.info(f"Found {total_ids} known Douban IDs to refresh")
+
+    # Add all IDs to queue
+    added_count = 0
+    for id_tuple in known_ids:
+        douban_id = str(id_tuple[0])
+        if add_to_queue(db, "douban_id", douban_id):
+            added_count += 1
+
+    logger.info(
+        f"Added {added_count} out of {total_ids} Douban IDs to queue for refresh"
+    )
+
+
 def execute_scheduled_task(
     db: Session, http_session: requests.Session, schedule_type: str
 ) -> datetime:
@@ -88,6 +131,8 @@ def execute_scheduled_task(
             process_queue_items(db, http_session)
         elif schedule_type == SCHEDULE_TYPE_BOOTSTRAP_LISTS:
             bootstrap_lists(db, http_session)
+        elif schedule_type == SCHEDULE_TYPE_REFRESH_FROM_KNOWN_DOUBAN_ID:
+            refresh_from_known_douban_id(db)
         else:
             logger.warning(f"Unknown schedule type: {schedule_type}")
     except RateLimitException as e:

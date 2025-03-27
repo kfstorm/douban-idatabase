@@ -5,7 +5,7 @@ import requests
 from sqlalchemy.orm import Session
 from typing import Any, Iterator, List
 from .http import get_json
-from .models import Queue
+from .models import add_to_queue
 
 
 logger = logging.getLogger(__name__)
@@ -121,11 +121,8 @@ def bootstrap_lists(db: Session, http_session: requests.Session):
                 list_type = url_parts[0]
             list_id = url_parts[1]
         if list_type == "subject_collection" or list_type == "doulist":
-            # Check if list is already in queue
-            existing = db.query(Queue).get((list_type, list_id))
-            if not existing:
-                db.add(Queue(type=list_type, id=list_id))
-                db.commit()
+            # Use common method to add to queue
+            add_to_queue(db, list_type, list_id)
         else:
             logger.warning(f"Unknown list type: {list_type}")
         count += 1
