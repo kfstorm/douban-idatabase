@@ -30,7 +30,7 @@ class Settings(BaseSettings):
         os.getenv("ITEM_REFRESH_INTERVAL_MINUTES", "30")
     )
 
-    IDMB_CSV_PATH: str = os.getenv("IDMB_CSV_PATH", "")
+    IMDB_CSV_PATH: str = os.getenv("IMDB_CSV_PATH", "")
 
     class Config:
         env_file = ".env"

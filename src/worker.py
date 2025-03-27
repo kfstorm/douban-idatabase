@@ -189,12 +189,12 @@ def process_list(
 
 
 def fetch_imdb_id_from_csv(douban_id: int) -> dict:
-    if not settings.IDMB_CSV_PATH:
+    if not settings.IMDB_CSV_PATH:
         return None
-    if not os.path.exists(settings.IDMB_CSV_PATH):
-        logger.warning(f"IMDb CSV file not found: {settings.IDMB_CSV_PATH}")
+    if not os.path.exists(settings.IMDB_CSV_PATH):
+        logger.warning(f"IMDb CSV file not found: {settings.IMDB_CSV_PATH}")
         return None
-    with open(settings.IDMB_CSV_PATH, "r") as f:
+    with open(settings.IMDB_CSV_PATH, "r") as f:
         reader = csv.reader(f)
         for row in reader:
             if douban_id == int(row[0]):
@@ -209,7 +209,7 @@ def fetch_imdb_id_from_csv(douban_id: int) -> dict:
                     "imdb_id": imdb_id,
                     "raw_data": {
                         "imdb_id": imdb_id,
-                        "imdb_source": os.path.basename(settings.IDMB_CSV_PATH),
+                        "imdb_source": os.path.basename(settings.IMDB_CSV_PATH),
                     },
                 }
     return None
