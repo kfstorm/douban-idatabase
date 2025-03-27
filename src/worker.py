@@ -9,14 +9,14 @@ from datetime import datetime
 from sqlalchemy.orm import Session
 
 from .lists import CollectionApi, DoulistApi
-from .models import Queue, Item, History, add_to_queue
+from .models import Queue, Item, History
 from .config import settings
 from .http import RateLimitException, get_response, get_json
 
 logger = logging.getLogger(__name__)
 
 # Updated Douban API URL for fetching movie details (mobile API)
-DOUBAN_API_URL = "https://m.douban.com/rexxar/api/v2/movie/{}"
+DOUBAN_REXXAR_API_URL = "https://m.douban.com/rexxar/api/v2/movie/{}"
 DOUBAN_DESKTOP_HTML_URL = "https://movie.douban.com/subject/{}/"
 DOUBAN_MOBILE_DESC_URL = "https://www.douban.com/doubanapp/h5/movie/{}/desc"
 IMDB_DESKTOP_HTML_PATTERN = re.compile(r"IMDb:.*?(\btt\d+\b)")
@@ -111,6 +111,17 @@ def process_queue_items(db: Session, http_session: requests.Session) -> None:
     )
 
 
+def allow_update_item(existing_item: Item) -> bool:
+    if existing_item and existing_item.update_time:
+        time_diff = datetime.utcnow() - existing_item.update_time
+        min_update_interval_days = settings.ITEM_REFRESH_INTERVAL_DAYS_DEFAULT * (
+            (existing_item.douban_id % 100) / 100 + 0.5
+        )
+        if time_diff.days < min_update_interval_days:
+            return False
+    return True
+
+
 def process_douban_id(
     db: Session, http_session: requests.Session, queue_item: Queue
 ) -> None:
@@ -121,21 +132,11 @@ def process_douban_id(
 
     # Check if item already exists and was updated within 1 day
     existing_item = db.query(Item).filter(Item.douban_id == douban_id).first()
-    if existing_item and existing_item.update_time:
-        time_diff = datetime.utcnow() - existing_item.update_time
-        min_update_interval_days = settings.ITEM_REFRESH_INTERVAL_DAYS_DEFAULT * (
-            (douban_id % 100) / 100 + 0.5
-        )
-        if time_diff.days < min_update_interval_days:
-            logger.info(
-                f"Skipping douban_id={douban_id},"
-                f" already updated recently ({time_diff.days} days ago)."
-                f" Min interval: {min_update_interval_days} days."
-            )
-            # Remove from queue since it's too recent to update
-            db.delete(queue_item)
-            db.commit()
-            return
+    if not allow_update_item(existing_item):
+        # Remove from queue since it's too recent to update
+        db.delete(queue_item)
+        db.commit()
+        return
 
     # Fetch data from Douban and create Item object
     item = fetch_douban_item(http_session, douban_id)
@@ -176,16 +177,23 @@ def process_list(
 
     # Process items in list
     for item in items:
-        parsed_url = urlparse(item["url"])
-        douban_id = [_ for _ in parsed_url.path.split("/") if _][-1]
+        detail_info = extract_douban_item_detail(item, f"{list_type}/{list_id}")
+        douban_id = detail_info["douban_id"]
 
         # Skip if already processed in this batch
         if douban_id in known_ids:
             continue
         known_ids.add(douban_id)
 
-        # Add to queue and known_douban_id table
-        add_to_queue(db, "douban_id", douban_id)
+        existing_item = db.query(Item).filter(Item.douban_id == douban_id).first()
+        if allow_update_item(existing_item):
+            imdb_info = fetch_imdb_id(http_session, douban_id)
+            if not imdb_info:
+                logger.warning(f"Failed to fetch IMDb ID for douban_id={douban_id}")
+                continue
+
+            item = merge_item(detail_info, imdb_info)
+            save_item_to_db(db, item)
 
 
 def fetch_imdb_id_from_csv(douban_id: int) -> dict:
@@ -335,58 +343,77 @@ def fetch_imdb_id(http_session: requests.Session, douban_id: int) -> dict:
     }
 
 
-def fetch_douban_item_detail(http_session: requests.Session, douban_id: int) -> Item:
+def extract_douban_item_detail(item: dict, source: str) -> dict:
     """
-    Fetch movie data from Douban Mobile API and return an Item object
+    Extract relevant fields from a Douban item detail response
     """
-    # Construct the API URL with douban_id
-    url = DOUBAN_API_URL.format(douban_id)
+    # Try to extract Douban ID from various fields
+    fields_to_extract_douban_id = ["url", "uri", "target_id", "id"]
+    douban_id = None
+    for field_name in fields_to_extract_douban_id:
+        if field_name in item:
+            value = item[field_name]
+            if value.isdecimal():
+                douban_id = int(value)
+            else:
+                parsed_url = urlparse(value)
+                douban_id = int([_ for _ in parsed_url.path.split("/") if _][-1])
+            break
+    if not douban_id:
+        raise ValueError(f"Could not extract Douban ID from item: {item}")
 
-    # Make request with redirects enabled
-    data = get_json(http_session, url, headers=COMMON_HEADERS, allow_redirects=True)
-
-    # Extract relevant fields from the more detailed API response
-    if not data or "id" not in data:
-        logger.error(
-            f"Invalid response from Douban API for douban_id={douban_id}: {data}"
-        )
-        return None
-
-    # Check if the ID matches the requested douban_id
-    if str(data["id"]) != str(douban_id):
-        logger.error(
-            f"ID mismatch in response from Douban API for douban_id={douban_id}: {data}"
-        )
-        return None
-
-    title = data.get("title")
+    title = item.get("title")
+    if not title:
+        raise ValueError(f"Could not extract title from item: {item}")
 
     # Try to extract year
-    year = None
-    if data.get("year"):
-        try:
-            year = int(data.get("year"))
-        except (ValueError, TypeError):
-            pass
+    year = int(item.get("year")) if "year" in item else None
+    if not year:
+        card_subtitle = item.get("card_subtitle") or item.get("subtitle")
+        if card_subtitle:
+            parts = card_subtitle.split("/")
+            year_str = parts[0].strip()
+            year_str: str
+            if len(year_str) == 4 and year_str.isdecimal():
+                year = int(year_str)
 
     # Get rating
     rating = None
-    if data.get("rating") and data["rating"].get("value"):
+    if item.get("rating") and item["rating"].get("value"):
         try:
-            rating = float(data["rating"]["value"])
+            rating = float(item["rating"]["value"])
         except (ValueError, TypeError):
             pass
 
-    logger.info(f"Successfully fetched detail for douban_id={douban_id}: {title}")
     return {
+        "douban_id": douban_id,
         "douban_title": title,
         "year": year,
         "rating": rating,
         "raw_data": {
-            "detail": data,
-            "detail_source": url,
+            "detail": item,
+            "detail_source": source,
         },
     }
+
+
+def fetch_douban_item_detail(http_session: requests.Session, douban_id: int) -> dict:
+    """
+    Fetch movie data from Douban Mobile API and return an Item object
+    """
+    # Construct the API URL with douban_id
+    url = DOUBAN_REXXAR_API_URL.format(douban_id)
+
+    # Make request with redirects enabled
+    data = get_json(http_session, url, headers=COMMON_HEADERS, allow_redirects=True)
+
+    result = extract_douban_item_detail(data, url)
+
+    logger.info(
+        "Successfully fetched detail from douban rexxar API"
+        f" for douban_id={douban_id}: {result['douban_title']}"
+    )
+    return result
 
 
 def fetch_douban_item(http_session: requests.Session, douban_id: int) -> Item:
@@ -401,15 +428,22 @@ def fetch_douban_item(http_session: requests.Session, douban_id: int) -> Item:
     if not imdb_info:
         logger.warning(f"Failed to fetch IMDb ID for douban_id={douban_id}")
         return None
+    logger.info(
+        "Successfully fetched data"
+        f" for douban_id={douban_id}: {detail_info['douban_title']}"
+    )
+    return merge_item(detail_info, imdb_info)
 
+
+def merge_item(detail_info: dict, imdb_info: dict) -> Item:
     raw_data_obj = {
         **detail_info["raw_data"],
         **imdb_info["raw_data"],
     }
 
     # Create an Item object
-    item = Item(
-        douban_id=int(douban_id),
+    return Item(
+        douban_id=detail_info["douban_id"],
         imdb_id=imdb_info["imdb_id"],
         douban_title=detail_info["douban_title"],
         year=detail_info["year"],
@@ -417,11 +451,6 @@ def fetch_douban_item(http_session: requests.Session, douban_id: int) -> Item:
         raw_data=json.dumps(raw_data_obj, ensure_ascii=False),
         update_time=datetime.utcnow(),
     )
-
-    logger.info(
-        f"Successfully fetched data for douban_id={douban_id}: {item.douban_title}"
-    )
-    return item
 
 
 def save_item_to_db(db: Session, item: Item):

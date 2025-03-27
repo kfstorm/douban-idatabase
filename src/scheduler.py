@@ -89,7 +89,7 @@ def refresh_from_known_douban_id(db: Session):
     # Add all douban IDs from `item` table to `known_douban_id` table
     douban_ids_from_items = db.query(Item.douban_id).all()
     for row in douban_ids_from_items:
-        douban_id = row[0]
+        douban_id = int(row[0])
         if (
             not db.query(KnownDoubanId)
             .filter(KnownDoubanId.douban_id == douban_id)
@@ -112,7 +112,7 @@ def refresh_from_known_douban_id(db: Session):
     added_count = 0
     for id_tuple in known_ids:
         douban_id = str(id_tuple[0])
-        if add_to_queue(db, "douban_id", douban_id):
+        if add_to_queue(db, "douban_id", str(douban_id)):
             added_count += 1
 
     logger.info(

@@ -99,7 +99,7 @@ def search_recent_douban_movies(db: Session, http_session: requests.Session):
                 # Check if the URL matches the Douban pattern
                 match = re.search(DOUBAN_ID_PATTERN, url)
                 if match:
-                    douban_id = match.group(1)
+                    douban_id = int(match.group(1))
                     douban_ids.add(douban_id)
 
             logger.info(f"Found {len(douban_ids)} Douban IDs on page {page+1}")
@@ -114,7 +114,7 @@ def search_recent_douban_movies(db: Session, http_session: requests.Session):
             for douban_id in douban_ids:
                 try:
                     # Use common method to add to queue and known_douban_id
-                    was_added = add_to_queue(db, "douban_id", douban_id)
+                    was_added = add_to_queue(db, "douban_id", str(douban_id))
                     if was_added:
                         added_count += 1
                         logger.info(f"Added Douban ID {douban_id} to queue")
