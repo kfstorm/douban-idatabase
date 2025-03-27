@@ -46,16 +46,6 @@ class Throttler:
             raise RateLimitException(next_call_time)
         return response
 
-    def get_info(self):
-        now = datetime.utcnow()
-        return {
-            key: {
-                "is_rate_limited": now < value,
-                "next_call_time": str(value) if now < value else None,
-            }
-            for key, value in self.next_call_time.items()
-        }
-
 
 throttler = Throttler()
 
@@ -64,16 +54,7 @@ def _get_extra_http_client_args():
     return {}
 
 
-last_throttler_info_print = datetime.utcnow()
-
-
 def get_response(http_session: requests.Session, url: str, **kwargs):
-    global last_throttler_info_print
-    now = datetime.utcnow()
-    if (now - last_throttler_info_print).total_seconds() > 60:
-        last_throttler_info_print = now
-        logging.info(f"Throttler info: {throttler.get_info()}")
-
     throttler._check_rate_limit(url)
 
     headers = {
