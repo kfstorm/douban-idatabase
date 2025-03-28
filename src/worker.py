@@ -5,11 +5,10 @@ import re
 from urllib.parse import urlparse
 import requests
 import json
-from datetime import datetime
 from sqlalchemy.orm import Session
 
 from .lists import CollectionApi, DoulistApi
-from .utils import parse_douban_time
+from .utils import parse_douban_time, now_timestamp, timestamp_to_local_time_str
 from .models import Queue, Item, History, List, add_to_queue
 from .config import settings
 from .http import RateLimitException, get_response, get_json
@@ -37,8 +36,8 @@ def process_queue_items(db: Session, http_session: requests.Session) -> None:
     time_limit_seconds = settings.QUEUE_PROCESS_TIME_LIMIT_SECONDS
     processed_count = 0
 
-    # Record start time
-    start_time = datetime.utcnow()
+    # Record start time as timestamp
+    start_time = now_timestamp()
 
     queue_size_before = db.query(Queue).count()
     if not queue_size_before:
@@ -51,7 +50,7 @@ def process_queue_items(db: Session, http_session: requests.Session) -> None:
 
     while True:
         # Check if we've exceeded the time limit
-        elapsed_seconds = (datetime.utcnow() - start_time).total_seconds()
+        elapsed_seconds = now_timestamp() - start_time
         if elapsed_seconds >= time_limit_seconds:
             logger.info(
                 f"Time limit reached ({time_limit_seconds} seconds)"
@@ -100,7 +99,7 @@ def process_queue_items(db: Session, http_session: requests.Session) -> None:
             # Continue with next item
 
     # Calculate total elapsed time
-    total_elapsed_seconds = (datetime.utcnow() - start_time).total_seconds()
+    total_elapsed_seconds = now_timestamp() - start_time
 
     if processed_count > 0:
         logger.info(
@@ -117,11 +116,14 @@ def process_queue_items(db: Session, http_session: requests.Session) -> None:
 
 def allow_update_item(existing_item: Item) -> bool:
     if existing_item and existing_item.update_time:
-        time_diff = datetime.utcnow() - existing_item.update_time
+        current_time = now_timestamp()
+        time_diff_days = (
+            current_time - existing_item.update_time
+        ) / 86400  # seconds in a day
         min_update_interval_days = settings.ITEM_REFRESH_INTERVAL_DAYS_DEFAULT * (
             (existing_item.douban_id % 100) / 100 + 0.5
         )
-        if time_diff.days < min_update_interval_days:
+        if time_diff_days < min_update_interval_days:
             return False
     return True
 
@@ -197,7 +199,8 @@ def process_list(
         ):
             logger.info(
                 f"Skipping list {list_type}/{list_id}"
-                f" - no updates since last check at {list_record.last_check_time}"
+                " - no updates since last check at"
+                f" {timestamp_to_local_time_str(list_record.last_check_time)}"
             )
             return
 
@@ -229,7 +232,7 @@ def process_list(
             save_item_to_db(db, item)
 
     # Update or create list record with current check time
-    now = datetime.utcnow()
+    now = now_timestamp()
     if list_record:
         list_record.last_check_time = now
     else:
@@ -239,7 +242,7 @@ def process_list(
 
     logger.info(
         f"Successfully processed list {list_type}/{list_id}"
-        f", updated last_check_time to {now}"
+        f", updated last_check_time to {timestamp_to_local_time_str(now)}"
     )
 
 
@@ -493,7 +496,7 @@ def merge_item(detail_info: dict, imdb_info: dict) -> Item:
         year=detail_info["year"],
         rating=detail_info["rating"],
         raw_data=json.dumps(raw_data_obj, ensure_ascii=False),
-        update_time=datetime.utcnow(),
+        update_time=now_timestamp(),
     )
 
 

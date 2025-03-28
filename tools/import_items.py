@@ -3,12 +3,31 @@ import json
 import os
 import argparse
 import sys
+import pytz
 
 # change sys.path to include the parent directory
 sys.path.append(os.path.abspath(os.path.dirname(os.path.dirname(__file__))))
 
 from src.models import Item  # noqa: E402
 from src.database import SessionLocal  # noqa: E402
+
+
+def parse_time(time_str):
+    """Parse time string to datetime object."""
+    naive_datetime = None
+    try:
+        naive_datetime = datetime.strptime(time_str, "%Y-%m-%d %H:%M:%S.%f")
+    except ValueError:
+        pass
+    if not naive_datetime:
+        try:
+            naive_datetime = datetime.strptime(time_str, "%Y-%m-%d %H:%M:%S")
+        except ValueError:
+            pass
+    if naive_datetime:
+        return pytz.UTC.localize(naive_datetime).timestamp()
+    return float(time_str)
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Import items from a file.")
@@ -44,9 +63,7 @@ if __name__ == "__main__":
                     year=int(parts[3]) if parts[3] else None,
                     rating=float(parts[4]) if parts[4] else None,
                     raw_data=raw_data,
-                    update_time=datetime.strptime(
-                        parts[-1].strip(), "%Y-%m-%d %H:%M:%S.%f"
-                    ),
+                    update_time=parse_time(parts[-1]),
                 )
                 db.add(item)
                 db.commit()

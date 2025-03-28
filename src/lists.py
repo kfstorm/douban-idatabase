@@ -1,9 +1,10 @@
-from datetime import datetime
 import logging
 from urllib.parse import urlparse, parse_qs
 import requests
 from sqlalchemy.orm import Session
 from typing import Any, Iterator, List
+
+from .utils import now_timestamp
 from .http import get_json
 from .models import add_to_queue
 
@@ -106,7 +107,7 @@ def bootstrap_lists(db: Session, http_session: requests.Session):
     logger.info("Adding lists to queue...")
 
     count = 0
-    last_print = datetime.utcnow()
+    last_print = now_timestamp()
     lists_api = ListsApi(http_session)
     for item in lists_api.iter_lists():
         parsed_url = urlparse(item["sharing_url"])
@@ -126,6 +127,6 @@ def bootstrap_lists(db: Session, http_session: requests.Session):
         else:
             logger.warning(f"Unknown list type: {list_type}")
         count += 1
-        if (datetime.utcnow() - last_print).total_seconds() >= 60:
+        if now_timestamp() - last_print >= 60:
             logger.info(f"Processed {count} lists.")
-            last_print = datetime.utcnow()
+            last_print = now_timestamp()

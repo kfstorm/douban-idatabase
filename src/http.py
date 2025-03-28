@@ -1,11 +1,11 @@
 from collections import defaultdict
-from datetime import datetime, timedelta
 import random
 import time
 import requests
 from urllib.parse import urlencode, urlparse
 import logging
 from .config import settings
+from .utils import now_timestamp, timestamp_to_local_time_str
 
 
 logger = logging.getLogger(__name__)
@@ -14,20 +14,22 @@ logger = logging.getLogger(__name__)
 class RateLimitException(Exception):
     """Exception raised when a rate limit is hit."""
 
-    def __init__(self, next_call_time: datetime):
+    def __init__(self, next_call_time: float):
         self.next_call_time = next_call_time
-        message = f"Rate limited. Next call at {next_call_time}"
+        message = (
+            f"Rate limited. Next call at {timestamp_to_local_time_str(next_call_time)}"
+        )
         super().__init__(message)
 
 
 class Throttler:
     def __init__(self):
-        self.next_call_time = defaultdict(lambda: datetime.min)
+        self.next_call_time = defaultdict(lambda: 0.0)
 
     def _check_rate_limit(self, url):
         host = urlparse(url).netloc
         next_call_time = self.next_call_time[host]
-        now = datetime.utcnow()
+        now = now_timestamp()
         if now < next_call_time:
             raise RateLimitException(next_call_time)
         time.sleep(random.uniform(0, settings.REQUEST_DELAY_MAX_SECONDS))
@@ -41,9 +43,7 @@ class Throttler:
             and "subject_ip_rate_limit" in response.text
         ):
             # Rate limited.
-            next_call_time = datetime.utcnow() + timedelta(
-                seconds=settings.RATE_LIMIT_DELAY_SECONDS
-            )
+            next_call_time = now_timestamp() + settings.RATE_LIMIT_DELAY_SECONDS
             raise RateLimitException(next_call_time)
         return response
 

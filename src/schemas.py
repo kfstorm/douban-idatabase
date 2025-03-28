@@ -1,5 +1,4 @@
 from pydantic import BaseModel
-from datetime import datetime
 from typing import Optional
 
 
@@ -11,7 +10,7 @@ class ItemBase(BaseModel):
     rating: Optional[float] = None
     # Not exposed in API responses
     # raw_data: Optional[str] = None
-    update_time: datetime
+    update_time: float
 
 
 class Item(ItemBase):
@@ -23,7 +22,7 @@ class QueueBase(BaseModel):
     type: str
     id: str
     params: Optional[str] = None
-    upsert_time: datetime
+    upsert_time: float
 
 
 class Queue(QueueBase):
@@ -40,7 +39,7 @@ class HistoryBase(BaseModel):
     rating: Optional[float] = None
     # Not exposed in API responses
     # raw_data: Optional[str] = None
-    update_time: datetime
+    update_time: float
 
 
 class History(HistoryBase):
@@ -50,7 +49,7 @@ class History(HistoryBase):
 
 class ScheduleBase(BaseModel):
     type: str
-    next_run: datetime
+    next_run: float
 
 
 class Schedule(ScheduleBase):

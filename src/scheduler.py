@@ -2,7 +2,6 @@ import logging
 import threading
 import time
 import requests
-from datetime import datetime, timedelta
 from sqlalchemy.orm import Session
 
 from .database import SessionLocal
@@ -11,6 +10,7 @@ from .crawler import search_recent_douban_movies
 from .lists import bootstrap_lists
 from .models import Item, Schedule, KnownDoubanId, add_to_queue
 from .http import new_http_session, RateLimitException
+from .utils import now_timestamp, timestamp_to_local_time_str
 
 logger = logging.getLogger(__name__)
 
@@ -35,7 +35,7 @@ SCHEDULE_INTERVALS = {
 
 def initialize_schedules(db: Session):
     """Initialize default schedules if they don't exist"""
-    now = datetime.utcnow()
+    now = now_timestamp()
 
     # Initialize all schedule types
     for schedule_type in SCHEDULE_INTERVALS.keys():
@@ -48,22 +48,23 @@ def initialize_schedules(db: Session):
     db.commit()
 
 
-def update_schedule_next_run(db: Session, schedule_type: str, next_run_time: datetime):
+def update_schedule_next_run(db: Session, schedule_type: str, next_run_time: float):
     """Update the next run time for a scheduled task"""
     schedule = db.query(Schedule).filter(Schedule.type == schedule_type).first()
     if schedule:
         if next_run_time:
             schedule.next_run = next_run_time
         else:
-            now = datetime.utcnow()
+            now = now_timestamp()
             interval = SCHEDULE_INTERVALS.get(
                 schedule_type, 3600
             )  # Default to 1 hour if not found
-            schedule.next_run = now + timedelta(seconds=interval)
+            schedule.next_run = now + interval
         db.commit()
         if should_log_schedule(schedule.type):
             logger.info(
-                f"Updated schedule for {schedule_type}, next run at {schedule.next_run}"
+                f"Updated schedule for {schedule_type}"
+                f", next run at {timestamp_to_local_time_str(schedule.next_run)}"
             )
     else:
         logger.error(f"Schedule {schedule_type} not found")
@@ -71,7 +72,7 @@ def update_schedule_next_run(db: Session, schedule_type: str, next_run_time: dat
 
 def get_next_schedule_run(db: Session):
     """Get the next scheduled task to run"""
-    now = datetime.utcnow()
+    now = now_timestamp()
     return (
         db.query(Schedule)
         .filter(Schedule.next_run <= now)
@@ -123,7 +124,7 @@ def refresh_from_known_douban_id(db: Session):
 
 def execute_scheduled_task(
     db: Session, http_session: requests.Session, schedule_type: str
-) -> datetime:
+) -> float:
     """Execute a specific scheduled task based on its type"""
     try:
         if schedule_type == SCHEDULE_TYPE_GOOGLE_SEARCH:

@@ -3,13 +3,12 @@ from sqlalchemy import (
     Integer,
     String,
     Float,
-    DateTime,
     Text,
 )
-from datetime import datetime
 from .database import Base
 from sqlalchemy import and_
 import logging
+from .utils import now_timestamp
 
 logger = logging.getLogger(__name__)
 
@@ -23,7 +22,7 @@ class Item(Base):
     year = Column(Integer)
     rating = Column(Float)
     raw_data = Column(Text, nullable=True)
-    update_time = Column(DateTime, default=datetime.utcnow)
+    update_time = Column(Float, default=now_timestamp)
 
 
 class Queue(Base):
@@ -32,7 +31,7 @@ class Queue(Base):
     type = Column(String(32), primary_key=True)
     id = Column(String(128), primary_key=True)
     params = Column(String(1024))
-    upsert_time = Column(DateTime, default=datetime.utcnow, index=True)
+    upsert_time = Column(Float, default=now_timestamp, index=True)
 
 
 class History(Base):
@@ -45,21 +44,21 @@ class History(Base):
     year = Column(Integer)
     rating = Column(Float)
     raw_data = Column(Text, nullable=True)
-    update_time = Column(DateTime)
+    update_time = Column(Float)
 
 
 class Schedule(Base):
     __tablename__ = "schedule"
 
     type = Column(String(32), primary_key=True)  # Type of scheduled task
-    next_run = Column(DateTime, nullable=False, index=True)  # When to run next
+    next_run = Column(Float, nullable=False, index=True)  # When to run next
 
 
 class KnownDoubanId(Base):
     __tablename__ = "known_douban_id"
 
     douban_id = Column(Integer, primary_key=True, index=True)
-    discover_time = Column(DateTime, default=datetime.utcnow)
+    discover_time = Column(Float, default=now_timestamp)
 
 
 class List(Base):
@@ -67,7 +66,7 @@ class List(Base):
 
     list_type = Column(String(32), primary_key=True)
     list_id = Column(String(128), primary_key=True)
-    last_check_time = Column(DateTime, nullable=True)
+    last_check_time = Column(Float, nullable=True)
 
 
 def get_items(db, douban_id: int = None, imdb_id: str = None, douban_title: str = None):
@@ -118,7 +117,7 @@ def add_to_queue(db, item_type: str, item_id: str, params: str = None) -> bool:
             if not known_id:
                 # Add to known_douban_id
                 known_id = KnownDoubanId(
-                    douban_id=douban_id_int, discover_time=datetime.utcnow()
+                    douban_id=douban_id_int, discover_time=now_timestamp()
                 )
                 db.add(known_id)
                 logger.debug(
@@ -136,7 +135,7 @@ def add_to_queue(db, item_type: str, item_id: str, params: str = None) -> bool:
             type=item_type,
             id=item_id,
             params=params,
-            upsert_time=datetime.utcnow(),
+            upsert_time=now_timestamp(),
         )
         db.add(queue_item)
         db.commit()
