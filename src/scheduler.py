@@ -61,9 +61,10 @@ def update_schedule_next_run(db: Session, schedule_type: str, next_run_time: dat
             )  # Default to 1 hour if not found
             schedule.next_run = now + timedelta(seconds=interval)
         db.commit()
-        logger.info(
-            f"Updated schedule for {schedule_type}, next run at {schedule.next_run}"
-        )
+        if should_log_schedule(schedule.type):
+            logger.info(
+                f"Updated schedule for {schedule_type}, next run at {schedule.next_run}"
+            )
     else:
         logger.error(f"Schedule {schedule_type} not found")
 
@@ -144,6 +145,15 @@ def execute_scheduled_task(
         logger.exception(f"Error executing scheduled task {schedule_type}: {e}")
 
 
+def should_log_schedule(schedule_type: str) -> bool:
+    """
+    Determine if the schedule type should be logged based on its interval
+    """
+    interval = SCHEDULE_INTERVALS.get(schedule_type)
+    # Only print logs for schedules with long intervals
+    return interval >= 3600
+
+
 def unified_scheduler():
     """Background thread that handles scheduled tasks"""
     global running
@@ -162,9 +172,7 @@ def unified_scheduler():
             schedule = get_next_schedule_run(db)
 
             if schedule:
-                interval = SCHEDULE_INTERVALS[schedule.type]
-                if not interval or interval >= 3600:
-                    # Only print logs for schedules with long intervals
+                if should_log_schedule(schedule.type):
                     logger.info(f"Running scheduled task: {schedule.type}")
 
                 # Execute the appropriate task based on schedule type

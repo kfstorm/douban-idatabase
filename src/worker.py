@@ -40,8 +40,11 @@ def process_queue_items(db: Session, http_session: requests.Session) -> None:
     # Record start time
     start_time = datetime.utcnow()
 
-    # Log total queue size before processing
     queue_size_before = db.query(Queue).count()
+    if not queue_size_before:
+        return
+
+    # Log total queue size before processing
     logger.info(
         f"Starting queue processing with {queue_size_before} total items in queue"
     )
