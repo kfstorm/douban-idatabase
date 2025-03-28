@@ -117,13 +117,12 @@ def process_queue_items(db: Session, http_session: requests.Session) -> None:
 def allow_update_item(existing_item: Item) -> bool:
     if existing_item and existing_item.update_time:
         current_time = now_timestamp()
-        time_diff_days = (
-            current_time - existing_item.update_time
-        ) / 86400  # seconds in a day
-        min_update_interval_days = settings.ITEM_REFRESH_INTERVAL_DAYS_DEFAULT * (
-            (existing_item.douban_id % 100) / 100 + 0.5
+        min_update_interval_seconds = (
+            settings.ITEM_REFRESH_INTERVAL_DAYS_DEFAULT
+            * 86400
+            * ((existing_item.douban_id % 10000) / 10000 + 0.5)
         )
-        if time_diff_days < min_update_interval_days:
+        if current_time - existing_item.update_time < min_update_interval_seconds:
             return False
     return True
 
