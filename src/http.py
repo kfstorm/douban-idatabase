@@ -8,6 +8,9 @@ import logging
 from .config import settings
 
 
+logger = logging.getLogger(__name__)
+
+
 class RateLimitException(Exception):
     """Exception raised when a rate limit is hit."""
 
@@ -85,7 +88,7 @@ def get_response(http_session: requests.Session, url: str, **kwargs):
         throttler._check_rate_limit(url)
     except RateLimitException as e:
         if settings.RATE_LIMIT_USE_ZENROWS and settings.ZENROWS_API_KEY:
-            logging.warning("Rate limited. Trying via ZenRows API...")
+            logger.warning("Rate limited. Trying via ZenRows API...")
             return get_response_via_zenrows(http_session, url, **kwargs)
         else:
             raise e
@@ -102,7 +105,7 @@ def get_response(http_session: requests.Session, url: str, **kwargs):
             and host != "api.zenrows.com"
         ):
             response.close()
-            logging.warning("Rate limited. Trying via ZenRows API...")
+            logger.warning("Rate limited. Trying via ZenRows API...")
             return get_response_via_zenrows(http_session, url, **kwargs)
         else:
             throttler.next_call_time[host] = e.next_call_time
@@ -110,7 +113,7 @@ def get_response(http_session: requests.Session, url: str, **kwargs):
     try:
         response.raise_for_status()
     except requests.HTTPError as e:
-        logging.error(f"Failed to fetch {url}: {e}")
+        logger.error(f"Failed to fetch {url}: {str(e)}")
         raise e
 
     return response

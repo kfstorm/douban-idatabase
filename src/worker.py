@@ -376,14 +376,12 @@ def fetch_imdb_id(http_session: requests.Session, douban_id: int) -> dict:
         logger.error(f"All IMDb ID fetch methods failed for douban_id={douban_id}")
         raise first_exception
 
-    # Return None or empty result if all methods failed without exception
-    return {
-        "imdb_id": None,
-        "raw_data": {
-            "imdb_id": None,
-            "imdb_source": None,
-        },
-    }
+    if not result:
+        raise Exception(
+            f"Failed to fetch IMDb ID for douban_id={douban_id}"
+            " using all available methods"
+        )
+    return result
 
 
 def extract_douban_item_detail(item: dict, source: str) -> dict:
