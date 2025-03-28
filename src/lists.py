@@ -3,6 +3,7 @@ from urllib.parse import urlparse, parse_qs
 import requests
 from sqlalchemy.orm import Session
 from typing import Any, Iterator, List
+from tqdm import tqdm
 
 from .utils import now_timestamp
 from .http import get_json
@@ -16,16 +17,31 @@ def read_pages(read_one_page, get_total, get_items, items_per_page) -> Iterator[
     total = None
     start = 0
     count = items_per_page
-    while total is None or start < total:
-        page_data = read_one_page(start, count)
-        if total is None:
-            total = get_total(page_data)
-        new_items = get_items(page_data)
-        for item in new_items:
-            yield item
-        start += len(new_items)
-        if not new_items:
-            break
+    pbar = None
+
+    try:
+        while total is None or start < total:
+            page_data = read_one_page(start, count)
+            if total is None:
+                total = get_total(page_data)
+                # Initialize progress bar after we know the total
+                pbar = tqdm(total=total)
+
+            for item in get_items(page_data):
+                yield item
+            if pbar:
+                pbar.update(min(count, total - start))
+
+            # Due to the logic of douban, the count of returned items
+            # may be less than the specified count per page.
+            # Maybe some items are deleted, hidden, or not available.
+            # So we still add the specified count to start.
+            start += count
+            if start >= total:
+                break
+    finally:
+        if pbar:
+            pbar.close()
 
 
 class BaseApi:
@@ -130,3 +146,5 @@ def bootstrap_lists(db: Session, http_session: requests.Session):
         if now_timestamp() - last_print >= 60:
             logger.info(f"Processed {count} lists.")
             last_print = now_timestamp()
+
+    logger.info(f"Finished adding lists to queue. Total: {count}")
