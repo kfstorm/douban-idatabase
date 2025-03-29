@@ -1,6 +1,8 @@
 import logging
 import os
 import sqlite3
+import gzip
+import shutil
 from datetime import datetime
 from pathlib import Path
 
@@ -29,7 +31,7 @@ def get_database_path():
 
 
 def perform_backup():
-    """Perform SQLite online backup"""
+    """Perform SQLite online backup with compression"""
     if not settings.BACKUP_ENABLED:
         logger.info("Database backup is disabled. Skipping...")
         return False
@@ -53,12 +55,15 @@ def perform_backup():
 
     # Generate backup filename with timestamp
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    backup_filename = f"backup_{timestamp}.sqlite3"
-    backup_path = backup_dir / backup_filename
-    backup_abs_path = os.path.abspath(str(backup_path))
+    temp_backup_filename = f"backup_{timestamp}.sqlite3"
+    compressed_backup_filename = f"backup_{timestamp}.sqlite3.gz"
+    temp_backup_path = backup_dir / temp_backup_filename
+    compressed_backup_path = backup_dir / compressed_backup_filename
+
+    temp_backup_abs_path = os.path.abspath(str(temp_backup_path))
 
     # Ensure we're not trying to backup a file to itself
-    if backup_abs_path == db_abs_path:
+    if temp_backup_abs_path == db_abs_path:
         logger.error(
             "Cannot backup database to itself. Please use a different backup directory."
         )
@@ -68,11 +73,11 @@ def perform_backup():
         # Connect to source database
         source_conn = sqlite3.connect(db_path)
 
-        # Connect to destination database (backup file)
-        dest_conn = sqlite3.connect(str(backup_path))
+        # Connect to destination database (temporary backup file)
+        dest_conn = sqlite3.connect(str(temp_backup_path))
 
         # Perform backup using SQLite's backup API
-        logger.info(f"Starting database backup to {backup_path}")
+        logger.info(f"Starting database backup to {temp_backup_path}")
         start_time = now_timestamp()
 
         with source_conn:
@@ -82,8 +87,19 @@ def perform_backup():
         dest_conn.close()
         source_conn.close()
 
+        # Compress the backup file
+        logger.info(f"Compressing backup file to {compressed_backup_path}")
+        with open(temp_backup_path, "rb") as f_in:
+            with gzip.open(compressed_backup_path, "wb") as f_out:
+                shutil.copyfileobj(f_in, f_out)
+
+        # Remove the temporary uncompressed backup
+        os.remove(temp_backup_path)
+
         duration = now_timestamp() - start_time
-        logger.info(f"Database backup completed in {duration:.2f} seconds")
+        logger.info(
+            f"Database backup completed and compressed in {duration:.2f} seconds"
+        )
 
         # Clean up old backups
         cleanup_old_backups(backup_dir)
@@ -92,13 +108,14 @@ def perform_backup():
 
     except sqlite3.Error as e:
         logger.error(f"SQLite error during backup: {e}")
-        # Try to clean up partial backup file if it exists
-        if os.path.exists(backup_path):
-            try:
-                os.remove(backup_path)
-                logger.info(f"Removed partial backup file: {backup_path}")
-            except OSError as ose:
-                logger.error(f"Failed to remove partial backup file: {ose}")
+        # Try to clean up partial backup files if they exist
+        for path in [temp_backup_path, compressed_backup_path]:
+            if os.path.exists(path):
+                try:
+                    os.remove(path)
+                    logger.info(f"Removed partial backup file: {path}")
+                except OSError as ose:
+                    logger.error(f"Failed to remove partial backup file: {ose}")
         return False
     except Exception as e:
         logger.exception(f"Unexpected error during backup: {e}")
@@ -111,6 +128,7 @@ def cleanup_old_backups(backup_dir):
     Always keeps at least one backup regardless of age.
     Excludes the working database file if it's in the same directory.
     Only processes files that match the backup naming pattern.
+    Handles both compressed (.sqlite3.gz) and uncompressed (.sqlite3) backups.
     """
     retention_seconds = settings.BACKUP_KEEP_SECONDS
     if retention_seconds <= 0:
@@ -129,16 +147,17 @@ def cleanup_old_backups(backup_dir):
         else:
             working_db_abs_path = None
 
-        # Get all backup files that match our backup filename pattern
+        # Get all backup files that match our backup filename patterns
         # and sort them by modification time (newest first)
         backup_files = []
-        for file in backup_dir.glob("backup_*.sqlite3"):
-            file_abs_path = os.path.abspath(str(file))
-            # Skip the working database file
-            if working_db_abs_path and file_abs_path == working_db_abs_path:
-                logger.info(f"Skipping working database file: {file.name}")
-                continue
-            backup_files.append(file)
+        for pattern in ["backup_*.sqlite3", "backup_*.sqlite3.gz"]:
+            for file in backup_dir.glob(pattern):
+                file_abs_path = os.path.abspath(str(file))
+                # Skip the working database file
+                if working_db_abs_path and file_abs_path == working_db_abs_path:
+                    logger.info(f"Skipping working database file: {file.name}")
+                    continue
+                backup_files.append(file)
 
         if not backup_files:
             logger.info("No backup files found. Nothing to clean up.")
