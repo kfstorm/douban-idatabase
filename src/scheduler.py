@@ -11,6 +11,8 @@ from .lists import bootstrap_lists
 from .models import Item, Schedule, KnownDoubanId, add_to_queue
 from .http import new_http_session, RateLimitException
 from .utils import now_timestamp, timestamp_to_local_time_str
+from .backup import perform_backup
+from .config import settings
 
 logger = logging.getLogger(__name__)
 
@@ -23,6 +25,7 @@ SCHEDULE_TYPE_GOOGLE_SEARCH = "google_search"
 SCHEDULE_TYPE_PROCESS_QUEUE = "process_queue"
 SCHEDULE_TYPE_BOOTSTRAP_LISTS = "bootstrap_lists"
 SCHEDULE_TYPE_REFRESH_FROM_KNOWN_DOUBAN_ID = "refresh_from_known_douban_id"
+SCHEDULE_TYPE_DATABASE_BACKUP = "database_backup"
 
 # Schedule intervals (in seconds)
 SCHEDULE_INTERVALS = {
@@ -30,6 +33,7 @@ SCHEDULE_INTERVALS = {
     SCHEDULE_TYPE_PROCESS_QUEUE: 1,  # 1 second
     SCHEDULE_TYPE_BOOTSTRAP_LISTS: 86400,  # 1 day
     SCHEDULE_TYPE_REFRESH_FROM_KNOWN_DOUBAN_ID: 86400,  # 1 day
+    SCHEDULE_TYPE_DATABASE_BACKUP: settings.BACKUP_INTERVAL_SECONDS,  # From settings
 }
 
 
@@ -135,6 +139,8 @@ def execute_scheduled_task(
             bootstrap_lists(db, http_session)
         elif schedule_type == SCHEDULE_TYPE_REFRESH_FROM_KNOWN_DOUBAN_ID:
             refresh_from_known_douban_id(db)
+        elif schedule_type == SCHEDULE_TYPE_DATABASE_BACKUP:
+            perform_backup()
         else:
             logger.warning(f"Unknown schedule type: {schedule_type}")
     except RateLimitException as e:

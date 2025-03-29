@@ -37,6 +37,16 @@ class Settings(BaseSettings):
 
     IMDB_CSV_PATH: str = os.getenv("IMDB_CSV_PATH", "")
 
+    # Backup settings
+    BACKUP_ENABLED: bool = bool(os.getenv("BACKUP_ENABLED", "true"))
+    BACKUP_INTERVAL_SECONDS: int = int(
+        os.getenv("BACKUP_INTERVAL_SECONDS", "86400")
+    )  # 24 hours
+    BACKUP_DIRECTORY: str = os.getenv("BACKUP_DIRECTORY", ".")
+    BACKUP_KEEP_SECONDS: int = int(
+        os.getenv("BACKUP_KEEP_SECONDS", "604800")
+    )  # 7 days default
+
     class Config:
         env_file = ".env"
         env_file_encoding = "utf-8"
