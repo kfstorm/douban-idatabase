@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 
 from .lists import CollectionApi, DoulistApi
 from .utils import parse_douban_time, now_timestamp, timestamp_to_local_time_str
-from .models import Queue, Item, History, List, add_to_queue
+from .models import KnownDoubanId, Queue, Item, History, List, add_to_queue
 from .config import settings
 from .http import RateLimitException, get_response, get_json
 
@@ -144,7 +144,27 @@ def process_douban_id(
         return
 
     # Fetch data from Douban and create Item object
-    item = fetch_douban_item(http_session, douban_id)
+    item = None
+    try:
+        item = fetch_douban_item(http_session, douban_id)
+    except requests.HTTPError as e:
+        if e.response.status_code == 404:
+            # Item not found. It's possible that the item is not a movie or tv,
+            # but added to known_douban_id before.
+            # It's also possible that the item was removed from Douban.
+            # In either case, we should remove it from known_douban_id.
+            logger.warning(
+                f"Item not found for douban_id={douban_id}."
+                " Removing from known_douban_id."
+            )
+            known_id = (
+                db.query(KnownDoubanId)
+                .filter(KnownDoubanId.douban_id == douban_id)
+                .first()
+            )
+            if known_id:
+                db.delete(known_id)
+                db.commit()
 
     if not item:
         logger.warning(f"Failed to fetch data for douban_id={douban_id}")
@@ -210,6 +230,8 @@ def process_list(
     # Process items in list
     for item in items:
         detail_info = extract_douban_item_detail(item, f"{list_type}/{list_id}")
+        if not detail_info:
+            continue
         douban_id = detail_info["douban_id"]
         # In case further processing fails, add to `queue` and `known_douban_id`
         # to avoid losing it.
@@ -393,6 +415,9 @@ def extract_douban_item_detail(item: dict, source: str) -> dict:
     """
     Extract relevant fields from a Douban item detail response
     """
+    if item["type"] not in ["movie", "tv"]:
+        return None
+
     # Try to extract Douban ID from various fields
     fields_to_extract_douban_id = ["url", "uri", "target_id", "id"]
     douban_id = None
@@ -454,6 +479,8 @@ def fetch_douban_item_detail(http_session: requests.Session, douban_id: int) -> 
     data = get_json(http_session, url, headers=COMMON_HEADERS, allow_redirects=True)
 
     result = extract_douban_item_detail(data, url)
+    if not result:
+        return None
 
     logger.info(
         "Successfully fetched detail from douban rexxar API"
@@ -468,11 +495,9 @@ def fetch_douban_item(http_session: requests.Session, douban_id: int) -> Item:
     """
     detail_info = fetch_douban_item_detail(http_session, douban_id)
     if not detail_info:
-        logger.warning(f"Failed to fetch detail for douban_id={douban_id}")
         return None
     imdb_info = fetch_imdb_id(http_session, douban_id)
     if not imdb_info:
-        logger.warning(f"Failed to fetch IMDb ID for douban_id={douban_id}")
         return None
     logger.info(
         "Successfully fetched data"
