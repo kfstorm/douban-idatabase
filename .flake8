@@ -2,4 +2,4 @@
 max-line-length = 80
 extend-select = B950
 extend-ignore = E203,E501,E701
-extend-immutable-calls = Depends, fastapi.Depends, fastapi.params.Depends, Query, fastapi.Query, fastapi.params.Query
+extend-immutable-calls = Depends, fastapi.Depends, fastapi.params.Depends, Query, fastapi.Query, fastapi.params.Query, Security, fastapi.Security, fastapi.params.Security, Path, fastapi.Path, fastapi.params.Path, Body, fastapi.Body, fastapi.params.Body

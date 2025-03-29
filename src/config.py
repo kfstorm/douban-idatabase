@@ -13,6 +13,9 @@ class Settings(BaseSettings):
     # ZenRows settings
     ZENROWS_API_KEY: str = os.getenv("ZENROWS_API_KEY", "")
 
+    # API Authentication
+    API_KEY: str = os.getenv("API_KEY", "")
+
     # Queue processing settings
     QUEUE_PROCESS_TIME_LIMIT_SECONDS: int = int(
         os.getenv("QUEUE_PROCESS_TIME_LIMIT_SECONDS", "60")
