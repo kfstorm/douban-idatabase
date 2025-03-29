@@ -30,6 +30,8 @@ def parse_time(time_str):
 
 
 if __name__ == "__main__":
+    # import items from
+    # `sqlite3 <DATABASE_PATH> -cmd ".mode tabs" 'select * from item' > <OUTPUT_FILE_PATH>`  # noqa: B950
     parser = argparse.ArgumentParser(description="Import items from a file.")
     parser.add_argument(
         "--file",
@@ -45,16 +47,17 @@ if __name__ == "__main__":
     db = SessionLocal()
     with open(args.file, "r", encoding="utf-8") as f:
         for line in f:
-            parts = line.split("|")
+            parts = line.split("\t")
             try:
-                assert len(parts) >= 7
+                assert len(parts) == 7
                 douban_id = int(parts[0])
 
-                if db.query(Item).get(douban_id):
+                if db.query(Item).filter(Item.douban_id == douban_id).first():
                     continue
 
-                raw_data = "|".join(parts[5:-1])
+                raw_data = parts[5]
                 if raw_data:
+                    # Test raw data for valid JSON
                     json.loads(raw_data)
                 item = Item(
                     douban_id=douban_id,
@@ -63,7 +66,7 @@ if __name__ == "__main__":
                     year=int(parts[3]) if parts[3] else None,
                     rating=float(parts[4]) if parts[4] else None,
                     raw_data=raw_data,
-                    update_time=parse_time(parts[-1]),
+                    update_time=parse_time(parts[6]),
                 )
                 db.add(item)
                 db.commit()

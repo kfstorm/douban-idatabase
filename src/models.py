@@ -127,7 +127,7 @@ def add_to_queue(db, item_type: str, item_id: str, params: str = None) -> bool:
             logger.warning(f"Invalid douban_id format: {item_id}. Error: {e}")
 
     # Check if item is already in queue
-    existing = db.query(Queue).get((item_type, item_id))
+    existing = db.query(Queue).filter_by(type=item_type, id=item_id).first()
 
     if not existing:
         # Add to queue
