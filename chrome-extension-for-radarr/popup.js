@@ -2,7 +2,8 @@
 document.addEventListener('DOMContentLoaded', function() {
   // Get current status from storage
   chrome.storage.sync.get([
-    'apiBaseUrl',
+    'doubanIdatabaseApiBaseUrl',
+    'doubanIdatabaseApiKey',
     'goodRatingThreshold',
     'mediumRatingThreshold',
     'goodRatingColor',
@@ -11,8 +12,13 @@ document.addEventListener('DOMContentLoaded', function() {
     'noRatingColor'
   ], function(data) {
     const statusElement = document.createElement('p');
-    statusElement.textContent = `API URL: ${data.apiBaseUrl || 'http://localhost:8000'}`;
+    statusElement.textContent = `API URL: ${data.doubanIdatabaseApiBaseUrl || 'http://localhost:8000'}`;
+
+    const apiKeyStatus = document.createElement('p');
+    apiKeyStatus.textContent = `douban-idatabase API Key: ${data.doubanIdatabaseApiKey ? 'Configured' : 'Not configured'}`;
+
     document.body.insertBefore(statusElement, document.querySelector('.button'));
+    document.body.insertBefore(apiKeyStatus, document.querySelector('.button'));
 
     // Add rating color legend
     const legendElement = document.createElement('div');

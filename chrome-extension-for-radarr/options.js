@@ -1,6 +1,7 @@
 // Save options to Chrome storage
 function saveOptions() {
-  const apiBaseUrl = document.getElementById('apiBaseUrl').value.trim();
+  const doubanIdatabaseApiBaseUrl = document.getElementById('doubanIdatabaseApiBaseUrl').value.trim();
+  const doubanIdatabaseApiKey = document.getElementById('doubanIdatabaseApiKey').value.trim();
   const radarrApiRoot = document.getElementById('radarrApiRoot').value.trim();
   const radarrApiKey = document.getElementById('radarrApiKey').value.trim();
   const goodRatingThreshold = parseFloat(document.getElementById('goodRatingThreshold').value) || 8.0;
@@ -11,7 +12,8 @@ function saveOptions() {
   const noRatingColor = document.getElementById('noRatingColor').value;
 
   chrome.storage.sync.set({
-    apiBaseUrl: apiBaseUrl || 'http://localhost:8000',
+    doubanIdatabaseApiBaseUrl: doubanIdatabaseApiBaseUrl || 'http://localhost:8000',
+    doubanIdatabaseApiKey: doubanIdatabaseApiKey,
     radarrApiRoot: radarrApiRoot,
     radarrApiKey: radarrApiKey,
     goodRatingThreshold: goodRatingThreshold,
@@ -36,7 +38,8 @@ function saveOptions() {
 // Restore saved options when opening the options page
 function restoreOptions() {
   chrome.storage.sync.get({
-    apiBaseUrl: 'http://localhost:8000',
+    doubanIdatabaseApiBaseUrl: 'http://localhost:8000',
+    doubanIdatabaseApiKey: '',
     radarrApiRoot: '',
     radarrApiKey: '',
     goodRatingThreshold: 8.0,
@@ -46,7 +49,8 @@ function restoreOptions() {
     lowRatingColor: '#e05924',  // red
     noRatingColor: '#888888'    // gray
   }, function(items) {
-    document.getElementById('apiBaseUrl').value = items.apiBaseUrl;
+    document.getElementById('doubanIdatabaseApiBaseUrl').value = items.doubanIdatabaseApiBaseUrl;
+    document.getElementById('doubanIdatabaseApiKey').value = items.doubanIdatabaseApiKey;
     document.getElementById('radarrApiRoot').value = items.radarrApiRoot;
     document.getElementById('radarrApiKey').value = items.radarrApiKey;
     document.getElementById('goodRatingThreshold').value = items.goodRatingThreshold;

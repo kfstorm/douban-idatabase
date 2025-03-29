@@ -1,7 +1,8 @@
 // Content script that runs on Radarr pages
 
 // Default API URL - this can be overridden in options
-let apiBaseUrl = 'http://localhost:8000';
+let doubanIdatabaseApiBaseUrl = 'http://localhost:8000';
+let doubanIdatabaseApiKey = '';
 let radarrApiRoot = '';
 let radarrApiKey = '';
 // Rating threshold settings
@@ -24,7 +25,8 @@ const MOVIE_CACHE_TTL = 5 * 60 * 1000; // 5 minutes cache validity
 
 // First, get the API settings from storage
 chrome.storage.sync.get([
-  'apiBaseUrl',
+  'doubanIdatabaseApiBaseUrl',
+  'doubanIdatabaseApiKey',
   'radarrApiRoot',
   'radarrApiKey',
   'goodRatingThreshold',
@@ -34,8 +36,12 @@ chrome.storage.sync.get([
   'lowRatingColor',
   'noRatingColor'
 ], function(data) {
-  if (data.apiBaseUrl) {
-    apiBaseUrl = data.apiBaseUrl;
+  if (data.doubanIdatabaseApiBaseUrl) {
+    doubanIdatabaseApiBaseUrl = data.doubanIdatabaseApiBaseUrl;
+  }
+
+  if (data.doubanIdatabaseApiKey) {
+    doubanIdatabaseApiKey = data.doubanIdatabaseApiKey;
   }
 
   if (data.radarrApiRoot) {
@@ -274,7 +280,12 @@ function processMovieElement(movieElement) {
 
 // Function to fetch Douban rating using the API
 function fetchDoubanRating(imdbId, tmdbId) {
-  return fetch(`${apiBaseUrl}/api/item?imdb_id=${imdbId}`)
+  let url = `${doubanIdatabaseApiBaseUrl}/api/item?imdb_id=${imdbId}`;
+  if (doubanIdatabaseApiKey) {
+    url += `&api_key=${doubanIdatabaseApiKey}`;
+  }
+
+  return fetch(url)
     .then(response => {
       if (response.ok) {
         return response.json();
