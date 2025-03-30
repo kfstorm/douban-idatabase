@@ -270,27 +270,34 @@ def process_list(
 def fetch_imdb_id_from_csv(douban_id: int) -> dict:
     if not settings.IMDB_CSV_PATH:
         return None
-    if not os.path.exists(settings.IMDB_CSV_PATH):
-        logger.warning(f"IMDb CSV file not found: {settings.IMDB_CSV_PATH}")
-        return None
-    with open(settings.IMDB_CSV_PATH, "r") as f:
-        reader = csv.reader(f)
-        for row in reader:
-            if douban_id == int(row[0]):
-                imdb_id = row[1]
-                if not imdb_id:
-                    imdb_id = None
-                logger.info(
-                    f"Found IMDb ID for douban_id={douban_id} in CSV."
-                    f" IMDb ID: {imdb_id}"
-                )
-                return {
-                    "imdb_id": imdb_id,
-                    "raw_data": {
+
+    # Split the CSV paths by comma
+    csv_paths = [path.strip() for path in settings.IMDB_CSV_PATH.split(",")]
+
+    for csv_path in csv_paths:
+        if not os.path.exists(csv_path):
+            logger.warning(f"IMDb CSV file not found: {csv_path}")
+            continue
+
+        with open(csv_path, "r") as f:
+            reader = csv.reader(f)
+            for row in reader:
+                if len(row) >= 2 and row[0].isdigit() and douban_id == int(row[0]):
+                    imdb_id = row[1]
+                    if not imdb_id:
+                        imdb_id = None
+                    logger.info(
+                        f"Found IMDb ID for douban_id={douban_id} in CSV {csv_path}."
+                        f" IMDb ID: {imdb_id}"
+                    )
+                    return {
                         "imdb_id": imdb_id,
-                        "imdb_source": os.path.basename(settings.IMDB_CSV_PATH),
-                    },
-                }
+                        "raw_data": {
+                            "imdb_id": imdb_id,
+                            "imdb_source": os.path.basename(csv_path),
+                        },
+                    }
+
     return None
 
 
