@@ -40,6 +40,12 @@ db_items_total = Gauge(
     registry=registry,
 )
 
+db_fetched_items_total = Gauge(
+    "douban_idatabase_fetched_items_total",
+    "Total number of fetched items (with update_time)",
+    registry=registry,
+)
+
 db_placeholder_items_total = Gauge(
     "douban_idatabase_placeholder_items_total",
     "Total number of placeholder items without data",
@@ -59,6 +65,12 @@ db_history_total = Gauge(
 db_lists_total = Gauge(
     "douban_idatabase_lists_total",
     "Total number of lists in the database",
+    registry=registry,
+)
+
+db_fetched_lists_total = Gauge(
+    "douban_idatabase_fetched_lists_total",
+    "Total number of fetched lists (with check time)",
     registry=registry,
 )
 
@@ -148,6 +160,42 @@ def update_db_metrics(db: Session):
 
     db_path = settings.SQLALCHEMY_DATABASE_URL
 
+    def _set_db_metrics(session):
+        """Helper function to set database metrics using the provided session"""
+        try:
+            total_items = session.query(Item).count()
+            db_items_total.set(total_items)
+
+            # Count placeholders (items with update_time is NULL)
+            placeholder_count = (
+                session.query(Item)
+                .filter(Item.update_time == None)  # noqa: E711
+                .count()
+            )
+            db_placeholder_items_total.set(placeholder_count)
+
+            # Set fetched items count (total - placeholders)
+            db_fetched_items_total.set(total_items - placeholder_count)
+
+            db_queue_size.set(session.query(Queue).count())
+            db_history_total.set(session.query(History).count())
+
+            total_lists = session.query(List).count()
+            db_lists_total.set(total_lists)
+
+            # Count placeholder lists (lists with last_check_time is NULL)
+            placeholder_lists_count = (
+                session.query(List)
+                .filter(List.last_check_time == None)  # noqa: E711
+                .count()
+            )
+            db_placeholder_lists_total.set(placeholder_lists_count)
+
+            # Set fetched lists count (total - placeholders)
+            db_fetched_lists_total.set(total_lists - placeholder_lists_count)
+        except Exception as e:
+            logger.error(f"Failed to collect metrics: {e}")
+
     # Create a readonly connection if using SQLite
     if db_path.startswith("sqlite:///"):
         db_file = db_path[10:]
@@ -160,52 +208,16 @@ def update_db_metrics(db: Session):
 
             ROSession = sessionmaker(bind=ro_engine)
             with ROSession() as ro_session:
-                db_items_total.set(ro_session.query(Item).count())
-                # Count placeholders (items with update_time is NULL)
-                placeholder_count = (
-                    ro_session.query(Item)
-                    .filter(Item.update_time == None)  # noqa: E711
-                    .count()
-                )
-                db_placeholder_items_total.set(placeholder_count)
-                db_queue_size.set(ro_session.query(Queue).count())
-                db_history_total.set(ro_session.query(History).count())
-                db_lists_total.set(ro_session.query(List).count())
+                _set_db_metrics(ro_session)
 
-                # Count placeholder lists (lists with last_check_time is NULL)
-                placeholder_lists_count = (
-                    ro_session.query(List)
-                    .filter(List.last_check_time == None)  # noqa: E711
-                    .count()
-                )
-                db_placeholder_lists_total.set(placeholder_lists_count)
-
+                # Set database file size (SQLite specific)
                 if os.path.exists(db_file):
                     database_size.set(os.path.getsize(db_file))
         except Exception as e:
             logger.error(f"Failed to collect metrics with readonly connection: {e}")
     else:
         # Non-SQLite database, use the provided session
-        try:
-            db_items_total.set(db.query(Item).count())
-            # Count placeholders (items with update_time is NULL)
-            placeholder_count = (
-                db.query(Item).filter(Item.update_time == None).count()  # noqa: E711
-            )
-            db_placeholder_items_total.set(placeholder_count)
-            db_queue_size.set(db.query(Queue).count())
-            db_history_total.set(db.query(History).count())
-            db_lists_total.set(db.query(List).count())
-
-            # Count placeholder lists (lists with last_check_time is NULL)
-            placeholder_lists_count = (
-                db.query(List)
-                .filter(List.last_check_time == None)  # noqa: E711
-                .count()
-            )
-            db_placeholder_lists_total.set(placeholder_lists_count)
-        except Exception as e:
-            logger.error(f"Failed to collect metrics: {e}")
+        _set_db_metrics(db)
 
 
 def get_metrics():
