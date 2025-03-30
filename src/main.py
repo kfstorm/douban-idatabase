@@ -94,7 +94,7 @@ async def metrics_middleware(request: Request, call_next):
 @app.get("/api/item", response_model=List[schemas.Item])
 def get_items(
     response: Response,
-    douban_id: int = Query(None),
+    douban_id: str = Query(None),
     imdb_id: str = Query(None),
     douban_title: str = Query(None),
     db: Session = Depends(get_db),

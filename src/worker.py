@@ -137,7 +137,7 @@ def allow_update_item(existing_item: Item) -> bool:
         min_update_interval_seconds = (
             settings.ITEM_REFRESH_INTERVAL_DAYS_DEFAULT
             * 86400
-            * ((existing_item.douban_id % 10000) / 10000 + 0.5)
+            * (((int)(existing_item.douban_id) % 10000) / 10000 + 0.5)
         )
         if current_time - existing_item.update_time < min_update_interval_seconds:
             return False
@@ -150,7 +150,7 @@ def process_douban_id(
     """
     Process a queue item of type 'douban_id'
     """
-    douban_id = int(queue_item.id)
+    douban_id = queue_item.id
 
     # Check if item already exists and was updated within the refresh interval
     existing_item = db.query(Item).filter(Item.douban_id == douban_id).first()
@@ -243,7 +243,7 @@ def process_list(
         douban_id = detail_info["douban_id"]
         # In case further processing fails, add to `queue` and `item`
         # to avoid losing it.
-        add_to_queue(db, "douban_id", str(douban_id))
+        add_to_queue(db, "douban_id", douban_id)
 
         # Skip if already processed in this batch
         if douban_id in known_ids:
@@ -275,7 +275,7 @@ def process_list(
     )
 
 
-def fetch_imdb_id_from_csv(douban_id: int) -> dict:
+def fetch_imdb_id_from_csv(douban_id: str) -> dict:
     if not settings.IMDB_CSV_PATH:
         return None
 
@@ -290,7 +290,7 @@ def fetch_imdb_id_from_csv(douban_id: int) -> dict:
         with open(csv_path, "r") as f:
             reader = csv.reader(f)
             for row in reader:
-                if len(row) >= 2 and row[0].isdigit() and douban_id == int(row[0]):
+                if len(row) >= 2 and row[0].isdigit() and douban_id == row[0]:
                     imdb_id = row[1]
                     if not imdb_id:
                         imdb_id = None
@@ -310,7 +310,7 @@ def fetch_imdb_id_from_csv(douban_id: int) -> dict:
 
 
 def fetch_imdb_id_from_mobile_desc(
-    http_session: requests.Session, douban_id: int
+    http_session: requests.Session, douban_id: str
 ) -> dict:
     """
     Fetch IMDb ID from Douban movie mobile description page
@@ -325,7 +325,7 @@ def fetch_imdb_id_from_mobile_desc(
 
 
 def fetch_imdb_id_from_desktop_html(
-    http_session: requests.Session, douban_id: int
+    http_session: requests.Session, douban_id: str
 ) -> dict:
     """
     Fetch IMDb ID from Douban movie desktop HTML page
@@ -341,7 +341,7 @@ def fetch_imdb_id_from_desktop_html(
 
 def fetch_imdb_id_with_html_regex(
     http_session: requests.Session,
-    douban_id: int,
+    douban_id: str,
     html_type: str,
     url_pattern: str,
     imdb_id_pattern: re.Pattern,
@@ -372,7 +372,7 @@ def fetch_imdb_id_with_html_regex(
     }
 
 
-def fetch_imdb_id(http_session: requests.Session, douban_id: int) -> dict:
+def fetch_imdb_id(http_session: requests.Session, douban_id: str) -> dict:
     """
     Fetch IMDb ID for a Douban movie using multiple methods
     """
@@ -440,10 +440,10 @@ def extract_douban_item_detail(item: dict, source: str) -> dict:
         if field_name in item:
             value = item[field_name]
             if value.isdecimal():
-                douban_id = int(value)
+                douban_id = value
             else:
                 parsed_url = urlparse(value)
-                douban_id = int([_ for _ in parsed_url.path.split("/") if _][-1])
+                douban_id = [_ for _ in parsed_url.path.split("/") if _][-1]
             break
     if not douban_id:
         raise ValueError(f"Could not extract Douban ID from item: {item}")
@@ -483,7 +483,7 @@ def extract_douban_item_detail(item: dict, source: str) -> dict:
     }
 
 
-def fetch_douban_item_detail(http_session: requests.Session, douban_id: int) -> dict:
+def fetch_douban_item_detail(http_session: requests.Session, douban_id: str) -> dict:
     """
     Fetch movie data from Douban Mobile API and return an Item object
     """
@@ -504,7 +504,7 @@ def fetch_douban_item_detail(http_session: requests.Session, douban_id: int) -> 
     return result
 
 
-def fetch_douban_item(http_session: requests.Session, douban_id: int) -> Item:
+def fetch_douban_item(http_session: requests.Session, douban_id: str) -> Item:
     """
     Fetch movie data from Douban API and return an Item object
     """

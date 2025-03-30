@@ -50,7 +50,7 @@ if __name__ == "__main__":
             parts = line.split("\t")
             try:
                 assert len(parts) == 7
-                douban_id = int(parts[0])
+                douban_id = parts[0]
 
                 if db.query(Item).filter(Item.douban_id == douban_id).first():
                     continue

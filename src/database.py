@@ -212,6 +212,103 @@ def migrate_known_douban_id_to_item():
             return False
 
 
+def migrate_douban_id_to_string():
+    """Migrate douban_id columns from integer to string type"""
+    logger.info("Checking if douban_id migration from int to string is needed...")
+
+    inspector = inspect(engine)
+    tables_to_check = ["item", "history"]
+
+    # Check if tables exist
+    existing_tables = inspector.get_table_names()
+    tables_needing_migration = []
+
+    for table in tables_to_check:
+        if table not in existing_tables:
+            continue
+
+        columns = {col["name"]: col for col in inspector.get_columns(table)}
+        if "douban_id" in columns:
+            col_type = str(columns["douban_id"]["type"]).lower()
+            # Check if the type is integer (needs migration)
+            if "int" in col_type:
+                tables_needing_migration.append(table)
+
+    if not tables_needing_migration:
+        logger.info("No migration needed for douban_id columns.")
+        return False
+
+    logger.info(f"Found tables requiring migration: {tables_needing_migration}")
+
+    # Collect column info before making any changes
+    table_columns = {}
+    for table in tables_needing_migration:
+        table_columns[table] = [col["name"] for col in inspector.get_columns(table)]
+
+    # Execute all operations in a single transaction
+    with SessionLocal() as session:
+        try:
+            # Create backup tables
+            for table in tables_needing_migration:
+                logger.info(f"Creating backup for table {table}")
+                session.execute(
+                    text(
+                        f"CREATE TABLE IF NOT EXISTS {table}_backup"
+                        f" AS SELECT * FROM {table}"
+                    )
+                )
+
+            # Drop existing tables to recreate with new schema
+            for table in tables_needing_migration:
+                logger.info(f"Dropping table {table} to recreate with new schema")
+                session.execute(text(f"DROP TABLE {table}"))
+
+            # Create tables with new schema (String instead of Integer)
+            Base.metadata.create_all(bind=engine)
+
+            # Migrate data from backup tables to new tables
+            for table in tables_needing_migration:
+                logger.info(f"Migrating data from {table}_backup to {table}")
+
+                # Use the previously stored column info
+                columns = table_columns[table]
+
+                # Prepare column lists for INSERT and SELECT
+                insert_columns = ", ".join(columns)
+
+                # Build the SELECT part with CAST for douban_id column
+                select_parts = []
+                for col in columns:
+                    if col == "douban_id":
+                        select_parts.append(f"CAST({col} AS TEXT) AS {col}")
+                    else:
+                        select_parts.append(col)
+
+                select_clause = ", ".join(select_parts)
+
+                # Execute the migration
+                insert_query = f"""
+                    INSERT INTO {table} ({insert_columns})
+                    SELECT {select_clause}
+                    FROM {table}_backup
+                """
+                session.execute(text(insert_query))
+
+            # Drop backup tables after successful migration
+            for table in tables_needing_migration:
+                session.execute(text(f"DROP TABLE {table}_backup"))
+
+            # Commit the entire transaction at once
+            session.commit()
+            logger.info("Successfully migrated douban_id columns to string format")
+            return True
+        except Exception as e:
+            # Roll back the entire transaction if any step fails
+            session.rollback()
+            logger.error(f"Migration failed: {str(e)}")
+            raise
+
+
 def init_db():
     """Initialize the database, creating tables and migrating if needed"""
     # Create tables if they don't exist
@@ -222,3 +319,6 @@ def init_db():
 
     # Migrate known_douban_id to item table
     migrate_known_douban_id_to_item()
+
+    # Migrate douban_id from int to string
+    migrate_douban_id_to_string()

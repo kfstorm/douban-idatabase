@@ -16,7 +16,7 @@ logger = logging.getLogger(__name__)
 class Item(Base):
     __tablename__ = "item"
 
-    douban_id = Column(Integer, primary_key=True, index=True)
+    douban_id = Column(String(16), primary_key=True, index=True)
     imdb_id = Column(String(16), index=True, nullable=True)
     douban_title = Column(String(128), index=True, nullable=True)
     year = Column(Integer, nullable=True)
@@ -38,7 +38,7 @@ class History(Base):
     __tablename__ = "history"
 
     change_id = Column(Integer, primary_key=True, autoincrement=True)
-    douban_id = Column(Integer, nullable=False)
+    douban_id = Column(String(16), nullable=False)
     imdb_id = Column(String(16), nullable=True)
     douban_title = Column(String(128), nullable=True)
     year = Column(Integer, nullable=True)
@@ -62,7 +62,7 @@ class List(Base):
     last_check_time = Column(Float, nullable=True)
 
 
-def get_items(db, douban_id: int = None, imdb_id: str = None, douban_title: str = None):
+def get_items(db, douban_id: str = None, imdb_id: str = None, douban_title: str = None):
     query = db.query(Item)
     filters = []
 
@@ -95,28 +95,19 @@ def add_to_queue(db, item_type: str, item_id: str, params: str = None) -> bool:
     Returns:
         bool: True if a new item was added to the queue, False if it already existed
     """
-    # Convert douban_id to integer for item table tracking
+    # For douban_id, make sure the value exists in the item table as a placeholder
     if item_type == "douban_id":
-        try:
-            douban_id_int = int(item_id)
+        # Check if the douban_id exists in the item table
+        existing_item = db.query(Item).filter(Item.douban_id == item_id).first()
 
-            # Check if the douban_id exists in the item table
-            existing_item = (
-                db.query(Item).filter(Item.douban_id == douban_id_int).first()
+        if not existing_item:
+            # Add to item table with minimal data
+            minimal_item = Item(
+                douban_id=item_id,
+                update_time=None,  # This indicates it's a placeholder
             )
-
-            if not existing_item:
-                # Add to item table with minimal data
-                minimal_item = Item(
-                    douban_id=douban_id_int,
-                    update_time=None,  # This indicates it's a placeholder
-                )
-                db.add(minimal_item)
-                logger.debug(
-                    f"Added Douban ID {douban_id_int} to item table as placeholder"
-                )
-        except (ValueError, TypeError) as e:
-            logger.warning(f"Invalid douban_id format: {item_id}. Error: {e}")
+            db.add(minimal_item)
+            logger.debug(f"Added Douban ID {item_id} to item table as placeholder")
 
     # Check if item is already in queue
     existing = db.query(Queue).filter_by(type=item_type, id=item_id).first()

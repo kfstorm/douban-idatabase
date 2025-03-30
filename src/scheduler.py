@@ -109,8 +109,8 @@ def refresh_from_known_douban_id(db: Session):
     # Add all IDs to queue
     added_count = 0
     for id_tuple in known_ids:
-        douban_id = str(id_tuple[0])
-        if add_to_queue(db, "douban_id", str(douban_id)):
+        douban_id = id_tuple[0]
+        if add_to_queue(db, "douban_id", douban_id):
             added_count += 1
 
     logger.info(
@@ -148,7 +148,7 @@ def import_douban_ids_from_csv(db: Session):
                 reader = csv.reader(f)
                 for row in reader:
                     if len(row) >= 1 and row[0].isdigit():
-                        douban_id = int(row[0])
+                        douban_id = row[0]
 
                         # Check if this Douban ID already exists in the item table
                         existing_item = (

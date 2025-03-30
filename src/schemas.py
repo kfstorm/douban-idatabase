@@ -3,7 +3,7 @@ from typing import Optional
 
 
 class ItemBase(BaseModel):
-    douban_id: int
+    douban_id: str
     imdb_id: Optional[str] = None
     douban_title: Optional[str] = None
     year: Optional[int] = None
@@ -32,7 +32,7 @@ class Queue(QueueBase):
 
 class HistoryBase(BaseModel):
     change_id: int
-    douban_id: int
+    douban_id: str
     imdb_id: Optional[str] = None
     douban_title: Optional[str] = None
     year: Optional[int] = None
