@@ -2,6 +2,8 @@ import logging
 import threading
 import time
 import requests
+import csv
+import os
 from sqlalchemy.orm import Session
 
 from .database import SessionLocal
@@ -26,6 +28,7 @@ SCHEDULE_TYPE_PROCESS_QUEUE = "process_queue"
 SCHEDULE_TYPE_BOOTSTRAP_LISTS = "bootstrap_lists"
 SCHEDULE_TYPE_REFRESH_FROM_KNOWN_DOUBAN_ID = "refresh_from_known_douban_id"
 SCHEDULE_TYPE_DATABASE_BACKUP = "database_backup"
+SCHEDULE_TYPE_IMPORT_DOUBAN_IDS_FROM_CSV = "import_douban_ids_from_csv"
 
 # Schedule intervals (in seconds)
 SCHEDULE_INTERVALS = {
@@ -34,6 +37,7 @@ SCHEDULE_INTERVALS = {
     SCHEDULE_TYPE_BOOTSTRAP_LISTS: 86400,  # 1 day
     SCHEDULE_TYPE_REFRESH_FROM_KNOWN_DOUBAN_ID: 86400,  # 1 day
     SCHEDULE_TYPE_DATABASE_BACKUP: settings.BACKUP_INTERVAL_SECONDS,  # From settings
+    SCHEDULE_TYPE_IMPORT_DOUBAN_IDS_FROM_CSV: 3600,  # 1 hour
 }
 
 
@@ -126,6 +130,73 @@ def refresh_from_known_douban_id(db: Session):
     )
 
 
+def import_douban_ids_from_csv(db: Session):
+    """
+    Import Douban IDs from CSV files into the known_douban_id table.
+    Uses the same CSV files as configured for IMDb ID mapping.
+    """
+    if not settings.IMDB_CSV_PATH:
+        return
+
+    logger.info("Starting import of Douban IDs from CSV files...")
+
+    # Split the CSV paths by comma
+    csv_paths = [path.strip() for path in settings.IMDB_CSV_PATH.split(",")]
+    total_imported = 0
+    total_existed = 0
+
+    for csv_path in csv_paths:
+        if not os.path.exists(csv_path):
+            logger.warning(f"CSV file not found: {csv_path}")
+            continue
+
+        imported_count = 0
+        existed_count = 0
+
+        logger.info(f"Processing CSV file: {csv_path}")
+
+        try:
+            with open(csv_path, "r") as f:
+                reader = csv.reader(f)
+                for row in reader:
+                    if len(row) >= 1 and row[0].isdigit():
+                        douban_id = int(row[0])
+
+                        # Check if this Douban ID already exists in the database
+                        known_id = (
+                            db.query(KnownDoubanId)
+                            .filter(KnownDoubanId.douban_id == douban_id)
+                            .first()
+                        )
+
+                        if not known_id:
+                            # Add new Douban ID to the known_douban_id table
+                            db.add(KnownDoubanId(douban_id=douban_id))
+                            imported_count += 1
+                        else:
+                            existed_count += 1
+
+                # Commit after processing each file
+                db.commit()
+
+                logger.info(
+                    f"Imported {imported_count} new Douban IDs from {csv_path} "
+                    f"({existed_count} already existed)"
+                )
+
+                total_imported += imported_count
+                total_existed += existed_count
+
+        except Exception as e:
+            logger.exception(f"Error processing CSV file {csv_path}: {e}")
+            db.rollback()
+
+    logger.info(
+        f"CSV import completed. Total: {total_imported} new Douban IDs imported "
+        f"({total_existed} already existed)"
+    )
+
+
 def execute_scheduled_task(
     db: Session, http_session: requests.Session, schedule_type: str
 ) -> float:
@@ -141,6 +212,8 @@ def execute_scheduled_task(
             refresh_from_known_douban_id(db)
         elif schedule_type == SCHEDULE_TYPE_DATABASE_BACKUP:
             perform_backup()
+        elif schedule_type == SCHEDULE_TYPE_IMPORT_DOUBAN_IDS_FROM_CSV:
+            import_douban_ids_from_csv(db)
         else:
             logger.warning(f"Unknown schedule type: {schedule_type}")
     except RateLimitException as e:
