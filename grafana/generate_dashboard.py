@@ -48,7 +48,26 @@ class DashboardGenerator:
         self.dashboard = DASHBOARD_BASE.copy()
         self.panels = []
         self.next_panel_id = 1
-        self.y_position = 0
+
+    def _get_next_panel_pos(self, h, w):
+        """Calculate the next panel position based on height, width"""
+        if not self.panels:
+            x, y = 0, 0
+        elif self.panels[-1]["type"] == "row":
+            # If the last panel is a row, start from the next row
+            x, y = 0, self.panels[-1]["gridPos"]["y"] + 1
+        else:
+            last = self.panels[-1]["gridPos"]
+            x, y = last["x"] + last["w"], last["y"]
+            if x + w > 24:  # Reset to next row
+                x = 0
+                y += last["h"]
+        return {
+            "h": h,
+            "w": w,
+            "x": x,
+            "y": y,
+        }
 
     def add_row(self, title: str) -> int:
         """Add a row panel to the dashboard"""
@@ -58,22 +77,20 @@ class DashboardGenerator:
         row_panel = {
             "collapsed": False,
             "datasource": None,
-            "gridPos": {"h": 1, "w": 24, "x": 0, "y": self.y_position},
+            "gridPos": self._get_next_panel_pos(1, 24),
             "id": panel_id,
-            "panels": [],
             "title": title,
             "type": "row",
         }
 
         self.panels.append(row_panel)
-        self.y_position += 1
-        return panel_id
 
     def add_stat_panel(
         self,
         title: str,
         metric: str,
-        width: int = 8,
+        height: int = 4,
+        width: int = 4,
         unit: str = "short",
         color_mode: str = "value",
         threshold_mode: str = "absolute",
@@ -81,10 +98,6 @@ class DashboardGenerator:
         """Add a stat panel to the dashboard"""
         panel_id = self.next_panel_id
         self.next_panel_id += 1
-
-        x_pos = (
-            (len(self.panels) - 1) % 3 * 8
-        )  # Simple layout: 3 panels per row, each 8 units wide
 
         panel = {
             "datasource": None,
@@ -100,7 +113,7 @@ class DashboardGenerator:
                 },
                 "overrides": [],
             },
-            "gridPos": {"h": 8, "w": width, "x": x_pos, "y": self.y_position},
+            "gridPos": self._get_next_panel_pos(height, width),
             "id": panel_id,
             "options": {
                 "colorMode": color_mode,
@@ -131,17 +144,12 @@ class DashboardGenerator:
 
         self.panels.append(panel)
 
-        # Update y_position if we've added 3 panels (filled a row)
-        if (len(self.panels) - 1) % 3 == 0:
-            self.y_position += 8
-
-        return panel_id
-
     def add_graph_panel(
         self,
         title: str,
         metric: str,
         legend_format: str,
+        height: int = 8,
         width: int = 12,
         y_axis_label: str = None,
         y_axis_format: str = "short",
@@ -149,10 +157,6 @@ class DashboardGenerator:
         """Add a time series graph panel to the dashboard"""
         panel_id = self.next_panel_id
         self.next_panel_id += 1
-
-        x_pos = (
-            (len(self.panels) - 1) % 2 * 12
-        )  # Simple layout: 2 panels per row, each 12 units wide
 
         panel = {
             "aliasColors": {},
@@ -163,7 +167,7 @@ class DashboardGenerator:
             "fieldConfig": {"defaults": {}, "overrides": []},
             "fill": 1,
             "fillGradient": 0,
-            "gridPos": {"h": 8, "w": width, "x": x_pos, "y": self.y_position},
+            "gridPos": self._get_next_panel_pos(height, width),
             "hiddenSeries": False,
             "id": panel_id,
             "legend": {
@@ -233,12 +237,6 @@ class DashboardGenerator:
         }
 
         self.panels.append(panel)
-
-        # Update y_position if we've added 2 panels (filled a row)
-        if (len(self.panels) - 1) % 2 == 0:
-            self.y_position += 8
-
-        return panel_id
 
     def generate_dashboard(self) -> Dict:
         """Generate the complete dashboard"""
@@ -313,27 +311,17 @@ def generate_dashboard():
         "Backup Operations",
         "rate(douban_idatabase_backup_operations_total[1h])",
         "{{status}}",
-        width=8,
         y_axis_label="operations/hour",
     )
     generator.add_stat_panel(
         "Backup Duration (p95)",
         "histogram_quantile(0.95, sum(rate(douban_idatabase_backup_duration_seconds_bucket[24h])) by (le))",  # noqa: B950
-        width=8,
         unit="s",
     )
     generator.add_stat_panel(
         "Backup File Size",
         "douban_idatabase_backup_file_size_bytes",
-        width=8,
         unit="decbytes",
-    )
-    generator.add_graph_panel(
-        "Backup File Size Over Time",
-        "douban_idatabase_backup_file_size_bytes",
-        "Backup File Size",
-        width=24,
-        y_axis_format="decbytes",
     )
 
     # Rate Limiting
