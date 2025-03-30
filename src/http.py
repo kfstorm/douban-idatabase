@@ -26,18 +26,20 @@ class Throttler:
     def __init__(self):
         self.next_call_time = defaultdict(lambda: 0.0)
 
-    def _check_rate_limit(self, url):
-        host = urlparse(url).netloc
+    def _check_rate_limit(self, host):
         next_call_time = self.next_call_time[host]
         now = now_timestamp()
         if now < next_call_time:
             raise RateLimitException(next_call_time)
         time.sleep(random.uniform(0, settings.REQUEST_DELAY_MAX_SECONDS))
 
-    def _handle_response(self, response):
-        host = urlparse(response.url).netloc
-        if (
-            response.status_code == 403
+    def _handle_response(self, response: requests.Response):
+        all_responses = response.history + [response]
+        host = urlparse(all_responses[0].request.url).netloc
+        if any(
+            response
+            for response in all_responses
+            if response.status_code == 403
             or response.status_code == 302
             and "sec.douban.com" in response.headers.get("location", "")
             or response.status_code == 400
@@ -77,6 +79,14 @@ def get_response_via_zenrows(http_session: requests.Session, url: str, **kwargs)
     return get_response(http_session, "https://api.zenrows.com/v1/", **kwargs)
 
 
+def can_use_zenrows(host: str):
+    return (
+        settings.RATE_LIMIT_USE_ZENROWS
+        and settings.ZENROWS_API_KEY
+        and "zenrows" not in host
+    )
+
+
 def get_response(http_session: requests.Session, url: str, **kwargs):
     headers = {
         "User-Agent": (
@@ -93,11 +103,17 @@ def get_response(http_session: requests.Session, url: str, **kwargs):
     host = urlparse(url).netloc
     start_time = time.time()
 
+    # Check if this host is already known to be rate limited
     try:
-        throttler._check_rate_limit(url)
+        throttler._check_rate_limit(host)
     except RateLimitException as e:
-        if settings.RATE_LIMIT_USE_ZENROWS and settings.ZENROWS_API_KEY:
-            logger.warning("Rate limited. Trying via ZenRows API...")
+        # If host is rate limited and ZenRows is available, use it directly
+        if can_use_zenrows(host):
+            logger.warning(
+                "The host is rate limited until"
+                f" {timestamp_to_local_time_str(e.next_call_time)}."
+                " Retry via ZenRows API..."
+            )
             return get_response_via_zenrows(http_session, url, **kwargs)
         else:
             raise e
@@ -117,17 +133,14 @@ def get_response(http_session: requests.Session, url: str, **kwargs):
         try:
             throttler._handle_response(response)
         except RateLimitException as e:
-            host = urlparse(response.url).netloc
-            if (
-                settings.RATE_LIMIT_USE_ZENROWS
-                and settings.ZENROWS_API_KEY
-                and host != "api.zenrows.com"
-            ):
+            throttler.next_call_time[host] = e.next_call_time
+            if can_use_zenrows(host):
                 response.close()
-                logger.warning("Rate limited. Trying via ZenRows API...")
+                logger.warning(
+                    f"The host {host} is now rate limited. Retry via ZenRows API..."
+                )
                 return get_response_via_zenrows(http_session, url, **kwargs)
             else:
-                throttler.next_call_time[host] = e.next_call_time
                 raise e
 
         try:
