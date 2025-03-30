@@ -1,6 +1,6 @@
 cache/
 __pycache__/
-db.sqlite3*
+*.sqlite3*
 logs/
 .env
 .vscode/
