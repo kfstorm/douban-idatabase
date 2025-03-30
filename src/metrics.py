@@ -62,6 +62,12 @@ db_lists_total = Gauge(
     registry=registry,
 )
 
+db_placeholder_lists_total = Gauge(
+    "douban_idatabase_placeholder_lists_total",
+    "Total number of placeholder lists without check time",
+    registry=registry,
+)
+
 # Worker metrics
 worker_processed_items = Counter(
     "douban_idatabase_worker_processed_items_total",
@@ -166,6 +172,14 @@ def update_db_metrics(db: Session):
                 db_history_total.set(ro_session.query(History).count())
                 db_lists_total.set(ro_session.query(List).count())
 
+                # Count placeholder lists (lists with last_check_time is NULL)
+                placeholder_lists_count = (
+                    ro_session.query(List)
+                    .filter(List.last_check_time == None)  # noqa: E711
+                    .count()
+                )
+                db_placeholder_lists_total.set(placeholder_lists_count)
+
                 if os.path.exists(db_file):
                     database_size.set(os.path.getsize(db_file))
         except Exception as e:
@@ -182,6 +196,14 @@ def update_db_metrics(db: Session):
             db_queue_size.set(db.query(Queue).count())
             db_history_total.set(db.query(History).count())
             db_lists_total.set(db.query(List).count())
+
+            # Count placeholder lists (lists with last_check_time is NULL)
+            placeholder_lists_count = (
+                db.query(List)
+                .filter(List.last_check_time == None)  # noqa: E711
+                .count()
+            )
+            db_placeholder_lists_total.set(placeholder_lists_count)
         except Exception as e:
             logger.error(f"Failed to collect metrics: {e}")
 

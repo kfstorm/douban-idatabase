@@ -309,6 +309,39 @@ def migrate_douban_id_to_string():
             raise
 
 
+def migrate_list_add_douban_update_time():
+    """Add douban_update_time column to list table if it doesn't exist"""
+    logger.info("Checking if list table needs douban_update_time column...")
+
+    inspector = inspect(engine)
+
+    # Check if list table exists
+    if "list" not in inspector.get_table_names():
+        logger.info("list table doesn't exist, skipping migration.")
+        return False
+
+    # Check if douban_update_time column already exists
+    columns = {col["name"]: col for col in inspector.get_columns("list")}
+    if "douban_update_time" in columns:
+        logger.info("douban_update_time column already exists in list table.")
+        return False
+
+    with SessionLocal() as session:
+        try:
+            # Add the douban_update_time column with float type
+            logger.info("Adding douban_update_time column to list table...")
+            session.execute(
+                text("ALTER TABLE list ADD COLUMN douban_update_time FLOAT")
+            )
+            session.commit()
+            logger.info("Successfully added douban_update_time column to list table")
+            return True
+        except Exception as e:
+            session.rollback()
+            logger.error(f"Error during list table migration: {str(e)}")
+            raise
+
+
 def init_db():
     """Initialize the database, creating tables and migrating if needed"""
     # Create tables if they don't exist
@@ -322,3 +355,6 @@ def init_db():
 
     # Migrate douban_id from int to string
     migrate_douban_id_to_string()
+
+    # Add douban_update_time column to list table if needed
+    migrate_list_add_douban_update_time()

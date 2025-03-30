@@ -60,6 +60,7 @@ class List(Base):
     list_type = Column(String(32), primary_key=True)
     list_id = Column(String(128), primary_key=True)
     last_check_time = Column(Float, nullable=True)
+    douban_update_time = Column(Float, nullable=True)
 
 
 def get_items(db, douban_id: str = None, imdb_id: str = None, douban_title: str = None):
@@ -85,6 +86,7 @@ def add_to_queue(db, item_type: str, item_id: str, params: str = None) -> bool:
     """
     Common method to add an item to the queue.
     For douban_id type, also tracks the ID in the item table.
+    For list types, also tracks in the list table as placeholder.
 
     Args:
         db: Database session
@@ -109,6 +111,24 @@ def add_to_queue(db, item_type: str, item_id: str, params: str = None) -> bool:
             db.add(minimal_item)
             logger.debug(f"Added Douban ID {item_id} to item table as placeholder")
 
+    # For list types, make sure the list exists in the list table as a placeholder
+    elif item_type in ["subject_collection", "doulist"]:
+        # Check if the list exists in the list table
+        existing_list = (
+            db.query(List).filter_by(list_type=item_type, list_id=item_id).first()
+        )
+
+        if not existing_list:
+            # Add to list table with minimal data
+            minimal_list = List(
+                list_type=item_type,
+                list_id=item_id,
+                last_check_time=None,  # This indicates it's a placeholder
+                douban_update_time=None,
+            )
+            db.add(minimal_list)
+            logger.debug(f"Added {item_type} ID {item_id} to list table as placeholder")
+
     # Check if item is already in queue
     existing = db.query(Queue).filter_by(type=item_type, id=item_id).first()
 
@@ -125,7 +145,7 @@ def add_to_queue(db, item_type: str, item_id: str, params: str = None) -> bool:
         logger.debug(f"Added item type={item_type}, id={item_id} to queue")
         return True
     else:
-        # Only commit if we added to item table but not to queue
-        if item_type == "douban_id":
+        # Only commit if we added to item/list table but not to queue
+        if item_type == "douban_id" or item_type in ["subject_collection", "doulist"]:
             db.commit()
         return False
