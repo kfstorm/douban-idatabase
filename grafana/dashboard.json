@@ -314,13 +314,13 @@
       "targets": [
         {
           "exemplar": true,
-          "expr": "douban_idatabase_known_douban_ids_total",
+          "expr": "douban_idatabase_placeholder_items_total",
           "interval": "",
           "legendFormat": "",
           "refId": "A"
         }
       ],
-      "title": "Known Douban IDs",
+      "title": "Placeholder Items",
       "type": "stat"
     },
     {
@@ -860,9 +860,9 @@
       "targets": [
         {
           "exemplar": true,
-          "expr": "douban_idatabase_known_douban_ids_total",
+          "expr": "douban_idatabase_placeholder_items_total",
           "interval": "",
-          "legendFormat": "Known Douban IDs",
+          "legendFormat": "Placeholder Items",
           "refId": "A"
         }
       ],
@@ -870,7 +870,7 @@
       "timeFrom": null,
       "timeRegions": [],
       "timeShift": null,
-      "title": "Known Douban IDs Over Time",
+      "title": "Placeholder Items Over Time",
       "tooltip": {
         "shared": true,
         "sort": 0,

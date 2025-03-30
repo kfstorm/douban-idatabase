@@ -113,7 +113,7 @@ def search_recent_douban_movies(db: Session, http_session: requests.Session):
             # Add all found Douban IDs to the queue
             for douban_id in douban_ids:
                 try:
-                    # Use common method to add to queue and known_douban_id
+                    # Use common method to add to queue and item
                     was_added = add_to_queue(db, "douban_id", str(douban_id))
                     if was_added:
                         added_count += 1

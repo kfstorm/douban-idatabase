@@ -142,6 +142,76 @@ def migrate_datetime_to_float():
             raise
 
 
+def migrate_known_douban_id_to_item():
+    """
+    Migrate all IDs from known_douban_id table to item table as placeholders,
+    and drop the old table
+    """
+    logger.info("Checking if known_douban_id migration is needed...")
+
+    inspector = inspect(engine)
+    existing_tables = inspector.get_table_names()
+
+    # Skip if known_douban_id doesn't exist
+    if "known_douban_id" not in existing_tables:
+        logger.info("known_douban_id table doesn't exist, skipping migration.")
+        return False
+
+    # Make sure item table exists before migration
+    if "item" not in existing_tables:
+        logger.info("item table doesn't exist, creating it first.")
+        Base.metadata.create_all(bind=engine, tables=[Base.metadata.tables["item"]])
+
+    with SessionLocal() as session:
+        try:
+            # Count records in known_douban_id table
+            count_query = text("SELECT COUNT(*) FROM known_douban_id")
+            total_ids = session.execute(count_query).scalar()
+
+            if total_ids > 0:
+                logger.info(
+                    f"Found {total_ids} IDs in known_douban_id table to migrate"
+                )
+
+                # Insert IDs that don't already exist in item table
+                migrate_query = text(
+                    """
+                    INSERT INTO item (douban_id)
+                    SELECT kdi.douban_id FROM known_douban_id kdi
+                    WHERE NOT EXISTS (
+                        SELECT 1 FROM item i WHERE i.douban_id = kdi.douban_id
+                    )
+                """
+                )
+
+                result = session.execute(migrate_query)
+                inserted_count = result.rowcount
+
+                logger.info(
+                    f"Migrated {inserted_count} new IDs"
+                    " from known_douban_id to item table"
+                )
+                logger.info(
+                    f"Skipped {total_ids - inserted_count} IDs"
+                    " that already existed in item table"
+                )
+            else:
+                logger.info(
+                    "No IDs in known_douban_id table, but still dropping the table."
+                )
+
+            # Drop the known_douban_id table after migration
+            session.execute(text("DROP TABLE known_douban_id"))
+            session.commit()
+
+            logger.info("Successfully dropped the known_douban_id table")
+            return True
+        except Exception as e:
+            session.rollback()
+            logger.error(f"Error during known_douban_id migration: {str(e)}")
+            return False
+
+
 def init_db():
     """Initialize the database, creating tables and migrating if needed"""
     # Create tables if they don't exist
@@ -149,3 +219,6 @@ def init_db():
 
     # Migrate datetime columns to float if needed
     migrate_datetime_to_float()
+
+    # Migrate known_douban_id to item table
+    migrate_known_douban_id_to_item()

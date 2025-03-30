@@ -17,12 +17,12 @@ class Item(Base):
     __tablename__ = "item"
 
     douban_id = Column(Integer, primary_key=True, index=True)
-    imdb_id = Column(String(16), index=True)
-    douban_title = Column(String(128), index=True)
-    year = Column(Integer)
-    rating = Column(Float)
+    imdb_id = Column(String(16), index=True, nullable=True)
+    douban_title = Column(String(128), index=True, nullable=True)
+    year = Column(Integer, nullable=True)
+    rating = Column(Float, nullable=True)
     raw_data = Column(Text, nullable=True)
-    update_time = Column(Float, default=now_timestamp)
+    update_time = Column(Float, default=now_timestamp, nullable=True, index=True)
 
 
 class Queue(Base):
@@ -39,12 +39,12 @@ class History(Base):
 
     change_id = Column(Integer, primary_key=True, autoincrement=True)
     douban_id = Column(Integer, nullable=False)
-    imdb_id = Column(String(16))
-    douban_title = Column(String(128))
-    year = Column(Integer)
-    rating = Column(Float)
+    imdb_id = Column(String(16), nullable=True)
+    douban_title = Column(String(128), nullable=True)
+    year = Column(Integer, nullable=True)
+    rating = Column(Float, nullable=True)
     raw_data = Column(Text, nullable=True)
-    update_time = Column(Float)
+    update_time = Column(Float, nullable=True)
 
 
 class Schedule(Base):
@@ -52,13 +52,6 @@ class Schedule(Base):
 
     type = Column(String(32), primary_key=True)  # Type of scheduled task
     next_run = Column(Float, nullable=False, index=True)  # When to run next
-
-
-class KnownDoubanId(Base):
-    __tablename__ = "known_douban_id"
-
-    douban_id = Column(Integer, primary_key=True, index=True)
-    discover_time = Column(Float, default=now_timestamp)
 
 
 class List(Base):
@@ -91,7 +84,7 @@ def get_items(db, douban_id: int = None, imdb_id: str = None, douban_title: str 
 def add_to_queue(db, item_type: str, item_id: str, params: str = None) -> bool:
     """
     Common method to add an item to the queue.
-    For douban_id type, also tracks the ID in known_douban_id table.
+    For douban_id type, also tracks the ID in the item table.
 
     Args:
         db: Database session
@@ -102,26 +95,25 @@ def add_to_queue(db, item_type: str, item_id: str, params: str = None) -> bool:
     Returns:
         bool: True if a new item was added to the queue, False if it already existed
     """
-    # Convert douban_id to integer for known_douban_id table
+    # Convert douban_id to integer for item table tracking
     if item_type == "douban_id":
         try:
             douban_id_int = int(item_id)
 
-            # Check/insert into known_douban_id table
-            known_id = (
-                db.query(KnownDoubanId)
-                .filter(KnownDoubanId.douban_id == douban_id_int)
-                .first()
+            # Check if the douban_id exists in the item table
+            existing_item = (
+                db.query(Item).filter(Item.douban_id == douban_id_int).first()
             )
 
-            if not known_id:
-                # Add to known_douban_id
-                known_id = KnownDoubanId(
-                    douban_id=douban_id_int, discover_time=now_timestamp()
+            if not existing_item:
+                # Add to item table with minimal data
+                minimal_item = Item(
+                    douban_id=douban_id_int,
+                    update_time=None,  # This indicates it's a placeholder
                 )
-                db.add(known_id)
+                db.add(minimal_item)
                 logger.debug(
-                    f"Added Douban ID {douban_id_int} to known_douban_id table"
+                    f"Added Douban ID {douban_id_int} to item table as placeholder"
                 )
         except (ValueError, TypeError) as e:
             logger.warning(f"Invalid douban_id format: {item_id}. Error: {e}")
@@ -142,7 +134,7 @@ def add_to_queue(db, item_type: str, item_id: str, params: str = None) -> bool:
         logger.debug(f"Added item type={item_type}, id={item_id} to queue")
         return True
     else:
-        # Only commit if we added to known_douban_id but not to queue
+        # Only commit if we added to item table but not to queue
         if item_type == "douban_id":
             db.commit()
         return False

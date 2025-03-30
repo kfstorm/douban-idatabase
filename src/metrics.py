@@ -11,7 +11,7 @@ from prometheus_client import (
 from sqlalchemy.orm import Session
 from sqlalchemy import create_engine
 
-from .models import Item, Queue, KnownDoubanId, History, List
+from .models import Item, Queue, History, List
 
 logger = logging.getLogger(__name__)
 
@@ -40,9 +40,9 @@ db_items_total = Gauge(
     registry=registry,
 )
 
-db_known_douban_ids_total = Gauge(
-    "douban_idatabase_known_douban_ids_total",
-    "Total number of known Douban IDs",
+db_placeholder_items_total = Gauge(
+    "douban_idatabase_placeholder_items_total",
+    "Total number of placeholder items without data",
     registry=registry,
 )
 
@@ -155,7 +155,13 @@ def update_db_metrics(db: Session):
             ROSession = sessionmaker(bind=ro_engine)
             with ROSession() as ro_session:
                 db_items_total.set(ro_session.query(Item).count())
-                db_known_douban_ids_total.set(ro_session.query(KnownDoubanId).count())
+                # Count placeholders (items with update_time is NULL)
+                placeholder_count = (
+                    ro_session.query(Item)
+                    .filter(Item.update_time == None)  # noqa: E711
+                    .count()
+                )
+                db_placeholder_items_total.set(placeholder_count)
                 db_queue_size.set(ro_session.query(Queue).count())
                 db_history_total.set(ro_session.query(History).count())
                 db_lists_total.set(ro_session.query(List).count())
@@ -168,7 +174,11 @@ def update_db_metrics(db: Session):
         # Non-SQLite database, use the provided session
         try:
             db_items_total.set(db.query(Item).count())
-            db_known_douban_ids_total.set(db.query(KnownDoubanId).count())
+            # Count placeholders (items with update_time is NULL)
+            placeholder_count = (
+                db.query(Item).filter(Item.update_time == None).count()  # noqa: E711
+            )
+            db_placeholder_items_total.set(placeholder_count)
             db_queue_size.set(db.query(Queue).count())
             db_history_total.set(db.query(History).count())
             db_lists_total.set(db.query(List).count())

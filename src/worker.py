@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session
 
 from .lists import CollectionApi, DoulistApi
 from .utils import parse_douban_time, now_timestamp, timestamp_to_local_time_str
-from .models import KnownDoubanId, Queue, Item, History, List, add_to_queue
+from .models import Queue, Item, History, List, add_to_queue
 from .config import settings
 from .http import RateLimitException, get_response, get_json
 from .metrics import worker_processed_items, worker_processing_duration
@@ -152,7 +152,7 @@ def process_douban_id(
     """
     douban_id = int(queue_item.id)
 
-    # Check if item already exists and was updated within 1 day
+    # Check if item already exists and was updated within the refresh interval
     existing_item = db.query(Item).filter(Item.douban_id == douban_id).first()
     if not allow_update_item(existing_item):
         # Remove from queue since it's too recent to update
@@ -167,20 +167,11 @@ def process_douban_id(
     except requests.HTTPError as e:
         if e.response.status_code == 404:
             # Item not found. It's possible that the item is not a movie or tv,
-            # but added to known_douban_id before.
+            # but we already added it to the item table.
             # It's also possible that the item was removed from Douban.
-            # In either case, we should remove it from known_douban_id.
-            logger.warning(
-                f"Item not found for douban_id={douban_id}."
-                " Removing from known_douban_id."
-            )
-            known_id = (
-                db.query(KnownDoubanId)
-                .filter(KnownDoubanId.douban_id == douban_id)
-                .first()
-            )
-            if known_id:
-                db.delete(known_id)
+            # Delete the item from the item table.
+            if existing_item:
+                db.delete(existing_item)
                 db.commit()
 
     if not item:
@@ -250,7 +241,7 @@ def process_list(
         if not detail_info:
             continue
         douban_id = detail_info["douban_id"]
-        # In case further processing fails, add to `queue` and `known_douban_id`
+        # In case further processing fails, add to `queue` and `item`
         # to avoid losing it.
         add_to_queue(db, "douban_id", str(douban_id))
 

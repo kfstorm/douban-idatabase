@@ -10,7 +10,7 @@ from .database import SessionLocal
 from .worker import process_queue_items
 from .crawler import search_recent_douban_movies
 from .lists import bootstrap_lists
-from .models import Item, Schedule, KnownDoubanId, add_to_queue
+from .models import Item, Schedule, add_to_queue
 from .http import new_http_session, RateLimitException
 from .utils import now_timestamp, timestamp_to_local_time_str
 from .backup import perform_backup
@@ -91,32 +91,20 @@ def get_next_schedule_run(db: Session):
 
 def refresh_from_known_douban_id(db: Session):
     """
-    Periodically refresh data from known_douban_id by adding them back to the queue
+    Periodically refresh data from item table by adding them back to the queue
     Processes all known IDs (no sampling)
     """
-    logger.info("Starting refresh from known_douban_id...")
+    logger.info("Starting refresh from item table...")
 
-    # Add all douban IDs from `item` table to `known_douban_id` table
-    douban_ids_from_items = db.query(Item.douban_id).all()
-    for row in douban_ids_from_items:
-        douban_id = int(row[0])
-        if (
-            not db.query(KnownDoubanId)
-            .filter(KnownDoubanId.douban_id == douban_id)
-            .first()
-        ):
-            db.add(KnownDoubanId(douban_id=douban_id))
-    db.commit()
-
-    # Get all known douban IDs
-    known_ids = db.query(KnownDoubanId.douban_id).all()
+    # Get all known douban IDs from the item table
+    known_ids = db.query(Item.douban_id).all()
     total_ids = len(known_ids)
 
     if total_ids == 0:
-        logger.info("No known Douban IDs found. Skipping refresh.")
+        logger.info("No Douban IDs found. Skipping refresh.")
         return
 
-    logger.info(f"Found {total_ids} known Douban IDs to refresh")
+    logger.info(f"Found {total_ids} Douban IDs to refresh")
 
     # Add all IDs to queue
     added_count = 0
@@ -132,7 +120,7 @@ def refresh_from_known_douban_id(db: Session):
 
 def import_douban_ids_from_csv(db: Session):
     """
-    Import Douban IDs from CSV files into the known_douban_id table.
+    Import Douban IDs from CSV files into the item table as placeholders.
     Uses the same CSV files as configured for IMDb ID mapping.
     """
     if not settings.IMDB_CSV_PATH:
@@ -162,16 +150,14 @@ def import_douban_ids_from_csv(db: Session):
                     if len(row) >= 1 and row[0].isdigit():
                         douban_id = int(row[0])
 
-                        # Check if this Douban ID already exists in the database
-                        known_id = (
-                            db.query(KnownDoubanId)
-                            .filter(KnownDoubanId.douban_id == douban_id)
-                            .first()
+                        # Check if this Douban ID already exists in the item table
+                        existing_item = (
+                            db.query(Item).filter(Item.douban_id == douban_id).first()
                         )
 
-                        if not known_id:
-                            # Add new Douban ID to the known_douban_id table
-                            db.add(KnownDoubanId(douban_id=douban_id))
+                        if not existing_item:
+                            # Add new Douban ID to the item table as a placeholder
+                            db.add(Item(douban_id=douban_id, update_time=None))
                             imported_count += 1
                         else:
                             existed_count += 1
