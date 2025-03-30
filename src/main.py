@@ -1,13 +1,21 @@
-from fastapi import FastAPI, HTTPException, Query, Depends, Response, Security
+from fastapi import FastAPI, HTTPException, Query, Depends, Response, Security, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security.api_key import APIKeyHeader, APIKeyQuery
 from sqlalchemy.orm import Session
 from typing import List, Optional
+from prometheus_client import CONTENT_TYPE_LATEST
 from . import models, schemas
 from .database import get_db, init_db
 from .logging_config import setup_logging
 from .scheduler import start_scheduler, stop_scheduler
 from .config import settings
+from .metrics import (
+    get_metrics,
+    update_db_metrics,
+    api_requests_total,
+    api_request_duration,
+)
+import time
 
 # Initialize logging
 logger = setup_logging()
@@ -61,6 +69,28 @@ def on_shutdown():
     stop_scheduler()
 
 
+@app.middleware("http")
+async def metrics_middleware(request: Request, call_next):
+    start_time = time.time()
+    response = await call_next(request)
+
+    # Skip metrics for the metrics endpoint itself
+    if request.url.path != "/metrics":
+        endpoint = request.url.path
+        method = request.method
+        status = response.status_code
+
+        # Record request count
+        api_requests_total.labels(endpoint=endpoint, method=method, status=status).inc()
+
+        # Record request duration
+        api_request_duration.labels(endpoint=endpoint, method=method).observe(
+            time.time() - start_time
+        )
+
+    return response
+
+
 @app.get("/api/item", response_model=List[schemas.Item])
 def get_items(
     response: Response,
@@ -84,3 +114,12 @@ def get_items(
     # Set cache for 1 day (86400 seconds) for successful responses
     response.headers["Cache-Control"] = "max-age=86400"
     return items
+
+
+@app.get("/metrics")
+def metrics_endpoint(db: Session = Depends(get_db)):
+    """Expose Prometheus metrics"""
+    # Update database metrics before returning
+    update_db_metrics(db)
+
+    return Response(content=get_metrics(), media_type=CONTENT_TYPE_LATEST)

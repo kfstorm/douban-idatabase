@@ -7,3 +7,4 @@ requests==2.31.0
 python-dotenv==1.0.1
 pytz
 tqdm==4.67.1
+prometheus-client==0.21.1

@@ -3,11 +3,13 @@ import os
 import sqlite3
 import gzip
 import shutil
+import time
 from datetime import datetime
 from pathlib import Path
 
 from .config import settings
 from .utils import now_timestamp, timestamp_to_local_time_str
+from .metrics import backup_operations, backup_duration, backup_file_size
 
 logger = logging.getLogger(__name__)
 
@@ -43,11 +45,13 @@ def perform_backup():
     db_path = get_database_path()
     if not db_path:
         logger.error("Cannot determine database path. Backup failed.")
+        backup_operations.labels(status="error").inc()
         return False
 
     # Check if database file exists
     if not os.path.exists(db_path):
         logger.error(f"Database file not found at {db_path}. Backup failed.")
+        backup_operations.labels(status="error").inc()
         return False
 
     # Get the absolute paths to check if we're trying to backup to the same file
@@ -67,7 +71,11 @@ def perform_backup():
         logger.error(
             "Cannot backup database to itself. Please use a different backup directory."
         )
+        backup_operations.labels(status="error").inc()
         return False
+
+    # Time the backup operation
+    backup_start_time = time.time()
 
     try:
         # Connect to source database
@@ -101,6 +109,14 @@ def perform_backup():
             f"Database backup completed and compressed in {duration:.2f} seconds"
         )
 
+        # Record metrics for the backup
+        backup_operations.labels(status="success").inc()
+        backup_duration.observe(time.time() - backup_start_time)
+
+        # Record the backup file size
+        if os.path.exists(compressed_backup_path):
+            backup_file_size.set(os.path.getsize(compressed_backup_path))
+
         # Clean up old backups
         cleanup_old_backups(backup_dir)
 
@@ -108,6 +124,7 @@ def perform_backup():
 
     except sqlite3.Error as e:
         logger.error(f"SQLite error during backup: {e}")
+        backup_operations.labels(status="error").inc()
         # Try to clean up partial backup files if they exist
         for path in [temp_backup_path, compressed_backup_path]:
             if os.path.exists(path):
@@ -119,6 +136,7 @@ def perform_backup():
         return False
     except Exception as e:
         logger.exception(f"Unexpected error during backup: {e}")
+        backup_operations.labels(status="error").inc()
         return False
 
 

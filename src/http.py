@@ -6,7 +6,7 @@ from urllib.parse import urlencode, urlparse
 import logging
 from .config import settings
 from .utils import now_timestamp, timestamp_to_local_time_str
-
+from .metrics import rate_limit_hits, http_requests_total, http_request_duration
 
 logger = logging.getLogger(__name__)
 
@@ -35,6 +35,7 @@ class Throttler:
         time.sleep(random.uniform(0, settings.REQUEST_DELAY_MAX_SECONDS))
 
     def _handle_response(self, response):
+        host = urlparse(response.url).netloc
         if (
             response.status_code == 403
             or response.status_code == 302
@@ -44,6 +45,10 @@ class Throttler:
         ):
             # Rate limited.
             next_call_time = now_timestamp() + settings.RATE_LIMIT_DELAY_SECONDS
+
+            # Record rate limit hit
+            rate_limit_hits.labels(host=host).inc()
+
             raise RateLimitException(next_call_time)
         return response
 
@@ -84,6 +89,10 @@ def get_response(http_session: requests.Session, url: str, **kwargs):
     if "headers" in kwargs:
         headers.update(kwargs.pop("headers"))
 
+    # Get the host for metrics
+    host = urlparse(url).netloc
+    start_time = time.time()
+
     try:
         throttler._check_rate_limit(url)
     except RateLimitException as e:
@@ -93,30 +102,46 @@ def get_response(http_session: requests.Session, url: str, **kwargs):
         else:
             raise e
 
-    response = http_session.get(url, headers=headers, timeout=60, **kwargs)
-
     try:
-        throttler._handle_response(response)
-    except RateLimitException as e:
-        host = urlparse(response.url).netloc
-        if (
-            settings.RATE_LIMIT_USE_ZENROWS
-            and settings.ZENROWS_API_KEY
-            and host != "api.zenrows.com"
-        ):
-            response.close()
-            logger.warning("Rate limited. Trying via ZenRows API...")
-            return get_response_via_zenrows(http_session, url, **kwargs)
-        else:
-            throttler.next_call_time[host] = e.next_call_time
+        response = http_session.get(url, headers=headers, timeout=60, **kwargs)
 
-    try:
-        response.raise_for_status()
-    except requests.HTTPError as e:
-        logger.error(f"Failed to fetch {url}: {str(e)}")
+        # Record response duration
+        duration = time.time() - start_time
+        http_request_duration.labels(host=host).observe(duration)
+
+        # Record request with status code
+        http_requests_total.labels(
+            host=host, status_code=str(response.status_code)
+        ).inc()
+
+        try:
+            throttler._handle_response(response)
+        except RateLimitException as e:
+            host = urlparse(response.url).netloc
+            if (
+                settings.RATE_LIMIT_USE_ZENROWS
+                and settings.ZENROWS_API_KEY
+                and host != "api.zenrows.com"
+            ):
+                response.close()
+                logger.warning("Rate limited. Trying via ZenRows API...")
+                return get_response_via_zenrows(http_session, url, **kwargs)
+            else:
+                throttler.next_call_time[host] = e.next_call_time
+                raise e
+
+        try:
+            response.raise_for_status()
+        except requests.HTTPError as e:
+            logger.error(f"Failed to fetch {url}: {str(e)}")
+            raise e
+
+        return response
+    except requests.exceptions.RequestException as e:
+        # Record network-level failures
+        http_requests_total.labels(host=host, status_code="error").inc()
+        logger.error(f"Request exception for {url}: {str(e)}")
         raise e
-
-    return response
 
 
 def get_json(http_session, url, **kwargs):

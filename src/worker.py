@@ -5,6 +5,7 @@ import re
 from urllib.parse import urlparse
 import requests
 import json
+import time
 from sqlalchemy.orm import Session
 
 from .lists import CollectionApi, DoulistApi
@@ -12,6 +13,7 @@ from .utils import parse_douban_time, now_timestamp, timestamp_to_local_time_str
 from .models import KnownDoubanId, Queue, Item, History, List, add_to_queue
 from .config import settings
 from .http import RateLimitException, get_response, get_json
+from .metrics import worker_processed_items, worker_processing_duration
 
 logger = logging.getLogger(__name__)
 
@@ -72,6 +74,9 @@ def process_queue_items(db: Session, http_session: requests.Session) -> None:
             item_type = queue_item.type
             logger.info(f"Processing queue item: type={item_type}, id={item_id}")
 
+            # Start timing for this specific item
+            item_start_time = time.time()
+
             # Dispatch to appropriate handler based on queue item type
             if item_type == "douban_id":
                 process_douban_id(db, http_session, queue_item)
@@ -79,6 +84,14 @@ def process_queue_items(db: Session, http_session: requests.Session) -> None:
                 process_list(db, http_session, queue_item)
             else:
                 logger.warning(f"Unsupported queue item type: {item_type}")
+
+            # Record processing duration
+            processing_duration = time.time() - item_start_time
+            worker_processing_duration.labels(type=item_type).observe(
+                processing_duration
+            )
+            worker_processed_items.labels(type=item_type, status="success").inc()
+
             # Remove the item from queue
             db.delete(queue_item)
             db.commit()
@@ -86,12 +99,16 @@ def process_queue_items(db: Session, http_session: requests.Session) -> None:
             processed_count += 1
         except RateLimitException as e:
             db.rollback()
+            worker_processed_items.labels(type=item_type, status="rate_limited").inc()
             raise e
 
         except Exception as e:
             logger.exception(
                 f"Error processing queue item {queue_item.id} of type {queue_item.type}: {e}"  # noqa: B950
             )
+            # Record the error
+            worker_processed_items.labels(type=item_type, status="error").inc()
+
             # Remove the item from queue even if there's an error
             db.delete(queue_item)
             db.commit()
