@@ -47,6 +47,10 @@ class Settings(BaseSettings):
         os.getenv("BACKUP_KEEP_SECONDS", "604800")
     )  # 7 days default
 
+    # Audit log settings
+    AUDIT_LOG_ENABLED: bool = bool(os.getenv("AUDIT_LOG_ENABLED", "true"))
+    AUDIT_LOG_RETAIN_DAYS: int = int(os.getenv("AUDIT_LOG_RETAIN_DAYS", "30"))
+
     class Config:
         env_file = ".env"
         env_file_encoding = "utf-8"
