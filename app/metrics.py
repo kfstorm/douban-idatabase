@@ -11,7 +11,7 @@ from prometheus_client import (
 from sqlalchemy.orm import Session
 from sqlalchemy import create_engine
 
-from .models import Item, Queue, History, List
+from app.models import Item, Queue, History, List
 
 logger = logging.getLogger(__name__)
 
@@ -164,7 +164,7 @@ exception_counts = Counter(
 
 def update_db_metrics(db: Session):
     """Update all database-related metrics"""
-    from .config import settings
+    from app.config import settings
 
     db_path = settings.SQLALCHEMY_DATABASE_URL
 

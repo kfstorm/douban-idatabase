@@ -3,11 +3,11 @@ import logging
 import requests
 from sqlalchemy.orm import Session
 
-from .utils import record_exception_metrics
-from .models import add_to_queue
+from app.utils import record_exception_metrics
+from app.models import add_to_queue
 from urllib.parse import urlencode
-from .config import settings
-from .http import get_json
+from app.config import settings
+from app.http import get_json
 
 # Get logger instead of configuring it locally
 logger = logging.getLogger(__name__)

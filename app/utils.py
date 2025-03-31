@@ -57,7 +57,7 @@ def record_exception_metrics(exc: Exception, metrics_counter=None):
 
     # Import here to avoid circular imports
     if metrics_counter is None:
-        from .metrics import exception_counts
+        from app.metrics import exception_counts
 
         metrics_counter = exception_counts
 

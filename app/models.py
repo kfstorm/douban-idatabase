@@ -5,10 +5,10 @@ from sqlalchemy import (
     Float,
     Text,
 )
-from .database import Base
+from app.database import Base
 from sqlalchemy import and_
 import logging
-from .utils import now_timestamp
+from app.utils import now_timestamp
 
 logger = logging.getLogger(__name__)
 

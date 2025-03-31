@@ -6,19 +6,19 @@ import csv
 import os
 from sqlalchemy.orm import Session
 
-from .database import SessionLocal
-from .worker import process_queue_items
-from .crawler import search_recent_douban_movies
-from .lists import bootstrap_lists
-from .models import Item, Schedule, add_to_queue
-from .http import new_http_session, RateLimitException
-from .utils import (
+from app.database import SessionLocal
+from app.worker import process_queue_items
+from app.crawler import search_recent_douban_movies
+from app.lists import bootstrap_lists
+from app.models import Item, Schedule, add_to_queue
+from app.http import new_http_session, RateLimitException
+from app.utils import (
     now_timestamp,
     timestamp_to_local_time_str,
     record_exception_metrics,
 )
-from .backup import perform_backup
-from .config import settings
+from app.backup import perform_backup
+from app.config import settings
 
 logger = logging.getLogger(__name__)
 

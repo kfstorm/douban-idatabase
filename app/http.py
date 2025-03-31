@@ -4,9 +4,13 @@ import time
 import requests
 from urllib.parse import urlencode, urlparse
 import logging
-from .config import settings
-from .utils import now_timestamp, record_exception_metrics, timestamp_to_local_time_str
-from .metrics import rate_limit_hits, http_requests_total, http_request_duration
+from app.config import settings
+from app.utils import (
+    now_timestamp,
+    record_exception_metrics,
+    timestamp_to_local_time_str,
+)
+from app.metrics import rate_limit_hits, http_requests_total, http_request_duration
 
 logger = logging.getLogger(__name__)
 

@@ -5,9 +5,9 @@ from sqlalchemy.orm import Session
 from typing import Any, Iterator, List
 from tqdm import tqdm
 
-from .utils import now_timestamp
-from .http import get_json
-from .models import add_to_queue
+from app.utils import now_timestamp
+from app.http import get_json
+from app.models import add_to_queue
 
 
 logger = logging.getLogger(__name__)

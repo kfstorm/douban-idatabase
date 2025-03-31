@@ -8,17 +8,17 @@ import json
 import time
 from sqlalchemy.orm import Session
 
-from .lists import CollectionApi, DoulistApi
-from .utils import (
+from app.lists import CollectionApi, DoulistApi
+from app.utils import (
     parse_douban_time,
     now_timestamp,
     record_exception_metrics,
     timestamp_to_local_time_str,
 )
-from .models import Queue, Item, History, List, DeletedItem, add_to_queue
-from .config import settings
-from .http import RateLimitException, get_response, get_json
-from .metrics import worker_processed_items, worker_processing_duration
+from app.models import Queue, Item, History, List, DeletedItem, add_to_queue
+from app.config import settings
+from app.http import RateLimitException, get_response, get_json
+from app.metrics import worker_processed_items, worker_processing_duration
 
 logger = logging.getLogger(__name__)
 

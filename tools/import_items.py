@@ -8,8 +8,8 @@ import pytz
 # change sys.path to include the parent directory
 sys.path.append(os.path.abspath(os.path.dirname(os.path.dirname(__file__))))
 
-from src.models import Item  # noqa: E402
-from src.database import SessionLocal  # noqa: E402
+from app.models import Item  # noqa: E402
+from app.database import SessionLocal  # noqa: E402
 
 
 def parse_time(time_str):

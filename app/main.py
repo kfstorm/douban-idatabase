@@ -4,12 +4,12 @@ from fastapi.security.api_key import APIKeyHeader, APIKeyQuery
 from sqlalchemy.orm import Session
 from typing import List, Optional
 from prometheus_client import CONTENT_TYPE_LATEST
-from . import models, schemas
-from .database import get_db, init_db
-from .logging_config import setup_logging
-from .scheduler import start_scheduler, stop_scheduler
-from .config import settings
-from .metrics import (
+from app import models, schemas
+from app.database import get_db, init_db
+from app.logging_config import setup_logging
+from app.scheduler import start_scheduler, stop_scheduler
+from app.config import settings
+from app.metrics import (
     get_metrics,
     update_db_metrics,
     api_requests_total,
