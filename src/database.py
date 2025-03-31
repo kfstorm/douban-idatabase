@@ -4,7 +4,6 @@ from sqlalchemy.orm import sessionmaker
 
 from .utils import record_exception_metrics
 from .config import settings
-from .audit import setup_audit_logging, setup_audit_log_listeners
 import logging
 
 logger = logging.getLogger(__name__)
@@ -365,9 +364,3 @@ def init_db():
 
     # Add douban_update_time column to list table if needed
     migrate_list_add_douban_update_time()
-
-    # Set up audit log listeners and file-based logging
-    if settings.AUDIT_LOG_ENABLED:
-        setup_audit_logging()
-        setup_audit_log_listeners()
-        logger.info("Database audit logging initialized")
