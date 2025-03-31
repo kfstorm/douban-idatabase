@@ -95,10 +95,15 @@ class DashboardGenerator:
         color_mode: str = "value",
         threshold_mode: str = "absolute",
         show_percentage: bool = True,
+        aggregation: str = "max",  # Added aggregation parameter with default "max"
     ) -> int:
         """Add a stat panel to the dashboard"""
         panel_id = self.next_panel_id
         self.next_panel_id += 1
+
+        # Apply aggregation to the metric
+        if aggregation:
+            metric = f"{aggregation}({metric})"
 
         panel = {
             "datasource": None,
@@ -342,6 +347,7 @@ def generate_dashboard():
         "histogram_quantile(0.95, sum(rate(douban_idatabase_backup_duration_seconds_bucket[24h])) by (le))",  # noqa: B950
         unit="s",
         show_percentage=True,
+        aggregation=None,  # No additional aggregation needed
     )
     generator.add_stat_panel(
         "Backup File Size",
@@ -393,6 +399,7 @@ def generate_dashboard():
         color_mode="value",
         threshold_mode="absolute",
         unit="short",
+        aggregation=None,  # No additional aggregation needed - already using sum
     )
     generator.add_stat_panel(
         "Total Exceptions (24h)",
@@ -402,6 +409,7 @@ def generate_dashboard():
         color_mode="value",
         threshold_mode="absolute",
         unit="short",
+        aggregation=None,  # No additional aggregation needed - already using sum
     )
 
     return generator.generate_dashboard()
