@@ -527,7 +527,12 @@ def extract_douban_item_detail(item: dict, source: str) -> dict:
         raise ValueError(f"Could not extract title from item: {item}")
 
     # Try to extract year
-    year = int(item.get("year")) if "year" in item else None
+    year = None
+    if "year" in item:
+        try:
+            year = int(item["year"])
+        except (ValueError, TypeError):
+            pass
     if not year:
         card_subtitle = item.get("card_subtitle") or item.get("subtitle")
         if card_subtitle:
@@ -542,8 +547,7 @@ def extract_douban_item_detail(item: dict, source: str) -> dict:
     if item.get("rating") and item["rating"].get("value"):
         try:
             rating = float(item["rating"]["value"])
-        except (ValueError, TypeError) as e:
-            record_exception_metrics(e)
+        except (ValueError, TypeError):
             pass
 
     return {
