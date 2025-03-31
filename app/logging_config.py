@@ -2,9 +2,10 @@ import logging
 import sys
 from datetime import datetime
 import os
+from app.config import settings
 
 # Create logs directory if it doesn't exist
-logs_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "logs")
+logs_dir = os.path.abspath(settings.LOGS_DIRECTORY)
 os.makedirs(logs_dir, exist_ok=True)
 
 # Get current date for log filename

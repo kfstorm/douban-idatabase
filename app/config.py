@@ -47,6 +47,9 @@ class Settings(BaseSettings):
         os.getenv("BACKUP_KEEP_SECONDS", "604800")
     )  # 7 days default
 
+    # Logs settings
+    LOGS_DIRECTORY: str = os.getenv("LOGS_DIRECTORY", "logs")
+
     class Config:
         env_file = ".env"
         env_file_encoding = "utf-8"
