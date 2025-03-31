@@ -40,10 +40,17 @@ class Throttler:
             response
             for response in all_responses
             if response.status_code == 403
-            or response.status_code == 302
-            and "sec.douban.com" in response.headers.get("location", "")
-            or response.status_code == 400
-            and "subject_ip_rate_limit" in response.text
+            or (
+                response.status_code == 302
+                and "sec.douban.com" in response.headers.get("location", "")
+            )
+            or (
+                response.status_code == 400
+                and (
+                    "subject_ip_rate_limit" in response.text
+                    or (not response.text.strip() and host == "m.douban.com")
+                )
+            )
         ):
             # Rate limited.
             next_call_time = now_timestamp() + settings.RATE_LIMIT_DELAY_SECONDS
