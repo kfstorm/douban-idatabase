@@ -94,6 +94,7 @@ class DashboardGenerator:
         unit: str = "short",
         color_mode: str = "value",
         threshold_mode: str = "absolute",
+        show_percentage: bool = True,
     ) -> int:
         """Add a stat panel to the dashboard"""
         panel_id = self.next_panel_id
@@ -127,6 +128,7 @@ class DashboardGenerator:
                 },
                 "text": {},
                 "textMode": "auto",
+                "showPercentChange": show_percentage,
             },
             "pluginVersion": "7.5.5",
             "targets": [
@@ -252,28 +254,50 @@ def generate_dashboard():
     # System & Database Overview
     generator.add_row("System & Database Overview")
     generator.add_stat_panel(
-        "Database Size", "douban_idatabase_database_size_bytes", unit="decbytes"
+        "Database Size",
+        "douban_idatabase_database_size_bytes",
+        unit="decbytes",
+        show_percentage=True,
     )
     generator.add_stat_panel(
-        "Uptime", "time() - douban_idatabase_process_start_time_seconds", unit="s"
+        "Uptime",
+        "time() - douban_idatabase_process_start_time_seconds",
+        unit="s",
+        show_percentage=False,
     )
 
     # Database Metrics
     generator.add_row("Database Metrics")
-    generator.add_stat_panel("Fetched Items", "douban_idatabase_fetched_items_total")
     generator.add_stat_panel(
-        "Placeholder Items", "douban_idatabase_placeholder_items_total"
+        "Fetched Items", "douban_idatabase_fetched_items_total", show_percentage=True
     )
-    generator.add_stat_panel("Total Items", "douban_idatabase_items_total")
-
-    generator.add_stat_panel("Fetched Lists", "douban_idatabase_fetched_lists_total")
     generator.add_stat_panel(
-        "Placeholder Lists", "douban_idatabase_placeholder_lists_total"
+        "Placeholder Items",
+        "douban_idatabase_placeholder_items_total",
+        show_percentage=True,
     )
-    generator.add_stat_panel("Total Lists", "douban_idatabase_lists_total")
+    generator.add_stat_panel(
+        "Total Items", "douban_idatabase_items_total", show_percentage=True
+    )
 
-    generator.add_stat_panel("Queue Size", "douban_idatabase_queue_size")
-    generator.add_stat_panel("History Entries", "douban_idatabase_history_total")
+    generator.add_stat_panel(
+        "Fetched Lists", "douban_idatabase_fetched_lists_total", show_percentage=True
+    )
+    generator.add_stat_panel(
+        "Placeholder Lists",
+        "douban_idatabase_placeholder_lists_total",
+        show_percentage=True,
+    )
+    generator.add_stat_panel(
+        "Total Lists", "douban_idatabase_lists_total", show_percentage=True
+    )
+
+    generator.add_stat_panel(
+        "Queue Size", "douban_idatabase_queue_size", show_percentage=True
+    )
+    generator.add_stat_panel(
+        "History Entries", "douban_idatabase_history_total", show_percentage=True
+    )
 
     # API Metrics
     generator.add_row("API Metrics")
@@ -281,7 +305,7 @@ def generate_dashboard():
         "API Requests by Endpoint",
         "rate(douban_idatabase_api_requests_total[5m])",
         "{{endpoint}} - {{method}} - {{status}}",
-        y_axis_label="requests/sec",
+        y_axis_format="reqps",
     )
     generator.add_graph_panel(
         "API Response Time (p95)",
@@ -296,7 +320,7 @@ def generate_dashboard():
         "Worker Processed Items",
         "rate(douban_idatabase_worker_processed_items_total[5m])",
         "{{type}} - {{status}}",
-        y_axis_label="items/sec",
+        y_axis_format="recps",
     )
     generator.add_graph_panel(
         "Worker Processing Time (p95)",
@@ -317,11 +341,13 @@ def generate_dashboard():
         "Backup Duration (p95)",
         "histogram_quantile(0.95, sum(rate(douban_idatabase_backup_duration_seconds_bucket[24h])) by (le))",  # noqa: B950
         unit="s",
+        show_percentage=True,
     )
     generator.add_stat_panel(
         "Backup File Size",
         "douban_idatabase_backup_file_size_bytes",
         unit="decbytes",
+        show_percentage=True,
     )
 
     # Rate Limiting
@@ -331,7 +357,7 @@ def generate_dashboard():
         "rate(douban_idatabase_rate_limit_hits_total[5m])",
         "{{host}}",
         width=24,
-        y_axis_label="hits/sec",
+        y_axis_format="ops",
     )
 
     # HTTP Metrics
@@ -340,7 +366,7 @@ def generate_dashboard():
         "HTTP Requests by Host and Status",
         "rate(douban_idatabase_http_requests_total[5m])",
         "{{host}} - {{status_code}}",
-        y_axis_label="requests/sec",
+        y_axis_format="reqps",
     )
     generator.add_graph_panel(
         "HTTP Response Time by Host (p95)",
