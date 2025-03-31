@@ -7,7 +7,7 @@ from app.utils import record_exception_metrics
 from app.models import add_to_queue
 from urllib.parse import urlencode
 from app.config import settings
-from app.http import get_json
+from app.http_utils import get_json
 
 # Get logger instead of configuring it locally
 logger = logging.getLogger(__name__)

@@ -4,6 +4,10 @@ from fastapi.security.api_key import APIKeyHeader, APIKeyQuery
 from sqlalchemy.orm import Session
 from typing import List, Optional
 from prometheus_client import CONTENT_TYPE_LATEST
+import time
+import multiprocessing
+import uvicorn
+
 from app import models, schemas
 from app.database import get_db, init_db
 from app.logging_config import setup_logging
@@ -15,7 +19,6 @@ from app.metrics import (
     api_requests_total,
     api_request_duration,
 )
-import time
 
 # Initialize logging
 logger = setup_logging()
@@ -51,22 +54,6 @@ app.add_middleware(
     allow_methods=["*"],  # Allows all methods
     allow_headers=["*"],  # Allows all headers
 )
-
-
-@app.on_event("startup")
-def on_startup():
-    logger.info("Starting up the application...")
-    init_db()
-    logger.info("Database initialized successfully")
-    # Start the scheduler
-    start_scheduler()
-
-
-@app.on_event("shutdown")
-def on_shutdown():
-    logger.info("Shutting down the application...")
-    # Stop the scheduler
-    stop_scheduler()
 
 
 @app.middleware("http")
@@ -123,3 +110,45 @@ def metrics_endpoint(db: Session = Depends(get_db)):
     update_db_metrics(db)
 
     return Response(content=get_metrics(), media_type=CONTENT_TYPE_LATEST)
+
+
+def run_app():
+    """Run the FastAPI app"""
+    uvicorn.run("app.main:app", host="0.0.0.0")
+
+
+def main():
+    """Main entry point that runs both the app and scheduler"""
+    # Initialize database before starting workers
+    logger.info("Initializing database in main process...")
+    init_db()
+    logger.info("Database initialized successfully")
+
+    # Make sure the metrics module is imported first in the main process
+    # This ensures the PROMETHEUS_MULTIPROC_DIR is set correctly
+    logger.info("Initializing metrics...")
+    from app.metrics import prometheus_multiproc_dir
+
+    logger.info(f"Using Prometheus multiprocess directory: {prometheus_multiproc_dir}")
+
+    # Start app in separate process
+    logger.info("Starting FastAPI application...")
+    app_process = multiprocessing.Process(target=run_app)
+    app_process.start()
+
+    # Start scheduler in main process - only one instance will run
+    logger.info("Starting scheduler in main process...")
+    start_scheduler()
+
+    try:
+        # Wait for the app process to complete
+        app_process.join()
+    except KeyboardInterrupt:
+        logger.info("Shutting down...")
+        stop_scheduler()
+        app_process.terminate()
+        app_process.join()
+
+
+if __name__ == "__main__":
+    main()

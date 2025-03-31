@@ -11,7 +11,7 @@ from app.worker import process_queue_items
 from app.crawler import search_recent_douban_movies
 from app.lists import bootstrap_lists
 from app.models import Item, Schedule, add_to_queue
-from app.http import new_http_session, RateLimitException
+from app.http_utils import new_http_session, RateLimitException
 from app.utils import (
     now_timestamp,
     timestamp_to_local_time_str,

@@ -1,13 +1,10 @@
 FROM python:3.11.8-alpine3.19
 
-RUN mkdir /app
-WORKDIR /app
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+COPY requirements.txt /requirements.txt
+RUN pip install --no-cache-dir -r /requirements.txt
 COPY app/* /app/
-
-VOLUME "/app/cache"
+COPY run.sh /run.sh
 
 EXPOSE 8000
 
-ENTRYPOINT [ "uvicorn", "app.main:app", "--host", "0.0.0.0"]
+ENTRYPOINT [ "/run.sh" ]

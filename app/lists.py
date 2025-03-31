@@ -6,7 +6,7 @@ from typing import Any, Iterator, List
 from tqdm import tqdm
 
 from app.utils import now_timestamp
-from app.http import get_json
+from app.http_utils import get_json
 from app.models import add_to_queue
 
 
