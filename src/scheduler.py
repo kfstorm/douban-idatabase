@@ -211,6 +211,7 @@ def execute_scheduled_task(
         )
         return e.next_call_time
     except Exception as e:
+        db.rollback()
         logger.exception(f"Error executing scheduled task {schedule_type}: {e}")
 
 
@@ -252,6 +253,7 @@ def unified_scheduler():
                     # Update the next run time
                     update_schedule_next_run(db, schedule.type, next_run_time)
             except Exception as e:
+                db.rollback()
                 logger.exception(f"Error in unified scheduler: {e}")
 
         # Sleep for a short time before checking again

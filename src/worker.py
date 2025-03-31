@@ -103,6 +103,7 @@ def process_queue_items(db: Session, http_session: requests.Session) -> None:
             raise e
 
         except Exception as e:
+            db.rollback()
             logger.exception(
                 f"Error processing queue item {queue_item.id} of type {queue_item.type}: {e}"  # noqa: B950
             )
