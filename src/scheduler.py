@@ -46,14 +46,17 @@ def initialize_schedules(db: Session):
     now = now_timestamp()
 
     # Initialize all schedule types
+    added_schedules = set()
     for schedule_type in SCHEDULE_INTERVALS.keys():
         schedule = db.query(Schedule).filter(Schedule.type == schedule_type).first()
         if not schedule:
             logger.info(f"Creating default schedule for {schedule_type}")
             schedule = Schedule(type=schedule_type, next_run=now)
             db.add(schedule)
+            added_schedules.add(schedule_type)
 
-    db.commit()
+    if added_schedules:
+        db.commit()
 
 
 def update_schedule_next_run(db: Session, schedule_type: str, next_run_time: float):
@@ -226,30 +229,30 @@ def unified_scheduler():
 
     logger.info("Unified scheduler started")
 
+    with SessionLocal() as db:
+        # Initialize schedules if needed
+        initialize_schedules(db)
+
+    http_session = new_http_session()
     while running:
-        db = SessionLocal()
-        try:
-            http_session = new_http_session()
+        with SessionLocal() as db:
+            try:
+                # Check for scheduled tasks that need to run
+                schedule = get_next_schedule_run(db)
 
-            # Initialize schedules if needed
-            initialize_schedules(db)
+                if schedule:
+                    if should_log_schedule(schedule.type):
+                        logger.info(f"Running scheduled task: {schedule.type}")
 
-            # Check for scheduled tasks that need to run
-            schedule = get_next_schedule_run(db)
+                    # Execute the appropriate task based on schedule type
+                    next_run_time = execute_scheduled_task(
+                        db, http_session, schedule.type
+                    )
 
-            if schedule:
-                if should_log_schedule(schedule.type):
-                    logger.info(f"Running scheduled task: {schedule.type}")
-
-                # Execute the appropriate task based on schedule type
-                next_run_time = execute_scheduled_task(db, http_session, schedule.type)
-
-                # Update the next run time
-                update_schedule_next_run(db, schedule.type, next_run_time)
-        except Exception as e:
-            logger.exception(f"Error in unified scheduler: {e}")
-        finally:
-            db.close()
+                    # Update the next run time
+                    update_schedule_next_run(db, schedule.type, next_run_time)
+            except Exception as e:
+                logger.exception(f"Error in unified scheduler: {e}")
 
         # Sleep for a short time before checking again
         # Using a short sleep time to be responsive to any tasks
