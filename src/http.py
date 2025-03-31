@@ -36,22 +36,19 @@ class Throttler:
     def _handle_response(self, response: requests.Response):
         all_responses = response.history + [response]
         host = urlparse(all_responses[0].request.url).netloc
-        if any(
-            response
-            for response in all_responses
-            if response.status_code == 403
-            or (
-                response.status_code == 302
-                and "sec.douban.com" in response.headers.get("location", "")
-            )
-            or (
-                response.status_code == 400
-                and (
-                    "subject_ip_rate_limit" in response.text
-                    or (not response.text.strip() and host == "m.douban.com")
+        rate_limited = False
+        for resp in all_responses:
+            if (
+                resp.status_code == 403
+                or (
+                    resp.status_code == 302
+                    and "sec.douban.com" in resp.headers.get("location", "")
                 )
-            )
-        ):
+                or (resp.status_code == 400 and "subject_ip_rate_limit" in resp.text)
+            ):
+                rate_limited = True
+                break
+        if rate_limited:
             # Rate limited.
             next_call_time = now_timestamp() + settings.RATE_LIMIT_DELAY_SECONDS
 
@@ -126,6 +123,7 @@ def get_response(http_session: requests.Session, url: str, **kwargs):
             raise e
 
     try:
+        logger.info("Accessing %s", url)
         response = http_session.get(url, headers=headers, timeout=60, **kwargs)
 
         # Record response duration
