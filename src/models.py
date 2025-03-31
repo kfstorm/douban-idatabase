@@ -63,6 +63,13 @@ class List(Base):
     douban_update_time = Column(Float, nullable=True)
 
 
+class DeletedItem(Base):
+    __tablename__ = "deleted_item"
+
+    douban_id = Column(String(16), primary_key=True, index=True)
+    delete_time = Column(Float, default=now_timestamp, index=True)
+
+
 def get_items(db, douban_id: str = None, imdb_id: str = None, douban_title: str = None):
     query = db.query(Item)
     filters = []

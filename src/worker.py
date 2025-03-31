@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session
 
 from .lists import CollectionApi, DoulistApi
 from .utils import parse_douban_time, now_timestamp, timestamp_to_local_time_str
-from .models import Queue, Item, History, List, add_to_queue
+from .models import Queue, Item, History, List, DeletedItem, add_to_queue
 from .config import settings
 from .http import RateLimitException, get_response, get_json
 from .metrics import worker_processed_items, worker_processing_duration
@@ -171,6 +171,23 @@ def process_douban_id(
             # It's also possible that the item was removed from Douban.
             # Delete the item from the item table.
             if existing_item:
+                existing_deleted_item = (
+                    db.query(DeletedItem)
+                    .filter(DeletedItem.douban_id == existing_item.douban_id)
+                    .first()
+                )
+                if not existing_deleted_item:
+                    # Record the deletion in the deleted_item table
+                    deleted_item = DeletedItem(
+                        douban_id=existing_item.douban_id, delete_time=now_timestamp()
+                    )
+                    db.add(deleted_item)
+                    logger.info(
+                        f"Recorded deletion of douban_id={existing_item.douban_id}"
+                        " in deleted_item table"
+                    )
+
+                # Now delete the item from the item table
                 db.delete(existing_item)
                 db.commit()
 
