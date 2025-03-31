@@ -114,7 +114,7 @@ def get_response(http_session: requests.Session, url: str, **kwargs):
         # If host is rate limited and ZenRows is available, use it directly
         if can_use_zenrows(host):
             logger.warning(
-                "The host is rate limited until"
+                f"The host {host} is rate limited until"
                 f" {timestamp_to_local_time_str(e.next_call_time)}."
                 " Retry via ZenRows API..."
             )
