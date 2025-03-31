@@ -12,7 +12,11 @@ from .crawler import search_recent_douban_movies
 from .lists import bootstrap_lists
 from .models import Item, Schedule, add_to_queue
 from .http import new_http_session, RateLimitException
-from .utils import now_timestamp, timestamp_to_local_time_str
+from .utils import (
+    now_timestamp,
+    timestamp_to_local_time_str,
+    record_exception_metrics,
+)
 from .backup import perform_backup
 from .config import settings
 
@@ -177,6 +181,7 @@ def import_douban_ids_from_csv(db: Session):
                 total_existed += existed_count
 
         except Exception as e:
+            record_exception_metrics(e)
             logger.exception(f"Error processing CSV file {csv_path}: {e}")
             db.rollback()
 
@@ -206,11 +211,13 @@ def execute_scheduled_task(
         else:
             logger.warning(f"Unknown schedule type: {schedule_type}")
     except RateLimitException as e:
+        record_exception_metrics(e)
         logger.warning(
             f"Rate limited while executing scheduled task {schedule_type}: {str(e)}"
         )
         return e.next_call_time
     except Exception as e:
+        record_exception_metrics(e)
         db.rollback()
         logger.exception(f"Error executing scheduled task {schedule_type}: {e}")
 
@@ -253,6 +260,7 @@ def unified_scheduler():
                     # Update the next run time
                     update_schedule_next_run(db, schedule.type, next_run_time)
             except Exception as e:
+                record_exception_metrics(e)
                 db.rollback()
                 logger.exception(f"Error in unified scheduler: {e}")
 

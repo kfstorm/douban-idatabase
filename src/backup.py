@@ -8,7 +8,7 @@ from datetime import datetime
 from pathlib import Path
 
 from .config import settings
-from .utils import now_timestamp, timestamp_to_local_time_str
+from .utils import now_timestamp, record_exception_metrics, timestamp_to_local_time_str
 from .metrics import backup_operations, backup_duration, backup_file_size
 
 logger = logging.getLogger(__name__)
@@ -123,6 +123,7 @@ def perform_backup():
         return True
 
     except sqlite3.Error as e:
+        record_exception_metrics(e)
         logger.error(f"SQLite error during backup: {e}")
         backup_operations.labels(status="error").inc()
         # Try to clean up partial backup files if they exist
@@ -132,9 +133,11 @@ def perform_backup():
                     os.remove(path)
                     logger.info(f"Removed partial backup file: {path}")
                 except OSError as ose:
+                    record_exception_metrics(ose)
                     logger.error(f"Failed to remove partial backup file: {ose}")
         return False
     except Exception as e:
+        record_exception_metrics(e)
         logger.exception(f"Unexpected error during backup: {e}")
         backup_operations.labels(status="error").inc()
         return False
@@ -202,4 +205,5 @@ def cleanup_old_backups(backup_dir):
             logger.info("No old backup files to remove")
 
     except Exception as e:
+        record_exception_metrics(e)
         logger.exception(f"Error during backup cleanup: {e}")

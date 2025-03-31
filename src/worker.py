@@ -9,7 +9,12 @@ import time
 from sqlalchemy.orm import Session
 
 from .lists import CollectionApi, DoulistApi
-from .utils import parse_douban_time, now_timestamp, timestamp_to_local_time_str
+from .utils import (
+    parse_douban_time,
+    now_timestamp,
+    record_exception_metrics,
+    timestamp_to_local_time_str,
+)
 from .models import Queue, Item, History, List, DeletedItem, add_to_queue
 from .config import settings
 from .http import RateLimitException, get_response, get_json
@@ -98,11 +103,13 @@ def process_queue_items(db: Session, http_session: requests.Session) -> None:
 
             processed_count += 1
         except RateLimitException as e:
+            record_exception_metrics(e)
             db.rollback()
             worker_processed_items.labels(type=item_type, status="rate_limited").inc()
             raise e
 
         except Exception as e:
+            record_exception_metrics(e)
             db.rollback()
             logger.exception(
                 f"Error processing queue item {queue_item.id} of type {queue_item.type}: {e}"  # noqa: B950
@@ -166,6 +173,7 @@ def process_douban_id(
     try:
         item = fetch_douban_item(http_session, douban_id)
     except requests.HTTPError as e:
+        record_exception_metrics(e)
         if e.response.status_code == 404:
             # Item not found. It's possible that the item is not a movie or tv,
             # but we already added it to the item table.
@@ -447,6 +455,7 @@ def fetch_imdb_id(http_session: requests.Session, douban_id: str) -> dict:
         if result:
             return result
     except Exception as e:
+        record_exception_metrics(e)
         logger.warning(
             f"Error fetching IMDb ID from CSV for douban_id={douban_id}: {str(e)}"
         )
@@ -458,6 +467,7 @@ def fetch_imdb_id(http_session: requests.Session, douban_id: str) -> dict:
         if result:
             return result
     except Exception as e:
+        record_exception_metrics(e)
         logger.warning(
             "Error fetching IMDb ID from mobile description page"
             f" for douban_id={douban_id}: {str(e)}"
@@ -470,6 +480,7 @@ def fetch_imdb_id(http_session: requests.Session, douban_id: str) -> dict:
         if result:
             return result
     except Exception as e:
+        record_exception_metrics(e)
         logger.warning(
             "Error fetching IMDb ID from desktop page"
             f" for douban_id={douban_id}: {str(e)}"
@@ -531,7 +542,8 @@ def extract_douban_item_detail(item: dict, source: str) -> dict:
     if item.get("rating") and item["rating"].get("value"):
         try:
             rating = float(item["rating"]["value"])
-        except (ValueError, TypeError):
+        except (ValueError, TypeError) as e:
+            record_exception_metrics(e)
             pass
 
     return {

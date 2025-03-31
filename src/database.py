@@ -1,6 +1,8 @@
 from sqlalchemy import create_engine, inspect, text
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
+
+from .utils import record_exception_metrics
 from .config import settings
 import logging
 
@@ -136,6 +138,7 @@ def migrate_datetime_to_float():
             logger.info("Successfully migrated datetime columns to timestamp format")
             return True
         except Exception as e:
+            record_exception_metrics(e)
             # Roll back the entire transaction if any step fails
             session.rollback()
             logger.error(f"Migration failed: {str(e)}")
@@ -207,6 +210,7 @@ def migrate_known_douban_id_to_item():
             logger.info("Successfully dropped the known_douban_id table")
             return True
         except Exception as e:
+            record_exception_metrics(e)
             session.rollback()
             logger.error(f"Error during known_douban_id migration: {str(e)}")
             return False
@@ -303,6 +307,7 @@ def migrate_douban_id_to_string():
             logger.info("Successfully migrated douban_id columns to string format")
             return True
         except Exception as e:
+            record_exception_metrics(e)
             # Roll back the entire transaction if any step fails
             session.rollback()
             logger.error(f"Migration failed: {str(e)}")
@@ -337,6 +342,7 @@ def migrate_list_add_douban_update_time():
             logger.info("Successfully added douban_update_time column to list table")
             return True
         except Exception as e:
+            record_exception_metrics(e)
             session.rollback()
             logger.error(f"Error during list table migration: {str(e)}")
             raise

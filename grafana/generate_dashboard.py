@@ -375,6 +375,35 @@ def generate_dashboard():
         y_axis_format="s",
     )
 
+    # Exceptions
+    generator.add_row("Exceptions")
+    generator.add_graph_panel(
+        "Exception Rate by Type and Module",
+        "rate(douban_idatabase_exceptions_total[5m])",
+        "{{type}} - {{module}}",
+        width=24,
+        y_axis_format="ops",
+        y_axis_label="exceptions/sec",
+    )
+    generator.add_stat_panel(
+        "Total Exceptions (1h)",
+        "sum(increase(douban_idatabase_exceptions_total[1h]))",
+        width=8,
+        height=4,
+        color_mode="value",
+        threshold_mode="absolute",
+        unit="short",
+    )
+    generator.add_stat_panel(
+        "Total Exceptions (24h)",
+        "sum(increase(douban_idatabase_exceptions_total[24h]))",
+        width=8,
+        height=4,
+        color_mode="value",
+        threshold_mode="absolute",
+        unit="short",
+    )
+
     return generator.generate_dashboard()
 
 

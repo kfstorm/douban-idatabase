@@ -153,6 +153,14 @@ http_request_duration = Histogram(
     registry=registry,
 )
 
+# Exception counter
+exception_counts = Counter(
+    "douban_idatabase_exceptions_total",
+    "Total number of exceptions by type and module",
+    ["type", "module"],
+    registry=registry,
+)
+
 
 def update_db_metrics(db: Session):
     """Update all database-related metrics"""

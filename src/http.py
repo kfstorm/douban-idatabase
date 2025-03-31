@@ -5,7 +5,7 @@ import requests
 from urllib.parse import urlencode, urlparse
 import logging
 from .config import settings
-from .utils import now_timestamp, timestamp_to_local_time_str
+from .utils import now_timestamp, record_exception_metrics, timestamp_to_local_time_str
 from .metrics import rate_limit_hits, http_requests_total, http_request_duration
 
 logger = logging.getLogger(__name__)
@@ -120,6 +120,7 @@ def get_response(http_session: requests.Session, url: str, **kwargs):
             )
             return get_response_via_zenrows(http_session, url, **kwargs)
         else:
+            record_exception_metrics(e)
             raise e
 
     try:
@@ -146,16 +147,19 @@ def get_response(http_session: requests.Session, url: str, **kwargs):
                 )
                 return get_response_via_zenrows(http_session, url, **kwargs)
             else:
+                record_exception_metrics(e)
                 raise e
 
         try:
             response.raise_for_status()
         except requests.HTTPError as e:
+            record_exception_metrics(e)
             logger.error(f"Failed to fetch {url}: {str(e)}")
             raise e
 
         return response
     except requests.exceptions.RequestException as e:
+        record_exception_metrics(e)
         # Record network-level failures
         http_requests_total.labels(host=host, status_code="error").inc()
         logger.error(f"Request exception for {url}: {str(e)}")

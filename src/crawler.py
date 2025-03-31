@@ -2,6 +2,8 @@ import re
 import logging
 import requests
 from sqlalchemy.orm import Session
+
+from .utils import record_exception_metrics
 from .models import add_to_queue
 from urllib.parse import urlencode
 from .config import settings
@@ -119,6 +121,7 @@ def search_recent_douban_movies(db: Session, http_session: requests.Session):
                         added_count += 1
                         logger.info(f"Added Douban ID {douban_id} to queue")
                 except Exception as e:
+                    record_exception_metrics(e)
                     logger.error(f"Error adding Douban ID {douban_id} to queue: {e}")
                     db.rollback()
 
@@ -130,6 +133,7 @@ def search_recent_douban_movies(db: Session, http_session: requests.Session):
                 has_more_results = False
 
         except Exception as e:
+            record_exception_metrics(e)
             logger.error(f"Error during Google search via ZenRows API: {e}")
             has_more_results = False
 
