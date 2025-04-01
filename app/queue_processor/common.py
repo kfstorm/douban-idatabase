@@ -51,7 +51,8 @@ def allow_update_tag(existing_tag: Tag) -> bool:
             current_time - existing_tag.last_check_time
             < settings.TAG_REFRESH_INTERVAL_DAYS * 86400
         ):
-            return existing_tag.fetch
+            return False
+        return existing_tag.fetch is None or existing_tag.fetch
     return True
 
 
