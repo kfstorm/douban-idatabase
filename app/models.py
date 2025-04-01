@@ -144,7 +144,7 @@ def add_placeholder_item(db, douban_id: str) -> bool:
             update_time=None,  # This indicates it's a placeholder
         )
         db.add(minimal_item)
-        logger.debug(f"Added placeholder item {douban_id}")
+        logger.info(f"Added placeholder item {douban_id}")
         return True
     else:
         return False
@@ -175,7 +175,7 @@ def add_placeholder_list(db, list_type: str, list_id: str) -> bool:
             douban_update_time=None,
         )
         db.add(minimal_list)
-        logger.debug(f"Added placeholder list {list_type}/{list_id}")
+        logger.info(f"Added placeholder list {list_type}/{list_id}")
         return True
     else:
         return False

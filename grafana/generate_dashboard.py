@@ -269,6 +269,7 @@ def generate_dashboard():
         "time() - douban_idatabase_process_start_time_seconds",
         unit="s",
         show_percentage=False,
+        aggregation="min",
     )
 
     # Database Metrics

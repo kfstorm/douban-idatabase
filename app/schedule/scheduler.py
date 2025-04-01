@@ -159,6 +159,11 @@ def unified_scheduler():
             try:
                 # Check for scheduled tasks that need to run
                 schedule = get_next_schedule_run(db)
+                if schedule.type not in SCHEDULE_INTERVALS:
+                    logger.warning(f"Unknown schedule type: {schedule.type}")
+                    db.delete(schedule)
+                    db.commit()
+                    continue
 
                 if schedule:
                     if should_log_schedule(schedule.type):
@@ -198,11 +203,24 @@ def start_scheduler():
 
 def stop_scheduler():
     """Stop the background scheduler thread"""
-    global running
+    global running, scheduler_thread
 
     if not (scheduler_thread and scheduler_thread.is_alive()):
         logger.warning("Scheduler is not running")
         return
 
     running = False
-    logger.info("Scheduler stopping (may take up to 10 seconds to complete)")
+    logger.info("Scheduler stopping (waiting up to 30 seconds to complete)")
+
+    # Give thread a chance to exit gracefully
+    scheduler_thread.join(timeout=30)
+
+    if scheduler_thread.is_alive():
+        logger.warning("Scheduler thread did not terminate within timeout")
+
+        # In Python, we can't forcefully kill a thread safely
+        # But setting daemon=True (which we do when creating it)
+        # ensures it won't prevent application shutdown
+        logger.info("Thread will be terminated when process exits")
+    else:
+        logger.info("Scheduler thread stopped successfully")
