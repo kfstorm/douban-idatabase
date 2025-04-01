@@ -66,21 +66,14 @@ def _add_to_queue(db, item_type: str, item_id: str, params: str = None) -> bool:
     Returns:
         bool: True if a new item was added to the queue, False if it already existed
     """
-    # Check if item is already in queue
-    existing = db.query(Queue).filter_by(type=item_type, id=item_id).first()
-
-    if not existing:
-        # Add to queue
-        queue_item = Queue(
-            type=item_type,
-            id=item_id,
-            params=params,
-            upsert_time=now_timestamp(),
-        )
-        db.add(queue_item)
-        return True
-    else:
-        return False
+    # Add to queue
+    queue_item = Queue(
+        type=item_type,
+        id=item_id,
+        params=params,
+        upsert_time=now_timestamp(),
+    )
+    db.add(queue_item)
 
 
 def refresh(db: Session):
