@@ -1,6 +1,6 @@
 import json
 
-from app.worker import extract_douban_item_detail
+from app.queue_processor.worker import extract_douban_item_detail
 
 
 def _test_extract_base(json_text: str, source: str, expected_result: dict):

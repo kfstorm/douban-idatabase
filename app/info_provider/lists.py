@@ -1,13 +1,9 @@
 import logging
-from urllib.parse import urlparse, parse_qs
 import requests
-from sqlalchemy.orm import Session
 from typing import Any, Iterator, List
 from tqdm import tqdm
 
-from app.utils import now_timestamp
 from app.http_utils import get_json
-from app.models import add_to_queue
 
 
 logger = logging.getLogger(__name__)
@@ -17,7 +13,7 @@ def read_pages(read_one_page, get_total, get_items, items_per_page) -> Iterator[
     total = None
     start = 0
     count = items_per_page
-    pbar = None
+    progress_bar = None
 
     try:
         while total is None or start < total:
@@ -25,12 +21,12 @@ def read_pages(read_one_page, get_total, get_items, items_per_page) -> Iterator[
             if total is None:
                 total = get_total(page_data)
                 # Initialize progress bar after we know the total
-                pbar = tqdm(total=total)
+                progress_bar = tqdm(total=total)
 
             for item in get_items(page_data):
                 yield item
-            if pbar:
-                pbar.update(min(count, total - start))
+            if progress_bar:
+                progress_bar.update(min(count, total - start))
 
             # Due to the logic of douban, the count of returned items
             # may be less than the specified count per page.
@@ -40,8 +36,8 @@ def read_pages(read_one_page, get_total, get_items, items_per_page) -> Iterator[
             if start >= total:
                 break
     finally:
-        if pbar:
-            pbar.close()
+        if progress_bar:
+            progress_bar.close()
 
 
 class BaseApi:
@@ -117,34 +113,3 @@ class ListsApi:
             items_per_page=50,
         ):
             yield item
-
-
-def bootstrap_lists(db: Session, http_session: requests.Session):
-    logger.info("Adding lists to queue...")
-
-    count = 0
-    last_print = now_timestamp()
-    lists_api = ListsApi(http_session)
-    for item in lists_api.iter_lists():
-        parsed_url = urlparse(item["sharing_url"])
-        url_parts = [_ for _ in parsed_url.path.split("/") if _][-2:]
-        list_type = url_parts[0]
-        list_id = url_parts[1]
-        if list_type == "doubanapp" and list_id == "dispatch":
-            query_params = parse_qs(parsed_url.query)
-            uri = query_params.get("uri", [None])[0]
-            if uri:
-                url_parts = [_ for _ in uri.split("/") if _][-2:]
-                list_type = url_parts[0]
-            list_id = url_parts[1]
-        if list_type == "subject_collection" or list_type == "doulist":
-            # Use common method to add to queue
-            add_to_queue(db, list_type, list_id)
-        else:
-            logger.warning(f"Unknown list type: {list_type}")
-        count += 1
-        if now_timestamp() - last_print >= 60:
-            logger.info(f"Processed {count} lists.")
-            last_print = now_timestamp()
-
-    logger.info(f"Finished adding lists to queue. Total: {count}")

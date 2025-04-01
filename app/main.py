@@ -11,7 +11,7 @@ import uvicorn
 from app import models, schemas
 from app.database import get_db, init_db
 from app.logging_config import setup_logging
-from app.scheduler import start_scheduler, stop_scheduler
+from app.schedule.scheduler import start_scheduler, stop_scheduler
 from app.config import settings
 from app.metrics import (
     get_metrics,

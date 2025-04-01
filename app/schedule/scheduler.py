@@ -2,22 +2,24 @@ import logging
 import threading
 import time
 import requests
-import csv
-import os
 from sqlalchemy.orm import Session
 
 from app.database import SessionLocal
-from app.worker import process_queue_items
-from app.crawler import search_recent_douban_movies
-from app.lists import bootstrap_lists
-from app.models import Item, Schedule, add_to_queue
+from app.queue_processor.worker import process_queue_items
+from app.schedule.add_recent_items_task import (
+    add_recent_items,
+)
+from app.schedule.discover_lists_task import discover_lists
+from app.models import Schedule
 from app.http_utils import new_http_session, RateLimitException
+from app.schedule.import_items_task import import_douban_ids_from_csv
+from app.schedule.refresh_task import refresh_from_known_douban_id
 from app.utils import (
     now_timestamp,
     timestamp_to_local_time_str,
     record_exception_metrics,
 )
-from app.backup import perform_backup
+from app.schedule.backup_task import perform_backup
 from app.config import settings
 
 logger = logging.getLogger(__name__)
@@ -96,112 +98,17 @@ def get_next_schedule_run(db: Session):
     )
 
 
-def refresh_from_known_douban_id(db: Session):
-    """
-    Periodically refresh data from item table by adding them back to the queue
-    Processes all known IDs (no sampling)
-    """
-    logger.info("Starting refresh from item table...")
-
-    # Get all known douban IDs from the item table
-    known_ids = db.query(Item.douban_id).all()
-    total_ids = len(known_ids)
-
-    if total_ids == 0:
-        logger.info("No Douban IDs found. Skipping refresh.")
-        return
-
-    logger.info(f"Found {total_ids} Douban IDs to refresh")
-
-    # Add all IDs to queue
-    added_count = 0
-    for id_tuple in known_ids:
-        douban_id = id_tuple[0]
-        if add_to_queue(db, "douban_id", douban_id):
-            added_count += 1
-
-    logger.info(
-        f"Added {added_count} out of {total_ids} Douban IDs to queue for refresh"
-    )
-
-
-def import_douban_ids_from_csv(db: Session):
-    """
-    Import Douban IDs from CSV files into the item table as placeholders.
-    Uses the same CSV files as configured for IMDb ID mapping.
-    """
-    if not settings.IMDB_CSV_PATH:
-        return
-
-    logger.info("Starting import of Douban IDs from CSV files...")
-
-    # Split the CSV paths by comma
-    csv_paths = [path.strip() for path in settings.IMDB_CSV_PATH.split(",")]
-    total_imported = 0
-    total_existed = 0
-
-    for csv_path in csv_paths:
-        if not os.path.exists(csv_path):
-            logger.warning(f"CSV file not found: {csv_path}")
-            continue
-
-        imported_count = 0
-        existed_count = 0
-
-        logger.info(f"Processing CSV file: {csv_path}")
-
-        try:
-            with open(csv_path, "r") as f:
-                reader = csv.reader(f)
-                for row in reader:
-                    if len(row) >= 1 and row[0].isdigit():
-                        douban_id = row[0]
-
-                        # Check if this Douban ID already exists in the item table
-                        existing_item = (
-                            db.query(Item).filter(Item.douban_id == douban_id).first()
-                        )
-
-                        if not existing_item:
-                            # Add new Douban ID to the item table as a placeholder
-                            db.add(Item(douban_id=douban_id, update_time=None))
-                            imported_count += 1
-                        else:
-                            existed_count += 1
-
-                # Commit after processing each file
-                db.commit()
-
-                logger.info(
-                    f"Imported {imported_count} new Douban IDs from {csv_path} "
-                    f"({existed_count} already existed)"
-                )
-
-                total_imported += imported_count
-                total_existed += existed_count
-
-        except Exception as e:
-            record_exception_metrics(e)
-            logger.exception(f"Error processing CSV file {csv_path}: {e}")
-            db.rollback()
-
-    logger.info(
-        f"CSV import completed. Total: {total_imported} new Douban IDs imported "
-        f"({total_existed} already existed)"
-    )
-
-
 def execute_scheduled_task(
     db: Session, http_session: requests.Session, schedule_type: str
 ) -> float:
     """Execute a specific scheduled task based on its type"""
     try:
         if schedule_type == SCHEDULE_TYPE_GOOGLE_SEARCH:
-            search_recent_douban_movies(db, http_session)
+            add_recent_items(db, http_session)
         elif schedule_type == SCHEDULE_TYPE_PROCESS_QUEUE:
             process_queue_items(db, http_session)
         elif schedule_type == SCHEDULE_TYPE_BOOTSTRAP_LISTS:
-            bootstrap_lists(db, http_session)
+            discover_lists(db, http_session)
         elif schedule_type == SCHEDULE_TYPE_REFRESH_FROM_KNOWN_DOUBAN_ID:
             refresh_from_known_douban_id(db)
         elif schedule_type == SCHEDULE_TYPE_DATABASE_BACKUP:
