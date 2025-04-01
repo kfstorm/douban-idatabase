@@ -6,6 +6,19 @@ from dotenv import load_dotenv
 load_dotenv()
 
 
+def _parse_bool_env_var(env_key: str, default_value: bool) -> bool:
+    """Parse a string value to a boolean."""
+    value = os.getenv(env_key)
+    if not value:
+        return default_value
+    value = value.strip().lower()
+    if value in ("true", "1", "yes"):
+        return True
+    elif value in ("false", "0", "no"):
+        return False
+    raise ValueError(f"Cannot parse '{value}' to a boolean.")
+
+
 class Settings(BaseSettings):
     SQLALCHEMY_DATABASE_URL: str = os.getenv(
         "SQLALCHEMY_DATABASE_URL", "sqlite:///db.sqlite3"
@@ -29,7 +42,7 @@ class Settings(BaseSettings):
         os.getenv("REQUEST_DELAY_MAX_SECONDS", "3")
     )
 
-    RATE_LIMIT_USE_ZENROWS: bool = bool(os.getenv("RATE_LIMIT_USE_ZENROWS", "false"))
+    RATE_LIMIT_USE_ZENROWS: bool = _parse_bool_env_var("RATE_LIMIT_USE_ZENROWS", False)
 
     ITEM_REFRESH_INTERVAL_DAYS_DEFAULT: int = int(
         os.getenv("ITEM_REFRESH_INTERVAL_MINUTES", "30")
@@ -45,7 +58,7 @@ class Settings(BaseSettings):
     IMDB_CSV_PATH: str = os.getenv("IMDB_CSV_PATH", "")
 
     # Backup settings
-    BACKUP_ENABLED: bool = bool(os.getenv("BACKUP_ENABLED", "true"))
+    BACKUP_ENABLED: bool = _parse_bool_env_var("BACKUP_ENABLED", True)
     BACKUP_INTERVAL_SECONDS: int = int(
         os.getenv("BACKUP_INTERVAL_SECONDS", "86400")
     )  # 24 hours
@@ -61,8 +74,8 @@ class Settings(BaseSettings):
         os.getenv("DISCOVER_LISTS_BY_GOOGLE_MAX_RESULTS", "1000")
     )
 
-    DISABLE_INDIVIDUAL_ITEM_FETCH: bool = bool(
-        os.getenv("DISABLE_INDIVIDUAL_ITEM_FETCH", "false")
+    DISABLE_INDIVIDUAL_ITEM_FETCH: bool = _parse_bool_env_var(
+        "DISABLE_INDIVIDUAL_ITEM_FETCH", False
     )
 
     class Config:
