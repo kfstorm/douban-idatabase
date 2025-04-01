@@ -297,6 +297,17 @@ def generate_dashboard():
     generator.add_stat_panel(
         "Total Lists", "douban_idatabase_lists_total", show_percentage=True
     )
+    generator.add_stat_panel(
+        "Valid Tags", "douban_idatabase_valid_tags_total", show_percentage=True
+    )
+    generator.add_stat_panel(
+        "Placeholder Tags",
+        "douban_idatabase_placeholder_tags_total",
+        show_percentage=True,
+    )
+    generator.add_stat_panel(
+        "Total Tags", "douban_idatabase_tags_total", show_percentage=True
+    )
 
     generator.add_stat_panel(
         "Queue Size", "douban_idatabase_queue_size", show_percentage=True

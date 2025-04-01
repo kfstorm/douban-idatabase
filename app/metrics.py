@@ -12,7 +12,7 @@ from prometheus_client import (
 from sqlalchemy.orm import Session
 from sqlalchemy import create_engine
 
-from app.models import Item, Queue, History, List
+from app.models import Item, Queue, History, List, Tag
 
 logger = logging.getLogger(__name__)
 
@@ -79,6 +79,21 @@ db_fetched_lists_total = Gauge(
 db_placeholder_lists_total = Gauge(
     "douban_idatabase_placeholder_lists_total",
     "Total number of placeholder lists without check time",
+)
+
+db_tags_total = Gauge(
+    "douban_idatabase_tags_total",
+    "Total number of tags in the database",
+)
+
+db_valid_tags_total = Gauge(
+    "douban_idatabase_valid_tags_total",
+    "Total number of valid tags (fetch=True)",
+)
+
+db_placeholder_tags_total = Gauge(
+    "douban_idatabase_placeholder_tags_total",
+    "Total number of placeholder tags without check time",
 )
 
 # Worker metrics
@@ -191,6 +206,24 @@ def update_db_metrics(db: Session):
 
             # Set fetched lists count (total - placeholders)
             db_fetched_lists_total.set(total_lists - placeholder_lists_count)
+
+            # Tag metrics
+            total_tags = session.query(Tag).count()
+            db_tags_total.set(total_tags)
+
+            # Count valid tags (fetch=True)
+            valid_tags_count = (
+                session.query(Tag).filter(Tag.fetch == True).count()  # noqa: E712
+            )
+            db_valid_tags_total.set(valid_tags_count)
+
+            # Count placeholder tags (last_check_time is NULL)
+            placeholder_tags_count = (
+                session.query(Tag)
+                .filter(Tag.last_check_time == None)  # noqa: E711
+                .count()
+            )
+            db_placeholder_tags_total.set(placeholder_tags_count)
         except Exception as e:
             logger.error(f"Failed to collect metrics: {e}")
 
