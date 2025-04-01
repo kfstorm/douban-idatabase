@@ -1,5 +1,5 @@
 import logging
-import re
+from urllib.parse import urlparse
 import requests
 from sqlalchemy.orm import Session
 
@@ -25,7 +25,6 @@ SEARCH_QUERY = (
     + " -inurl:cinema"
     + " -inurl:trailer"
 )
-DOUBAN_ID_PATTERN = r"movie\.douban\.com/subject/(\d+)"
 
 
 def add_recent_items(db: Session, http_session: requests.Session):
@@ -42,13 +41,16 @@ def add_recent_items(db: Session, http_session: requests.Session):
         tbs="qdr:d",  # Native Google time filter: past day
     ):
         # Extract links and find Douban IDs
-        url = result.get("link", "")
-
-        # Check if the URL matches the Douban pattern
-        match = re.search(DOUBAN_ID_PATTERN, url)
-        if match:
-            douban_id = match.group(1)
-            douban_ids.add(douban_id)
+        url = result.get("link")
+        if not url:
+            continue
+        parsed_url = urlparse(url)
+        if not parsed_url.path.startswith("/subject/"):
+            continue
+        douban_id = parsed_url.path.split("/")[2]
+        if not douban_id or not douban_id.isdecimal():
+            continue
+        douban_ids.add(douban_id)
 
     logger.info(f"Found {len(douban_ids)} Douban IDs")
 

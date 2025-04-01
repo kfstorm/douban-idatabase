@@ -2,6 +2,7 @@ import logging
 import requests
 from sqlalchemy.orm import Session
 
+from app.config import settings
 from app.info_provider.detail import fetch_douban_item_detail
 from app.info_provider.imdb import fetch_imdb_id
 from app.models import DeletedItem, Item, Queue
@@ -17,14 +18,14 @@ def process_douban_id(
     """
     Process a queue item of type 'douban_id'
     """
+    if settings.DISABLE_INDIVIDUAL_ITEM_FETCH:
+        return
+
     douban_id = queue_item.id
 
     # Check if item already exists and was updated within the refresh interval
     existing_item = db.query(Item).filter(Item.douban_id == douban_id).first()
     if not allow_update_item(existing_item):
-        # Remove from queue since it's too recent to update
-        db.delete(queue_item)
-        db.commit()
         return
 
     # Fetch data from Douban and create Item object
@@ -61,9 +62,6 @@ def process_douban_id(
 
     if not item:
         logger.warning(f"Failed to fetch data for douban_id={douban_id}")
-        # Remove from queue even if failed (to avoid endless retries)
-        db.delete(queue_item)
-        db.commit()
         return
 
     # Save the item to database

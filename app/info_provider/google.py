@@ -36,29 +36,28 @@ def google_search(
         )
         return
 
-    page = 0
     count = 0
     has_more_results = True
 
+    # Build the Google search URL with parameters
+    google_params = {
+        "q": query,
+        **kwargs,
+    }
+
+    # Build complete Google search URL
+    google_url = f"{GOOGLE_SEARCH_URL}?{urlencode(google_params)}"
+    page = 0
     while has_more_results and count < max_results:
+        page += 1
         try:
-            # Build the Google search URL with parameters
-            google_params = {
-                "q": query,
-                **kwargs,
-                "start": page * 10,
-            }
-
-            # Build complete Google search URL
-            google_url = f"{GOOGLE_SEARCH_URL}?{urlencode(google_params)}"
-
             # Define ZenRows API parameters
             zenrows_params = {
                 "apikey": settings.ZENROWS_API_KEY,
                 "url": google_url,
             }
 
-            logger.info(f"Searching Google (page {page+1}) via ZenRows API...")
+            logger.info(f"Searching Google (page {page}) via ZenRows API...")
 
             # Make request to ZenRows API
             search_results = get_json(
@@ -67,9 +66,7 @@ def google_search(
 
             # Check if we have organic results
             organic_results = search_results.get("organic_results", [])
-            logger.info(
-                f"Found {len(organic_results)} organic results on page {page+1}"
-            )
+            logger.info(f"Found {len(organic_results)} organic results on page {page}")
 
             if not organic_results:
                 logger.info("No organic results found, stopping pagination")
@@ -82,12 +79,14 @@ def google_search(
                 if count >= max_results:
                     has_more_results = False
                     break
-            if organic_results:
-                # Move to the next page
-                page += 1
-            else:
-                logger.info("No more results found, stopping pagination")
-                has_more_results = False
+
+            if "pagination" in search_results:
+                next_page = search_results["pagination"].get("next_page")
+                if not next_page:
+                    logger.info("No next page found, stopping pagination")
+                    has_more_results = False
+                    break
+                google_url = next_page
 
         except Exception as e:
             record_exception_metrics(e)

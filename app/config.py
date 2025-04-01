@@ -57,6 +57,14 @@ class Settings(BaseSettings):
     # Logs settings
     LOGS_DIRECTORY: str = os.getenv("LOGS_DIRECTORY", "logs")
 
+    DISCOVER_LISTS_BY_GOOGLE_MAX_RESULTS: int = int(
+        os.getenv("DISCOVER_LISTS_BY_GOOGLE_MAX_RESULTS", "1000")
+    )
+
+    DISABLE_INDIVIDUAL_ITEM_FETCH: bool = bool(
+        os.getenv("DISABLE_INDIVIDUAL_ITEM_FETCH", "false")
+    )
+
     class Config:
         env_file = ".env"
         env_file_encoding = "utf-8"

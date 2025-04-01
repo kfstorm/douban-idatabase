@@ -2,6 +2,7 @@ import logging
 from sqlalchemy.orm import Session, selectinload
 from sqlalchemy import and_
 
+from app.config import settings
 from app.models import Item, List, add_to_queue, Queue
 from app.queue_processor.common import allow_update_item, allow_update_list
 from app.utils import now_timestamp
@@ -14,34 +15,37 @@ def refresh(db: Session):
     Periodically refresh data from item/list table by adding them back to the queue
     """
 
-    logger.info("Starting refresh from item table...")
+    if not settings.DISABLE_INDIVIDUAL_ITEM_FETCH:
+        logger.info("Starting refresh from item table...")
 
-    last_print = now_timestamp()
-    processed_items_count = 0
-    added_items_count = 0
+        last_print = now_timestamp()
+        processed_items_count = 0
+        added_items_count = 0
 
-    # Query items not already in the queue
-    items_query = (
-        db.query(Item)
-        .options(selectinload("*"))
-        .outerjoin(Queue, and_(Queue.type == "douban_id", Queue.id == Item.douban_id))
-        .filter(Queue.id == None)  # noqa: E711
-    )
+        # Query items not already in the queue
+        items_query = (
+            db.query(Item)
+            .options(selectinload("*"))
+            .outerjoin(
+                Queue, and_(Queue.type == "douban_id", Queue.id == Item.douban_id)
+            )
+            .filter(Queue.id == None)  # noqa: E711
+        )
 
-    all_items = items_query.all()
-    for item in all_items:
-        if allow_update_item(item):
-            if add_to_queue(db, "douban_id", item.douban_id):
-                added_items_count += 1
-        processed_items_count += 1
-        if now_timestamp() - last_print >= 60:
-            logger.info(f"Processed {processed_items_count} items.")
-            last_print = now_timestamp()
+        all_items = items_query.all()
+        for item in all_items:
+            if allow_update_item(item):
+                if add_to_queue(db, "douban_id", item.douban_id):
+                    added_items_count += 1
+            processed_items_count += 1
+            if now_timestamp() - last_print >= 60:
+                logger.info(f"Processed {processed_items_count} items.")
+                last_print = now_timestamp()
 
-    logger.info(
-        f"Added {added_items_count} items to queue for refresh."
-        f" Processed {processed_items_count} items."
-    )
+        logger.info(
+            f"Added {added_items_count} items to queue for refresh."
+            f" Processed {processed_items_count} items."
+        )
 
     logger.info("Starting refresh from list table...")
 

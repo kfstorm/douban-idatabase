@@ -9,6 +9,7 @@ from app.queue_processor.worker import process_queue_items
 from app.schedule.add_recent_items_task import (
     add_recent_items,
 )
+from app.schedule.discover_lists_by_google_task import discover_lists_by_google
 from app.schedule.discover_lists_task import discover_lists
 from app.models import Schedule
 from app.http_utils import new_http_session, RateLimitException
@@ -35,6 +36,7 @@ SCHEDULE_TYPE_BOOTSTRAP_LISTS = "bootstrap_lists"
 SCHEDULE_TYPE_REFRESH = "refresh"
 SCHEDULE_TYPE_DATABASE_BACKUP = "database_backup"
 SCHEDULE_TYPE_IMPORT_DOUBAN_IDS_FROM_CSV = "import_douban_ids_from_csv"
+SCHEDULE_TYPE_DISCOVER_LISTS_BY_GOOGLE = "discover_lists_by_google"
 
 # Schedule intervals (in seconds)
 SCHEDULE_INTERVALS = {
@@ -43,7 +45,8 @@ SCHEDULE_INTERVALS = {
     SCHEDULE_TYPE_BOOTSTRAP_LISTS: 86400,  # 1 day
     SCHEDULE_TYPE_REFRESH: 3600,  # 1 hour
     SCHEDULE_TYPE_DATABASE_BACKUP: settings.BACKUP_INTERVAL_SECONDS,  # From settings
-    SCHEDULE_TYPE_IMPORT_DOUBAN_IDS_FROM_CSV: 3600,  # 1 hour
+    SCHEDULE_TYPE_IMPORT_DOUBAN_IDS_FROM_CSV: 86400,  # 1 day
+    SCHEDULE_TYPE_DISCOVER_LISTS_BY_GOOGLE: 86400,  # 1 day
 }
 
 
@@ -115,6 +118,8 @@ def execute_scheduled_task(
             perform_backup()
         elif schedule_type == SCHEDULE_TYPE_IMPORT_DOUBAN_IDS_FROM_CSV:
             import_douban_ids_from_csv(db)
+        elif schedule_type == SCHEDULE_TYPE_DISCOVER_LISTS_BY_GOOGLE:
+            discover_lists_by_google(db, http_session)
         else:
             logger.warning(f"Unknown schedule type: {schedule_type}")
     except RateLimitException as e:
