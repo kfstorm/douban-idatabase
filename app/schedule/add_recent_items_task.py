@@ -4,7 +4,7 @@ import requests
 from sqlalchemy.orm import Session
 
 from app.info_provider.google import google_search
-from app.models import add_to_queue
+from app.models import add_placeholder_item
 from app.utils import record_exception_metrics
 
 logger = logging.getLogger(__name__)
@@ -56,15 +56,12 @@ def add_recent_items(db: Session, http_session: requests.Session):
 
     for douban_id in douban_ids:
         try:
-            # Use common method to add to queue and item
-            was_added = add_to_queue(db, "douban_id", douban_id)
-            if was_added:
+            if add_placeholder_item(db, douban_id):
                 added_count += 1
-                logger.info(f"Added Douban ID {douban_id} to queue")
         except Exception as e:
             record_exception_metrics(e)
-            logger.error(f"Error adding Douban ID {douban_id} to queue: {e}")
+            logger.error(f"Error adding Douban ID {douban_id} as a placeholder: {e}")
             db.rollback()
 
-    logger.info(f"Added {added_count} new Douban IDs to the queue")
+    logger.info(f"Added {added_count} new Douban IDs as placeholders")
     return

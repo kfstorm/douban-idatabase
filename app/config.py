@@ -35,6 +35,13 @@ class Settings(BaseSettings):
         os.getenv("ITEM_REFRESH_INTERVAL_MINUTES", "30")
     )
 
+    LIST_REFRESH_MIN_INTERVAL_DAYS: int = int(
+        os.getenv("LIST_REFRESH_MIN_INTERVAL_DAYS", "30")
+    )
+    LIST_REFRESH_MAX_INTERVAL_DAYS: int = int(
+        os.getenv("LIST_REFRESH_MAX_INTERVAL_DAYS", "365")
+    )
+
     IMDB_CSV_PATH: str = os.getenv("IMDB_CSV_PATH", "")
 
     # Backup settings

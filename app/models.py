@@ -92,8 +92,6 @@ def get_items(db, douban_id: str = None, imdb_id: str = None, douban_title: str 
 def add_to_queue(db, item_type: str, item_id: str, params: str = None) -> bool:
     """
     Common method to add an item to the queue.
-    For douban_id type, also tracks the ID in the item table.
-    For list types, also tracks in the list table as placeholder.
 
     Args:
         db: Database session
@@ -104,38 +102,6 @@ def add_to_queue(db, item_type: str, item_id: str, params: str = None) -> bool:
     Returns:
         bool: True if a new item was added to the queue, False if it already existed
     """
-    # For douban_id, make sure the value exists in the item table as a placeholder
-    if item_type == "douban_id":
-        # Check if the douban_id exists in the item table
-        existing_item = db.query(Item).filter(Item.douban_id == item_id).first()
-
-        if not existing_item:
-            # Add to item table with minimal data
-            minimal_item = Item(
-                douban_id=item_id,
-                update_time=None,  # This indicates it's a placeholder
-            )
-            db.add(minimal_item)
-            logger.debug(f"Added Douban ID {item_id} to item table as placeholder")
-
-    # For list types, make sure the list exists in the list table as a placeholder
-    elif item_type in ["subject_collection", "doulist"]:
-        # Check if the list exists in the list table
-        existing_list = (
-            db.query(List).filter_by(list_type=item_type, list_id=item_id).first()
-        )
-
-        if not existing_list:
-            # Add to list table with minimal data
-            minimal_list = List(
-                list_type=item_type,
-                list_id=item_id,
-                last_check_time=None,  # This indicates it's a placeholder
-                douban_update_time=None,
-            )
-            db.add(minimal_list)
-            logger.debug(f"Added {item_type} ID {item_id} to list table as placeholder")
-
     # Check if item is already in queue
     existing = db.query(Queue).filter_by(type=item_type, id=item_id).first()
 
@@ -155,4 +121,61 @@ def add_to_queue(db, item_type: str, item_id: str, params: str = None) -> bool:
         # Only commit if we added to item/list table but not to queue
         if item_type == "douban_id" or item_type in ["subject_collection", "doulist"]:
             db.commit()
+        return False
+
+
+def add_placeholder_item(db, douban_id: str) -> bool:
+    """
+    Add a placeholder item to the item table if it doesn't exist.
+
+    Args:
+        db: Database session
+        douban_id: Douban ID of the item
+
+    Returns:
+        bool: True if a new item was added, False if it already existed
+    """
+    existing_item = db.query(Item).filter_by(douban_id=douban_id).first()
+
+    if not existing_item:
+        # Add to item table with minimal data
+        minimal_item = Item(
+            douban_id=douban_id,
+            update_time=None,  # This indicates it's a placeholder
+        )
+        db.add(minimal_item)
+        logger.debug(f"Added placeholder item {douban_id}")
+        return True
+    else:
+        return False
+
+
+def add_placeholder_list(db, list_type: str, list_id: str) -> bool:
+    """
+    Add a placeholder list to the list table if it doesn't exist.
+
+    Args:
+        db: Database session
+        list_type: Type of the list (e.g., 'subject_collection', 'doulist')
+        list_id: ID of the list
+
+    Returns:
+        bool: True if a new list was added, False if it already existed
+    """
+    existing_list = (
+        db.query(List).filter_by(list_type=list_type, list_id=list_id).first()
+    )
+
+    if not existing_list:
+        # Add to list table with minimal data
+        minimal_list = List(
+            list_type=list_type,
+            list_id=list_id,
+            last_check_time=None,  # This indicates it's a placeholder
+            douban_update_time=None,
+        )
+        db.add(minimal_list)
+        logger.debug(f"Added placeholder list {list_type}/{list_id}")
+        return True
+    else:
         return False

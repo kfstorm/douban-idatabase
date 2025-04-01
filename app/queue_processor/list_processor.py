@@ -7,7 +7,7 @@ from app.info_provider.detail import (
 )
 from app.info_provider.imdb import fetch_imdb_id
 from app.info_provider.lists import CollectionApi, DoulistApi
-from app.models import Item, List, Queue, add_to_queue
+from app.models import Item, List, Queue
 from app.queue_processor.common import allow_update_item, merge_item, save_item_to_db
 from app.utils import (
     now_timestamp,
@@ -84,10 +84,6 @@ def process_list(
             if not detail_info:
                 continue
             douban_id = detail_info["douban_id"]
-            # In case further processing fails, add to `queue` and `item`
-            # to avoid losing it.
-            add_to_queue(db, "douban_id", douban_id)
-
             # Skip if already processed in this batch
             if douban_id in known_ids:
                 continue

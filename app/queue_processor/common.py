@@ -3,7 +3,7 @@ import logging
 from sqlalchemy.orm import Session
 
 from app.config import settings
-from app.models import History, Item
+from app.models import History, Item, List
 from app.utils import now_timestamp
 
 logger = logging.getLogger(__name__)
@@ -19,6 +19,28 @@ def allow_update_item(existing_item: Item) -> bool:
         )
         if current_time - existing_item.update_time < min_update_interval_seconds:
             return False
+    return True
+
+
+def allow_update_list(existing_list: List) -> bool:
+    if existing_list and existing_list.last_check_time:
+        current_time = now_timestamp()
+        if existing_list.douban_update_time:
+            next_check_time = existing_list.last_check_time + max(
+                min(
+                    existing_list.last_check_time - existing_list.douban_update_time,
+                    settings.LIST_REFRESH_MAX_INTERVAL_DAYS * 86400,
+                ),
+                settings.LIST_REFRESH_MIN_INTERVAL_DAYS * 86400,
+            )
+        else:
+            next_check_time = (
+                existing_list.last_check_time
+                + settings.LIST_REFRESH_MIN_INTERVAL_DAYS * 86400
+            )
+        if current_time < next_check_time:
+            return False
+
     return True
 
 
