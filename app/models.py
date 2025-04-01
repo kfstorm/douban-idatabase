@@ -89,41 +89,6 @@ def get_items(db, douban_id: str = None, imdb_id: str = None, douban_title: str 
     return query.limit(5).all()
 
 
-def add_to_queue(db, item_type: str, item_id: str, params: str = None) -> bool:
-    """
-    Common method to add an item to the queue.
-
-    Args:
-        db: Database session
-        item_type: Type of queue item
-        item_id: ID of the item
-        params: Optional parameters
-
-    Returns:
-        bool: True if a new item was added to the queue, False if it already existed
-    """
-    # Check if item is already in queue
-    existing = db.query(Queue).filter_by(type=item_type, id=item_id).first()
-
-    if not existing:
-        # Add to queue
-        queue_item = Queue(
-            type=item_type,
-            id=item_id,
-            params=params,
-            upsert_time=now_timestamp(),
-        )
-        db.add(queue_item)
-        db.commit()
-        logger.debug(f"Added item type={item_type}, id={item_id} to queue")
-        return True
-    else:
-        # Only commit if we added to item/list table but not to queue
-        if item_type == "douban_id" or item_type in ["subject_collection", "doulist"]:
-            db.commit()
-        return False
-
-
 def add_placeholder_item(db, douban_id: str) -> bool:
     """
     Add a placeholder item to the item table if it doesn't exist.
