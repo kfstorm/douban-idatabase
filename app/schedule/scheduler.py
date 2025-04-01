@@ -13,6 +13,7 @@ from app.schedule.discover_lists_by_google_task import discover_lists_by_google
 from app.schedule.discover_lists_task import discover_lists
 from app.models import Schedule
 from app.http_utils import new_http_session, RateLimitException
+from app.schedule.discover_tags_by_google_task import discover_tags_by_google
 from app.schedule.import_items_task import import_douban_ids_from_csv
 from app.schedule.refresh_task import refresh
 from app.utils import (
@@ -37,6 +38,7 @@ SCHEDULE_TYPE_REFRESH = "refresh"
 SCHEDULE_TYPE_DATABASE_BACKUP = "database_backup"
 SCHEDULE_TYPE_IMPORT_DOUBAN_IDS_FROM_CSV = "import_douban_ids_from_csv"
 SCHEDULE_TYPE_DISCOVER_LISTS_BY_GOOGLE = "discover_lists_by_google"
+SCHEDULE_TYPE_DISCOVER_TAGS_BY_GOOGLE = "discover_tags_by_google"
 
 # Schedule intervals (in seconds)
 SCHEDULE_INTERVALS = {
@@ -47,6 +49,7 @@ SCHEDULE_INTERVALS = {
     SCHEDULE_TYPE_DATABASE_BACKUP: settings.BACKUP_INTERVAL_SECONDS,  # From settings
     SCHEDULE_TYPE_IMPORT_DOUBAN_IDS_FROM_CSV: 86400,  # 1 day
     SCHEDULE_TYPE_DISCOVER_LISTS_BY_GOOGLE: 86400,  # 1 day
+    SCHEDULE_TYPE_DISCOVER_TAGS_BY_GOOGLE: 86400,  # 1 day
 }
 
 
@@ -120,6 +123,8 @@ def execute_scheduled_task(
             import_douban_ids_from_csv(db)
         elif schedule_type == SCHEDULE_TYPE_DISCOVER_LISTS_BY_GOOGLE:
             discover_lists_by_google(db, http_session)
+        elif schedule_type == SCHEDULE_TYPE_DISCOVER_TAGS_BY_GOOGLE:
+            discover_tags_by_google(db, http_session)
         else:
             logger.warning(f"Unknown schedule type: {schedule_type}")
     except RateLimitException as e:
@@ -158,7 +163,7 @@ def unified_scheduler():
 
                 # Check for scheduled tasks that need to run
                 schedule = get_next_schedule_run(db)
-                if schedule.type not in SCHEDULE_INTERVALS:
+                if schedule and schedule.type not in SCHEDULE_INTERVALS:
                     logger.warning(f"Unknown schedule type: {schedule.type}")
                     db.delete(schedule)
                     db.commit()

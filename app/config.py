@@ -54,6 +54,7 @@ class Settings(BaseSettings):
     LIST_REFRESH_MAX_INTERVAL_DAYS: int = int(
         os.getenv("LIST_REFRESH_MAX_INTERVAL_DAYS", "365")
     )
+    TAG_REFRESH_INTERVAL_DAYS: int = int(os.getenv("TAG_REFRESH_INTERVAL_DAYS", "30"))
 
     IMDB_CSV_PATH: str = os.getenv("IMDB_CSV_PATH", "")
 
@@ -76,6 +77,10 @@ class Settings(BaseSettings):
 
     DISABLE_INDIVIDUAL_ITEM_FETCH: bool = _parse_bool_env_var(
         "DISABLE_INDIVIDUAL_ITEM_FETCH", False
+    )
+
+    DISCOVER_LISTS_BY_TAG_MIN_FAVORITES: int = int(
+        os.getenv("DISCOVER_LISTS_BY_TAG_MIN_FAVORITES", "100")
     )
 
     class Config:

@@ -1,6 +1,6 @@
 import logging
 import requests
-from typing import Any, Iterator, List
+from typing import Any, Iterator
 from tqdm import tqdm
 
 from app.http_utils import get_json
@@ -59,21 +59,19 @@ class BaseApi:
             headers=self.headers,
         )
 
-    def get_items(self, id: str) -> List[Any]:
+    def iter_items(self, id: str) -> Iterator[Any]:
         logger.info(f"Fetching items for {id} ...")
-        items = [
-            _
-            for _ in read_pages(
-                read_one_page=lambda start, count: self._read_one_page(
-                    id, start, count
-                ),
-                get_total=lambda page_data: page_data["total"],
-                get_items=lambda page_data: page_data[self.items_key],
-                items_per_page=50,
-            )
-        ]
-        logger.info(f"Fetched {len(items)} items for {id}.")
-        return items
+        count = 0
+        for item in read_pages(
+            read_one_page=lambda start, count: self._read_one_page(id, start, count),
+            get_total=lambda page_data: page_data["total"],
+            get_items=lambda page_data: page_data[self.items_key],
+            items_per_page=50,
+        ):
+            yield item
+            count += 1
+
+        logger.info(f"Fetched {count} items for {id}.")
 
 
 class CollectionApi(BaseApi):
@@ -113,3 +111,14 @@ class ListsApi:
             items_per_page=50,
         ):
             yield item
+
+
+def get_list_api_by_list_type(
+    http_session: requests.Session, list_type: str
+) -> BaseApi:
+    if list_type == "subject_collection":
+        return CollectionApi(http_session)
+    elif list_type == "doulist":
+        return DoulistApi(http_session)
+    else:
+        raise ValueError(f"Unknown list type {list_type}")

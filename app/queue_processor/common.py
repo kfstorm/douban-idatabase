@@ -3,7 +3,7 @@ import logging
 from sqlalchemy.orm import Session
 
 from app.config import settings
-from app.models import History, Item, List
+from app.models import History, Item, List, Tag
 from app.utils import now_timestamp
 
 logger = logging.getLogger(__name__)
@@ -41,6 +41,17 @@ def allow_update_list(existing_list: List) -> bool:
         if current_time < next_check_time:
             return False
 
+    return True
+
+
+def allow_update_tag(existing_tag: Tag) -> bool:
+    if existing_tag and existing_tag.last_check_time:
+        current_time = now_timestamp()
+        if (
+            current_time - existing_tag.last_check_time
+            < settings.TAG_REFRESH_INTERVAL_DAYS * 86400
+        ):
+            return existing_tag.fetch
     return True
 
 

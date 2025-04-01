@@ -75,9 +75,9 @@ def get_response_via_zenrows(http_session: requests.Session, url: str, **kwargs)
     original_params = kwargs.pop("params", {})
     if original_params:
         if "?" in url:
-            final_url = f"{final_url}{url}&{urlencode(original_params)}"
+            final_url = f"{final_url}&{urlencode(original_params)}"
         else:
-            final_url = f"{final_url}{url}?{urlencode(original_params)}"
+            final_url = f"{final_url}?{urlencode(original_params)}"
     new_params = {
         "url": final_url,
         "apikey": settings.ZENROWS_API_KEY,

@@ -6,7 +6,7 @@ from app.info_provider.detail import (
     extract_douban_item_detail,
 )
 from app.info_provider.imdb import fetch_imdb_id
-from app.info_provider.lists import CollectionApi, DoulistApi
+from app.info_provider.lists import get_list_api_by_list_type
 from app.models import Item, List, Queue
 from app.queue_processor.common import allow_update_item, merge_item, save_item_to_db
 from app.utils import (
@@ -27,13 +27,7 @@ def process_list(
     list_type = queue_item.type
     list_id = queue_item.id
     logger.info(f"Processing list {list_type} {list_id} ...")
-    collection_api = CollectionApi(http_session)
-    doulist_api = DoulistApi(http_session)
-    list_apis = {
-        "subject_collection": collection_api,
-        "doulist": doulist_api,
-    }
-    list_api = list_apis[list_type]
+    list_api = get_list_api_by_list_type(list_type)
 
     # Check if we've processed this list before
     list_record = db.query(List).filter_by(list_type=list_type, list_id=list_id).first()
@@ -75,11 +69,10 @@ def process_list(
     # Only fetch and process list items if needed
     if need_to_update_items:
         # Fetch and process list items
-        items = list_api.get_items(list_id)
         known_ids = set()
 
         # Process items in list
-        for item in items:
+        for item in list_api.iter_items(list_id):
             detail_info = extract_douban_item_detail(item, f"{list_type}/{list_id}")
             if not detail_info:
                 continue

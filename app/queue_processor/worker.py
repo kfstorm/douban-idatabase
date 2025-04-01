@@ -5,6 +5,7 @@ from sqlalchemy.orm import Session
 
 from app.queue_processor.douban_id_processor import process_douban_id
 from app.queue_processor.list_processor import process_list
+from app.queue_processor.tag_processor import process_tag
 from app.utils import (
     now_timestamp,
     record_exception_metrics,
@@ -69,6 +70,8 @@ def process_queue_items(db: Session, http_session: requests.Session) -> None:
                 process_douban_id(db, http_session, queue_item)
             elif item_type == "subject_collection" or item_type == "doulist":
                 process_list(db, http_session, queue_item)
+            elif item_type == "tag":
+                process_tag(db, http_session, queue_item)
             else:
                 logger.warning(f"Unsupported queue item type: {item_type}")
 

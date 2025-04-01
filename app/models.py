@@ -4,6 +4,7 @@ from sqlalchemy import (
     String,
     Float,
     Text,
+    Boolean,
 )
 from app.database import Base
 from sqlalchemy import and_
@@ -63,6 +64,14 @@ class List(Base):
     douban_update_time = Column(Float, nullable=True)
 
 
+class Tag(Base):
+    __tablename__ = "tag"
+
+    tag_name = Column(String(32), primary_key=True)
+    fetch = Column(Boolean, nullable=True)
+    last_check_time = Column(Float, nullable=True)
+
+
 class DeletedItem(Base):
     __tablename__ = "deleted_item"
 
@@ -109,6 +118,7 @@ def add_placeholder_item(db, douban_id: str) -> bool:
             update_time=None,  # This indicates it's a placeholder
         )
         db.add(minimal_item)
+        db.commit()
         logger.info(f"Added placeholder item {douban_id}")
         return True
     else:
@@ -140,7 +150,36 @@ def add_placeholder_list(db, list_type: str, list_id: str) -> bool:
             douban_update_time=None,
         )
         db.add(minimal_list)
+        db.commit()
         logger.info(f"Added placeholder list {list_type}/{list_id}")
+        return True
+    else:
+        return False
+
+
+def add_placeholder_tag(db, tag_name: str) -> bool:
+    """
+    Add a placeholder tag to the tag table if it doesn't exist.
+
+    Args:
+        db: Database session
+        tag_name: Name of the tag
+
+    Returns:
+        bool: True if a new tag was added, False if it already existed
+    """
+    existing_tag = db.query(Tag).filter_by(tag_name=tag_name).first()
+
+    if not existing_tag:
+        # Add to tag table with minimal data
+        minimal_tag = Tag(
+            tag_name=tag_name,
+            fetch=None,
+            last_check_time=None,  # This indicates it's a placeholder
+        )
+        db.add(minimal_tag)
+        db.commit()
+        logger.info(f"Added placeholder tag {tag_name}")
         return True
     else:
         return False
