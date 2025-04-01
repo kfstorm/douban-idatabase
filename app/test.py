@@ -1,6 +1,6 @@
 import json
 
-from app.queue_processor.worker import extract_douban_item_detail
+from app.info_provider.detail import extract_douban_item_detail
 
 
 def _test_extract_base(json_text: str, source: str, expected_result: dict):
@@ -39,7 +39,7 @@ def test_extract_from_doulist_movie():
     }
     """  # noqa: B950
     expected_result = {
-        "douban_id": 1987675,
+        "douban_id": "1987675",
         "douban_title": "咖啡约会",
         "year": 2006,
         "rating": 6.7,
@@ -71,7 +71,7 @@ def test_extract_from_doulist_tv():
     }
     """  # noqa: B950
     expected_result = {
-        "douban_id": 26101735,
+        "douban_id": "26101735",
         "douban_title": "他在我身边 第一季",
         "year": 2013,
         "rating": 6.7,
