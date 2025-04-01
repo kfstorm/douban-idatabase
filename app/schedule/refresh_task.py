@@ -188,8 +188,7 @@ def refresh(db: Session):
     """
     Periodically refresh data from item/list/tag table by adding them back to the queue
     """
+    _refresh_tags(db)
+    _refresh_lists(db)
     if not settings.DISABLE_INDIVIDUAL_ITEM_FETCH:
         _refresh_items(db)
-
-    _refresh_lists(db)
-    _refresh_tags(db)
