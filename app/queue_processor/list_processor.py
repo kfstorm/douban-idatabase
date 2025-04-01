@@ -27,7 +27,7 @@ def process_list(
     list_type = queue_item.type
     list_id = queue_item.id
     logger.info(f"Processing list {list_type} {list_id} ...")
-    list_api = get_list_api_by_list_type(list_type)
+    list_api = get_list_api_by_list_type(http_session, list_type)
 
     # Check if we've processed this list before
     list_record = db.query(List).filter_by(list_type=list_type, list_id=list_id).first()
