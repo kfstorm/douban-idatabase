@@ -149,14 +149,13 @@ def unified_scheduler():
 
     logger.info("Unified scheduler started")
 
-    with SessionLocal() as db:
-        # Initialize schedules if needed
-        initialize_schedules(db)
-
     http_session = new_http_session()
     while running:
         with SessionLocal() as db:
             try:
+                # Initialize schedules if needed
+                initialize_schedules(db)
+
                 # Check for scheduled tasks that need to run
                 schedule = get_next_schedule_run(db)
                 if schedule.type not in SCHEDULE_INTERVALS:
