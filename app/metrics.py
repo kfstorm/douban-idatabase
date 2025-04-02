@@ -4,7 +4,7 @@ import time
 from prometheus_client import (
     Counter,
     Gauge,
-    Histogram,
+    Summary,
     CollectorRegistry,
     generate_latest,
     multiprocess,
@@ -29,6 +29,9 @@ registry = CollectorRegistry()
 if prometheus_multiproc_dir:
     multiprocess.MultiProcessCollector(registry)
 
+# Define default quantiles for all summary metrics
+DEFAULT_QUANTILES = {0.5: 0.05, 0.9: 0.01, 0.95: 0.005, 0.99: 0.001}
+
 # API metrics
 api_requests_total = Counter(
     "douban_idatabase_api_requests_total",
@@ -36,10 +39,11 @@ api_requests_total = Counter(
     ["endpoint", "method", "status"],
 )
 
-api_request_duration = Histogram(
+api_request_duration = Summary(
     "douban_idatabase_api_request_duration_seconds",
     "API request duration in seconds",
     ["endpoint", "method"],
+    quantiles=DEFAULT_QUANTILES,
 )
 
 # Database metrics
@@ -102,10 +106,11 @@ worker_processed_items = Counter(
     ["type", "status"],
 )
 
-worker_processing_duration = Histogram(
+worker_processing_duration = Summary(
     "douban_idatabase_worker_processing_duration_seconds",
     "Queue item processing duration in seconds",
     ["type"],
+    quantiles=DEFAULT_QUANTILES,
 )
 
 # Backup metrics
@@ -115,9 +120,10 @@ backup_operations = Counter(
     ["status"],
 )
 
-backup_duration = Histogram(
+backup_duration = Summary(
     "douban_idatabase_backup_duration_seconds",
     "Backup operation duration in seconds",
+    quantiles=DEFAULT_QUANTILES,
 )
 
 backup_file_size = Gauge(
@@ -152,10 +158,11 @@ http_requests_total = Counter(
     ["host", "status_code"],
 )
 
-http_request_duration = Histogram(
+http_request_duration = Summary(
     "douban_idatabase_http_request_duration_seconds",
     "HTTP request duration in seconds",
     ["host"],
+    quantiles=DEFAULT_QUANTILES,
 )
 
 # Exception counter

@@ -61,19 +61,17 @@ async def metrics_middleware(request: Request, call_next):
     start_time = time.time()
     response = await call_next(request)
 
-    # Skip metrics for the metrics endpoint itself
-    if request.url.path != "/metrics":
-        endpoint = request.url.path
-        method = request.method
-        status = response.status_code
+    endpoint = request.url.path
+    method = request.method
+    status = response.status_code
 
-        # Record request count
-        api_requests_total.labels(endpoint=endpoint, method=method, status=status).inc()
+    # Record request count
+    api_requests_total.labels(endpoint=endpoint, method=method, status=status).inc()
 
-        # Record request duration
-        api_request_duration.labels(endpoint=endpoint, method=method).observe(
-            time.time() - start_time
-        )
+    # Record request duration
+    api_request_duration.labels(endpoint=endpoint, method=method).observe(
+        time.time() - start_time
+    )
 
     return response
 
