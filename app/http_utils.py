@@ -26,6 +26,9 @@ class RateLimitException(Exception):
         super().__init__(message)
 
 
+NO_PERMISSION_DEFAULT_MESSAGE = "No permission to access this resource."
+
+
 class NoPermissionException(Exception):
     """Exception raised when there is no permission to access a resource."""
 
@@ -57,10 +60,9 @@ class Throttler:
             #     "localized_message": "这是一个非公开的豆列"
             # }
             if (
-                resp.status_code in (403, 422)  # access douban directly / via ZenRows
-                and "permission" in resp.text
-            ):
-                message = "No permission to access this resource."
+                resp.status_code == 403 and "permission" in resp.text
+            ):  # access douban directly
+                message = NO_PERMISSION_DEFAULT_MESSAGE
                 try:
                     json_response = resp.json()
                     if "localized_message" in json_response:
@@ -70,6 +72,8 @@ class Throttler:
                 except ValueError:
                     pass
                 raise NoPermissionException(message)
+            elif resp.status_code in 422:  # access douban via zenrows
+                raise NoPermissionException(NO_PERMISSION_DEFAULT_MESSAGE)
 
             if (
                 resp.status_code == 403
