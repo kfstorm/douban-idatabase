@@ -326,7 +326,7 @@ def generate_dashboard():
     )
     generator.add_graph_panel(
         "API Response Time (p95)",
-        'douban_idatabase_api_request_duration_seconds{quantile="0.95"}',
+        "histogram_quantile(0.95, sum(rate(douban_idatabase_api_request_duration_seconds_bucket[5m])) by (le, endpoint, method))",  # noqa: B950
         "{{endpoint}} - {{method}} (p95)",
         y_axis_format="s",
     )
@@ -341,7 +341,7 @@ def generate_dashboard():
     )
     generator.add_graph_panel(
         "Worker Processing Time (p95)",
-        'douban_idatabase_worker_processing_duration_seconds{quantile="0.95"}',
+        "histogram_quantile(0.95, sum(rate(douban_idatabase_worker_processing_duration_seconds_bucket[5m])) by (le, type))",  # noqa: B950
         "{{type}} (p95)",
         y_axis_format="s",
     )
@@ -356,7 +356,7 @@ def generate_dashboard():
     )
     generator.add_stat_panel(
         "Backup Duration (p95)",
-        'douban_idatabase_backup_duration_seconds{quantile="0.95"}',
+        "histogram_quantile(0.95, sum(rate(douban_idatabase_backup_duration_seconds_bucket[24h])) by (le))",  # noqa: B950
         unit="s",
         show_percentage=True,
         aggregation=None,  # No additional aggregation needed
@@ -388,7 +388,7 @@ def generate_dashboard():
     )
     generator.add_graph_panel(
         "HTTP Response Time by Host (p95)",
-        'douban_idatabase_http_request_duration_seconds{quantile="0.95"}',
+        "histogram_quantile(0.95, sum(rate(douban_idatabase_http_request_duration_seconds_bucket[5m])) by (le, host))",  # noqa: B950
         "{{host}} (p95)",
         y_axis_format="s",
     )

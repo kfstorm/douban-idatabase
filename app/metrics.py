@@ -4,11 +4,11 @@ import time
 from prometheus_client import (
     Counter,
     Gauge,
+    Histogram,
     CollectorRegistry,
     generate_latest,
     multiprocess,
 )
-from prometheus_summary import Summary
 from sqlalchemy.orm import Session
 
 from app.models import Item, Queue, History, List, Tag
@@ -29,8 +29,10 @@ registry = CollectorRegistry()
 if prometheus_multiproc_dir:
     multiprocess.MultiProcessCollector(registry)
 
-# Define default quantiles for all summary metrics
-DEFAULT_INVARIANTS = ((0.50, 0.05), (0.90, 0.01), (0.95, 0.005), (0.99, 0.001))
+# Define exponential buckets for duration histograms
+# Start at 0.001s (1ms), multiply by 2 each time, generate 20 buckets
+# This covers from 1ms to ~524s.
+DURATION_BUCKETS = [0.001 * (2**i) for i in range(20)]
 
 # API metrics
 api_requests_total = Counter(
@@ -39,11 +41,11 @@ api_requests_total = Counter(
     ["endpoint", "method", "status"],
 )
 
-api_request_duration = Summary(
+api_request_duration = Histogram(
     "douban_idatabase_api_request_duration_seconds",
     "API request duration in seconds",
     ["endpoint", "method"],
-    invariants=DEFAULT_INVARIANTS,
+    buckets=DURATION_BUCKETS,
 )
 
 # Database metrics
@@ -106,11 +108,11 @@ worker_processed_items = Counter(
     ["type", "status"],
 )
 
-worker_processing_duration = Summary(
+worker_processing_duration = Histogram(
     "douban_idatabase_worker_processing_duration_seconds",
     "Queue item processing duration in seconds",
     ["type"],
-    invariants=DEFAULT_INVARIANTS,
+    buckets=DURATION_BUCKETS,
 )
 
 # Backup metrics
@@ -120,10 +122,10 @@ backup_operations = Counter(
     ["status"],
 )
 
-backup_duration = Summary(
+backup_duration = Histogram(
     "douban_idatabase_backup_duration_seconds",
     "Backup operation duration in seconds",
-    invariants=DEFAULT_INVARIANTS,
+    buckets=DURATION_BUCKETS,
 )
 
 backup_file_size = Gauge(
@@ -158,11 +160,11 @@ http_requests_total = Counter(
     ["host", "status_code"],
 )
 
-http_request_duration = Summary(
+http_request_duration = Histogram(
     "douban_idatabase_http_request_duration_seconds",
     "HTTP request duration in seconds",
     ["host"],
-    invariants=DEFAULT_INVARIANTS,
+    buckets=DURATION_BUCKETS,
 )
 
 # Exception counter

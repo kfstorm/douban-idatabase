@@ -8,5 +8,4 @@ python-dotenv==1.0.1
 pytz
 tqdm==4.67.1
 prometheus-client==0.21.1
-prometheus-summary==0.1.6
 beautifulsoup4==4.13.3
