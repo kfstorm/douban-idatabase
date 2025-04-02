@@ -59,7 +59,7 @@ def process_in_batches(db, base_query, batch_size, process_callback, entity_name
     return processed_count, added_count
 
 
-def _add_to_queue(db, item_type: str, item_id: str, params: str = None) -> bool:
+def _add_to_queue(db, item_type: str, item_id: str, params: str = None):
     """
     Common method to add an item to the queue.
 
@@ -99,7 +99,8 @@ def _refresh_items(db: Session):
     # Process item callback
     def process_item(item: Item):
         if allow_update_item(item):
-            return _add_to_queue(db, "douban_id", item.douban_id)
+            _add_to_queue(db, "douban_id", item.douban_id)
+            return True
         return False
 
     processed_items_count, added_items_count = process_in_batches(
@@ -134,7 +135,8 @@ def _refresh_lists(db: Session):
     # Process list callback
     def process_list(list_: List):
         if allow_update_list(list_):
-            return _add_to_queue(db, list_.list_type, list_.list_id)
+            _add_to_queue(db, list_.list_type, list_.list_id)
+            return True
         return False
 
     processed_lists_count, added_lists_count = process_in_batches(
@@ -169,7 +171,8 @@ def _refresh_tags(db: Session):
     # Process tag callback
     def process_tag(tag: Tag):
         if allow_update_tag(tag):
-            return _add_to_queue(db, "tag", tag.tag_name)
+            _add_to_queue(db, "tag", tag.tag_name)
+            return True
         return False
 
     processed_tags_count, added_tags_count = process_in_batches(
