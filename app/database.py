@@ -24,6 +24,22 @@ def get_db():
         db.close()
 
 
+def enable_wal_mode():
+    """Enable WAL (Write-Ahead Logging) mode for better concurrency"""
+    logger.info("Enabling WAL mode for SQLite database...")
+    with SessionLocal() as session:
+        try:
+            session.execute(text("PRAGMA journal_mode=WAL;"))
+            session.execute(
+                text("PRAGMA synchronous=NORMAL;")
+            )  # Less fsync for better performance
+            session.commit()
+            logger.info("Successfully enabled WAL mode")
+        except Exception as e:
+            record_exception_metrics(e)
+            logger.error(f"Failed to enable WAL mode: {str(e)}")
+
+
 def migrate_datetime_to_float():
     """Migrate datetime columns to float timestamp columns"""
     logger.info("Checking if datetime to timestamp migration is needed...")
@@ -352,6 +368,10 @@ def init_db():
     """Initialize the database, creating tables and migrating if needed"""
     # Create tables if they don't exist
     Base.metadata.create_all(bind=engine)
+
+    # Enable WAL mode for better concurrency
+    if settings.SQLALCHEMY_DATABASE_URL.startswith("sqlite:///"):
+        enable_wal_mode()
 
     # Migrate datetime columns to float if needed
     migrate_datetime_to_float()

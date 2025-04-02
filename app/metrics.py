@@ -10,7 +10,6 @@ from prometheus_client import (
     multiprocess,
 )
 from sqlalchemy.orm import Session
-from sqlalchemy import create_engine
 
 from app.models import Item, Queue, History, List, Tag
 
@@ -173,82 +172,55 @@ def update_db_metrics(db: Session):
 
     db_path = settings.SQLALCHEMY_DATABASE_URL
 
-    def _set_db_metrics(session):
-        """Helper function to set database metrics using the provided session"""
-        try:
-            total_items = session.query(Item).count()
-            db_items_total.set(total_items)
+    try:
+        total_items = db.query(Item).count()
+        db_items_total.set(total_items)
 
-            # Count placeholders (items with update_time is NULL)
-            placeholder_count = (
-                session.query(Item)
-                .filter(Item.update_time == None)  # noqa: E711
-                .count()
-            )
-            db_placeholder_items_total.set(placeholder_count)
+        # Count placeholders (items with update_time is NULL)
+        placeholder_count = (
+            db.query(Item).filter(Item.update_time == None).count()  # noqa: E711
+        )
+        db_placeholder_items_total.set(placeholder_count)
 
-            # Set fetched items count (total - placeholders)
-            db_fetched_items_total.set(total_items - placeholder_count)
+        # Set fetched items count (total - placeholders)
+        db_fetched_items_total.set(total_items - placeholder_count)
 
-            db_queue_size.set(session.query(Queue).count())
-            db_history_total.set(session.query(History).count())
+        db_queue_size.set(db.query(Queue).count())
+        db_history_total.set(db.query(History).count())
 
-            total_lists = session.query(List).count()
-            db_lists_total.set(total_lists)
+        total_lists = db.query(List).count()
+        db_lists_total.set(total_lists)
 
-            # Count placeholder lists (lists with last_check_time is NULL)
-            placeholder_lists_count = (
-                session.query(List)
-                .filter(List.last_check_time == None)  # noqa: E711
-                .count()
-            )
-            db_placeholder_lists_total.set(placeholder_lists_count)
+        # Count placeholder lists (lists with last_check_time is NULL)
+        placeholder_lists_count = (
+            db.query(List).filter(List.last_check_time == None).count()  # noqa: E711
+        )
+        db_placeholder_lists_total.set(placeholder_lists_count)
 
-            # Set fetched lists count (total - placeholders)
-            db_fetched_lists_total.set(total_lists - placeholder_lists_count)
+        # Set fetched lists count (total - placeholders)
+        db_fetched_lists_total.set(total_lists - placeholder_lists_count)
 
-            # Tag metrics
-            total_tags = session.query(Tag).count()
-            db_tags_total.set(total_tags)
+        # Tag metrics
+        total_tags = db.query(Tag).count()
+        db_tags_total.set(total_tags)
 
-            # Count valid tags (fetch=True)
-            valid_tags_count = (
-                session.query(Tag).filter(Tag.fetch == True).count()  # noqa: E712
-            )
-            db_valid_tags_total.set(valid_tags_count)
+        # Count valid tags (fetch=True)
+        valid_tags_count = db.query(Tag).filter(Tag.fetch == True).count()  # noqa: E712
+        db_valid_tags_total.set(valid_tags_count)
 
-            # Count placeholder tags (last_check_time is NULL)
-            placeholder_tags_count = (
-                session.query(Tag)
-                .filter(Tag.last_check_time == None)  # noqa: E711
-                .count()
-            )
-            db_placeholder_tags_total.set(placeholder_tags_count)
-        except Exception as e:
-            logger.error(f"Failed to collect metrics: {e}")
+        # Count placeholder tags (last_check_time is NULL)
+        placeholder_tags_count = (
+            db.query(Tag).filter(Tag.last_check_time == None).count()  # noqa: E711
+        )
+        db_placeholder_tags_total.set(placeholder_tags_count)
 
-    # Create a readonly connection if using SQLite
-    if db_path.startswith("sqlite:///"):
-        db_file = db_path[10:]
-        readonly_url = db_path + "?mode=ro"
-
-        try:
-            # Use SQLAlchemy ORM with readonly connection for metrics
-            ro_engine = create_engine(readonly_url)
-            from sqlalchemy.orm import sessionmaker
-
-            ROSession = sessionmaker(bind=ro_engine)
-            with ROSession() as ro_session:
-                _set_db_metrics(ro_session)
-
-                # Set database file size (SQLite specific)
-                if os.path.exists(db_file):
-                    database_size.set(os.path.getsize(db_file))
-        except Exception as e:
-            logger.error(f"Failed to collect metrics with readonly connection: {e}")
-    else:
-        # Non-SQLite database, use the provided session
-        _set_db_metrics(db)
+        # Set database file size (SQLite specific)
+        if db_path.startswith("sqlite:///"):
+            db_file = db_path[10:]
+            if os.path.exists(db_file):
+                database_size.set(os.path.getsize(db_file))
+    except Exception as e:
+        logger.error(f"Failed to collect metrics: {e}")
 
 
 def get_metrics():
