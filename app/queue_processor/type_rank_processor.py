@@ -34,12 +34,13 @@ def process_type_rank(
     type_id, interval_id = parts
 
     added_count = 0
-
+    total_count = 0
     # Get rank details for this type and interval
     for item_detail in get_rank_details(http_session, type_id, interval_id):
         douban_id = item_detail.get("douban_id")
         if not douban_id:
             continue
+        total_count += 1
 
         # Check if item already exists
         existing_item = db.query(Item).filter(Item.douban_id == douban_id).first()
@@ -58,5 +59,6 @@ def process_type_rank(
 
     logger.info(
         f"Added/updated {added_count} items"
-        f" for type rank {queue_id} (type: {type_name})"
+        f" for type rank {queue_id} (type: {type_name})."
+        f" Total items processed: {total_count}"
     )
