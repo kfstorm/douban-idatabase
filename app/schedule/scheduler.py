@@ -22,6 +22,7 @@ from app.utils import (
     record_exception_metrics,
 )
 from app.schedule.backup_task import perform_backup
+from app.schedule.discover_items_by_type_rank_task import discover_items_by_type_rank
 from app.config import settings
 
 logger = logging.getLogger(__name__)
@@ -39,6 +40,7 @@ SCHEDULE_TYPE_DATABASE_BACKUP = "database_backup"
 SCHEDULE_TYPE_IMPORT_DOUBAN_IDS_FROM_CSV = "import_douban_ids_from_csv"
 SCHEDULE_TYPE_DISCOVER_LISTS_BY_GOOGLE = "discover_lists_by_google"
 SCHEDULE_TYPE_DISCOVER_TAGS_BY_GOOGLE = "discover_tags_by_google"
+SCHEDULE_TYPE_DISCOVER_ITEMS_BY_TYPE_RANK = "discover_items_by_type_rank"
 
 # Schedule intervals (in seconds)
 SCHEDULE_INTERVALS = {
@@ -50,6 +52,7 @@ SCHEDULE_INTERVALS = {
     SCHEDULE_TYPE_IMPORT_DOUBAN_IDS_FROM_CSV: 86400,  # 1 day
     SCHEDULE_TYPE_DISCOVER_LISTS_BY_GOOGLE: 86400,  # 1 day
     SCHEDULE_TYPE_DISCOVER_TAGS_BY_GOOGLE: 86400,  # 1 day
+    SCHEDULE_TYPE_DISCOVER_ITEMS_BY_TYPE_RANK: 86400,  # 1 day
 }
 
 
@@ -125,6 +128,8 @@ def execute_scheduled_task(
             discover_lists_by_google(db, http_session)
         elif schedule_type == SCHEDULE_TYPE_DISCOVER_TAGS_BY_GOOGLE:
             discover_tags_by_google(db, http_session)
+        elif schedule_type == SCHEDULE_TYPE_DISCOVER_ITEMS_BY_TYPE_RANK:
+            discover_items_by_type_rank(db, http_session)
         else:
             logger.warning(f"Unknown schedule type: {schedule_type}")
     except RateLimitException as e:
