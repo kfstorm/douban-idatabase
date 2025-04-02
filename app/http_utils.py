@@ -72,7 +72,7 @@ class Throttler:
                 except ValueError:
                     pass
                 raise NoPermissionException(message)
-            elif resp.status_code in 422:  # access douban via zenrows
+            elif resp.status_code == 422:  # access douban via zenrows
                 raise NoPermissionException(NO_PERMISSION_DEFAULT_MESSAGE)
 
             if (
