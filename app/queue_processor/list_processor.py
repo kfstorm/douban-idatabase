@@ -7,14 +7,10 @@ from app.info_provider.detail import (
     extract_douban_item_detail,
 )
 from app.info_provider.imdb import fetch_imdb_id
-from app.info_provider.lists import get_list_api_by_list_type
+from app.info_provider.lists import extract_update_time, get_list_api_by_list_type
 from app.models import Item, List, Queue
 from app.queue_processor.common import allow_update_item, merge_item, save_item_to_db
-from app.utils import (
-    now_timestamp,
-    parse_douban_time,
-    timestamp_to_local_time_str,
-)
+from app.utils import now_timestamp, timestamp_to_local_time_str
 
 logger = logging.getLogger(__name__)
 
@@ -47,12 +43,7 @@ def process_list(
             db.commit()
         return
 
-    # Look for update time field
-    update_time_str = list_info.get("update_time") or list_info.get("updated_at")
-
-    douban_update_time = None
-    if update_time_str:
-        douban_update_time = parse_douban_time(update_time_str)
+    douban_update_time = extract_update_time(list_info)
 
     need_to_update_items = True
     need_to_update_douban_time = False

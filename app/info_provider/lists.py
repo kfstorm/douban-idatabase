@@ -1,12 +1,31 @@
 import logging
+from urllib.parse import parse_qs, urlparse
 import requests
 from typing import Any, Iterator
 from tqdm import tqdm
 
 from app.http_utils import get_json
+from app.utils import parse_douban_time
 
 
 logger = logging.getLogger(__name__)
+
+
+LIST_ITEMS_PAGE_SIZE = 50
+LISTS_PAGE_SIZE = 50
+
+
+def extract_update_time(list_info: dict) -> int:
+    """
+    Extract the update time from the list info.
+    """
+    # Look for update time field
+    update_time_str = list_info.get("update_time") or list_info.get("updated_at")
+
+    douban_update_time = None
+    if update_time_str:
+        douban_update_time = parse_douban_time(update_time_str)
+    return douban_update_time
 
 
 def read_pages(read_one_page, get_total, get_items, items_per_page) -> Iterator[Any]:
@@ -66,7 +85,7 @@ class BaseApi:
             read_one_page=lambda start, count: self._read_one_page(id, start, count),
             get_total=lambda page_data: page_data["total"],
             get_items=lambda page_data: page_data[self.items_key],
-            items_per_page=50,
+            items_per_page=LIST_ITEMS_PAGE_SIZE,
         ):
             yield item
             count += 1
@@ -103,14 +122,25 @@ class ListsApi:
             headers=self.headers,
         )
 
-    def iter_lists(self) -> Iterator[Any]:
+    def iter_lists(self) -> Iterator[tuple[str, str]]:
         for item in read_pages(
             read_one_page=lambda start, count: self._read_one_page(start, count),
             get_total=lambda page_data: page_data["total"],
             get_items=lambda page_data: page_data["data"][0]["items"],
-            items_per_page=50,
+            items_per_page=LISTS_PAGE_SIZE,
         ):
-            yield item
+            parsed_url = urlparse(item["sharing_url"])
+            url_parts = [_ for _ in parsed_url.path.split("/") if _][-2:]
+            list_type = url_parts[0]
+            list_id = url_parts[1]
+            if list_type == "doubanapp" and list_id == "dispatch":
+                query_params = parse_qs(parsed_url.query)
+                uri = query_params.get("uri", [None])[0]
+                if uri:
+                    url_parts = [_ for _ in uri.split("/") if _][-2:]
+                    list_type = url_parts[0]
+                list_id = url_parts[1]
+            yield (list_type, list_id)
 
 
 def get_list_api_by_list_type(

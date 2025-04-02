@@ -1,18 +1,20 @@
 import json
 
 from app.info_provider.detail import extract_douban_item_detail
+from app.test.common import check_detail
 
 
 def _test_extract_base(json_text: str, source: str, expected_result: dict):
     """Test extracting item details from a JSON string."""
     obj = json.loads(json_text)
-    item = extract_douban_item_detail(obj, source)
+    detail = extract_douban_item_detail(obj, source)
     if expected_result:
+        check_detail(detail)
         expected_result["raw_data"] = {
             "detail": obj,
             "detail_source": source,
         }
-    assert expected_result == item
+    assert expected_result == detail
 
 
 def test_extract_from_doulist_movie():
@@ -220,5 +222,77 @@ def test_extract_from_type_rank_movie():
         "douban_title": "肖申克的救赎",
         "year": 1994,
         "rating": 9.7,
+    }
+    _test_extract_base(json_text, source, expected_result)
+
+
+def test_extract_from_subject_collection():
+    """Test extracting item details from a subject collection API response."""
+    source = "https://m.douban.com/rexxar/api/v2/subject_collection/EC4IX6YEQ/items"
+    json_text = """
+    {
+      "comment": "",
+      "rating": {
+        "count": 5860,
+        "max": 10,
+        "star_count": 3.5,
+        "value": 7.4
+      },
+      "controversy_reason": "",
+      "rank_value": 20,
+      "pic": {
+        "large": "https://img1.doubanio.com/view/photo/m_ratio_poster/public/p1837839519.jpg",
+        "normal": "https://img1.doubanio.com/view/photo/s_ratio_poster/public/p1837839519.jpg"
+      },
+      "rank": 20,
+      "uri": "douban://douban.com/movie/4844730",
+      "is_show": false,
+      "vendor_icons": [],
+      "card_subtitle": "2012 / 美国 / 喜剧 动作 / 弗兰克·克拉斯 / 凯文·詹姆斯 萨尔玛·海耶克",
+      "id": "4844730",
+      "title": "好景在望",
+      "has_linewatch": false,
+      "is_released": true,
+      "interest": null,
+      "color_scheme": {
+        "is_dark": true,
+        "primary_color_light": "726560",
+        "_base_color": [
+          0.041666666666666664,
+          0.15763546798029557,
+          0.796078431372549
+        ],
+        "secondary_color": "f9f6f4",
+        "_avg_color": [
+          0.03846153846153851,
+          0.11206896551724135,
+          0.4549019607843137
+        ],
+        "primary_color_dark": "4c4340"
+      },
+      "type": "movie",
+      "description": "",
+      "tags": [],
+      "cover_url": "https://img1.doubanio.com/view/photo/m_ratio_poster/public/p1837839519.jpg",
+      "photos": [
+        "https://img1.doubanio.com/view/photo/m/public/p1845835788.jpg",
+        "https://img2.doubanio.com/view/photo/m/public/p1845835711.jpg",
+        "https://img3.doubanio.com/view/photo/m/public/p1845835643.jpg",
+        "https://img3.doubanio.com/view/photo/m/public/p1845830803.jpg"
+      ],
+      "actions": [],
+      "sharing_url": "https://www.douban.com/doubanapp/dispatch/movie/4844730",
+      "url": "https://movie.douban.com/subject/4844730/",
+      "honor_infos": [],
+      "good_rating_stats": 0,
+      "subtype": "movie",
+      "null_rating_reason": ""
+    }
+    """  # noqa: B950
+    expected_result = {
+        "douban_id": "4844730",
+        "douban_title": "好景在望",
+        "year": 2012,
+        "rating": 7.4,
     }
     _test_extract_base(json_text, source, expected_result)

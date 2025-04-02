@@ -1,7 +1,6 @@
 import logging
 import requests
 from sqlalchemy.orm import Session
-from urllib.parse import parse_qs, urlparse
 
 from app.info_provider.lists import ListsApi
 from app.models import add_placeholder_list
@@ -18,19 +17,8 @@ def discover_lists(db: Session, http_session: requests.Session):
     added_count = 0
     last_print = now_timestamp()
     lists_api = ListsApi(http_session)
-    for item in lists_api.iter_lists():
+    for list_type, list_id in lists_api.iter_lists():
         count += 1
-        parsed_url = urlparse(item["sharing_url"])
-        url_parts = [_ for _ in parsed_url.path.split("/") if _][-2:]
-        list_type = url_parts[0]
-        list_id = url_parts[1]
-        if list_type == "doubanapp" and list_id == "dispatch":
-            query_params = parse_qs(parsed_url.query)
-            uri = query_params.get("uri", [None])[0]
-            if uri:
-                url_parts = [_ for _ in uri.split("/") if _][-2:]
-                list_type = url_parts[0]
-            list_id = url_parts[1]
         if list_type == "subject_collection" or list_type == "doulist":
             try:
                 if add_placeholder_list(db, list_type, list_id):
