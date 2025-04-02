@@ -56,4 +56,7 @@ def process_type_rank(
             save_item_to_db(db, item)
             added_count += 1
 
-    logger.info(f"Added/updated {added_count} items for type rank {queue_id}")
+    logger.info(
+        f"Added/updated {added_count} items"
+        f" for type rank {queue_id} (type: {type_name})"
+    )
