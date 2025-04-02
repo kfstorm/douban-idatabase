@@ -14,7 +14,12 @@ def extract_douban_item_detail(item: dict, source: str) -> dict:
     """
     Extract relevant fields from a Douban item detail response
     """
-    if item["type"] not in ["movie", "tv"]:
+    # Handle missing type field in some APIs (like type_rank)
+    if "type" not in item:
+        # For movie chart APIs, assume it's a movie
+        if "url" not in item or "movie.douban.com/subject" not in item["url"]:
+            return None
+    elif item.get("type") not in ["movie", "tv"]:
         return None
 
     # Try to extract Douban ID from various fields
@@ -43,6 +48,17 @@ def extract_douban_item_detail(item: dict, source: str) -> dict:
             year = int(item["year"])
         except (ValueError, TypeError):
             pass
+
+    # Try to extract year from release_date field (used in type_rank API)
+    if not year and "release_date" in item:
+        release_date = item["release_date"]
+        if release_date:
+            # Extract year from date formats like "1994-09-10" or just "1994"
+            if len(release_date) >= 4 and release_date[:4].isdigit():
+                year = int(release_date[:4])
+            elif release_date.isdigit():
+                year = int(release_date)
+
     if not year:
         card_subtitle = item.get("card_subtitle") or item.get("subtitle")
         if card_subtitle:
@@ -52,9 +68,26 @@ def extract_douban_item_detail(item: dict, source: str) -> dict:
             if len(year_str) == 4 and year_str.isdecimal():
                 year = int(year_str)
 
-    # Get rating
+    # Get rating - handle different formats
     rating = None
-    if item.get("rating") and item["rating"].get("value"):
+    # Handle array format ["9.7", "50"] from type_rank API
+    if (
+        item.get("rating")
+        and isinstance(item["rating"], list)
+        and len(item["rating"]) > 0
+    ):
+        try:
+            rating = float(item["rating"][0])
+        except (ValueError, TypeError):
+            pass
+    # Handle direct score field from type_rank API
+    if not rating and "score" in item:
+        try:
+            rating = float(item["score"])
+        except (ValueError, TypeError):
+            pass
+    # Handle standard format with rating.value
+    if not rating and item.get("rating") and item["rating"].get("value"):
         try:
             rating = float(item["rating"]["value"])
         except (ValueError, TypeError):

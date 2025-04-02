@@ -180,3 +180,45 @@ def test_extract_from_doulist_book():
     """  # noqa: B950
     expected_result = None
     _test_extract_base(json_text, source, expected_result)
+
+
+def test_extract_from_type_rank_movie():
+    """Test extracting item details from type_rank API response."""
+    source = "https://movie.douban.com/j/chart/top_list?type=11&interval_id=100:90"
+    json_text = """
+    {
+        "rating": [
+            "9.7",
+            "50"
+        ],
+        "rank": 1,
+        "cover_url": "https://img3.doubanio.com/view/photo/s_ratio_poster/public/p480747492.jpg",
+        "is_playable": true,
+        "id": "1292052",
+        "types": [
+            "犯罪",
+            "剧情"
+        ],
+        "regions": [
+            "美国"
+        ],
+        "title": "肖申克的救赎",
+        "url": "https://movie.douban.com/subject/1292052/",
+        "release_date": "1994-09-10",
+        "actor_count": 25,
+        "vote_count": 3151308,
+        "score": "9.7",
+        "actors": [
+            "蒂姆·罗宾斯",
+            "摩根·弗里曼"
+        ],
+        "is_watched": true
+    }
+    """  # noqa: B950
+    expected_result = {
+        "douban_id": "1292052",
+        "douban_title": "肖申克的救赎",
+        "year": 1994,
+        "rating": 9.7,
+    }
+    _test_extract_base(json_text, source, expected_result)
