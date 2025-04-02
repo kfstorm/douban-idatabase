@@ -4,7 +4,6 @@ import requests
 from typing import Any, Iterator, Tuple
 from tqdm import tqdm
 
-from app.config import settings
 from app.http_utils import get_response
 
 
@@ -43,8 +42,7 @@ def read_pages(read_one_page, get_total, get_items, items_per_page) -> Iterator[
 
 
 def fetch_lists_from_tag(
-    http_session: requests.Session,
-    tag_name: str,
+    http_session: requests.Session, tag_name: str, min_favorites: int = None
 ) -> Iterator[Tuple[str, str]]:
     """
     Get lists from a tag.
@@ -73,22 +71,24 @@ def fetch_lists_from_tag(
                 continue
             list_id = path.split("/")[2]
 
-            # Extract favorite count from meta div
-            meta_div = dl.find("div", class_="meta")
-            if not meta_div:
-                continue
-
-            meta_text = meta_div.get_text(strip=True)
-            fav_match = re.search(r"(\d+)人关注", meta_text)
-            if not fav_match:
-                continue
-
-            fav_count = int(fav_match.group(1))
-
             has_list_in_page = True
+            if min_favorites is not None:
+                # Extract favorite count from meta div
+                meta_div = dl.find("div", class_="meta")
+                if not meta_div:
+                    continue
 
-            # Only return lists with enough favorites
-            if fav_count >= settings.DISCOVER_LISTS_BY_TAG_MIN_FAVORITES:
+                meta_text = meta_div.get_text(strip=True)
+                fav_match = re.search(r"(\d+)人关注", meta_text)
+                if not fav_match:
+                    continue
+
+                fav_count = int(fav_match.group(1))
+
+                # Only return lists with enough favorites
+                if fav_count >= min_favorites:
+                    yield ("doulist", list_id)
+            else:
                 yield ("doulist", list_id)
 
         if not has_list_in_page:

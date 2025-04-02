@@ -26,6 +26,13 @@ class RateLimitException(Exception):
         super().__init__(message)
 
 
+class NoPermissionException(Exception):
+    """Exception raised when there is no permission to access a resource."""
+
+    def __init__(self, message: str):
+        super().__init__(message)
+
+
 class Throttler:
     def __init__(self):
         self.next_call_time = defaultdict(lambda: 0.0)
@@ -40,8 +47,30 @@ class Throttler:
     def _handle_response(self, response: requests.Response):
         all_responses = response.history + [response]
         host = urlparse(all_responses[0].request.url).netloc
-        rate_limited = False
+
         for resp in all_responses:
+            # Example response:
+            # {
+            #     "msg": "doulist_owner_permission",
+            #     "code": 1105,
+            #     "request": "GET /v2/doulist/158272741/items",
+            #     "localized_message": "这是一个非公开的豆列"
+            # }
+            if (
+                resp.status_code in (403, 422)  # access douban directly / via ZenRows
+                and "permission" in resp.text
+            ):
+                message = "No permission to access this resource."
+                try:
+                    json_response = resp.json()
+                    if "localized_message" in json_response:
+                        message = json_response["localized_message"]
+                    elif "msg" in json_response:
+                        message = json_response["msg"]
+                except ValueError:
+                    pass
+                raise NoPermissionException(message)
+
             if (
                 resp.status_code == 403
                 or (
@@ -50,16 +79,14 @@ class Throttler:
                 )
                 or (resp.status_code == 400 and "subject_ip_rate_limit" in resp.text)
             ):
-                rate_limited = True
-                break
-        if rate_limited:
-            # Rate limited.
-            next_call_time = now_timestamp() + settings.RATE_LIMIT_DELAY_SECONDS
+                # Rate limited.
+                next_call_time = now_timestamp() + settings.RATE_LIMIT_DELAY_SECONDS
 
-            # Record rate limit hit
-            rate_limit_hits.labels(host=host).inc()
+                # Record rate limit hit
+                rate_limit_hits.labels(host=host).inc()
 
-            raise RateLimitException(next_call_time)
+                raise RateLimitException(next_call_time)
+
         return response
 
 

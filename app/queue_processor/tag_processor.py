@@ -1,7 +1,10 @@
 import logging
 import requests
+from itertools import islice
 from sqlalchemy.orm import Session
 
+from app.config import settings
+from app.http_utils import NoPermissionException
 from app.info_provider.detail import (
     extract_douban_item_detail,
 )
@@ -33,48 +36,44 @@ def process_tag(db: Session, http_session: requests.Session, queue_item: Queue) 
 
     # If the tag has not decided to fetch or not,
     # we need to decide first
-    # (by check if there are enough TV or Movie lists)
+    # (by check if there are TV or Movie lists)
     # and then update the tag record accordingly
     if tag_record and tag_record.fetch:
-        fetch_check_list_count = 0
+        is_tv_or_movie_tag = True
     else:
-        fetch_check_list_count = 4
-    tv_or_movie_list_count = 0
-    count = 0
-    for list_type, list_id in fetch_lists_from_tag(http_session, tag_name):
-        count += 1
-        if count <= fetch_check_list_count:
-            if _check_is_tv_or_movie_list(http_session, list_type, list_id):
-                tv_or_movie_list_count += 1
-        else:
-            # All checked lists must be TV or Movie lists
-            if tv_or_movie_list_count < fetch_check_list_count:
-                logger.info(
-                    f"Tag {tag_name} has only {tv_or_movie_list_count} "
-                    f"TV/Movie lists out of {fetch_check_list_count}"
-                    ", mark as no fetch"
-                )
-                now = now_timestamp()
-                if not tag_record:
-                    tag_record = Tag(
-                        tag_name=tag_name, fetch=False, last_check_time=now
-                    )
-                    db.add(tag_record)
-                else:
-                    tag_record.fetch = False
-                    tag_record.last_check_time = now
-                    db.commit()
-                return
-            break
+        fetch_check_list_count = 10
+        is_tv_or_movie_tag = any(
+            _check_is_tv_or_movie_list(http_session, list_type, list_id)
+            for list_type, list_id in islice(
+                fetch_lists_from_tag(http_session, tag_name), fetch_check_list_count
+            )
+        )
 
-    if tag_record.fetch is None:
-        logger.info(f"Tag {tag_name} is a TV/Movie tag")
-        tag_record.fetch = True
-        db.commit()
+    is_or_not_str = "is" if is_tv_or_movie_tag else "is not"
+    if not tag_record:
+        logger.info(f"Tag {tag_name} {is_or_not_str} a TV/Movie tag.")
+        tag_record = Tag(tag_name=tag_name, fetch=is_tv_or_movie_tag)
+        db.add(tag_record)
+    elif tag_record.fetch is None:
+        logger.info(f"Tag {tag_name} {is_or_not_str} a TV/Movie tag.")
+        tag_record.fetch = is_tv_or_movie_tag
+
+    if not is_tv_or_movie_tag:
+        now = now_timestamp()
+        tag_record.last_check_time = now
+
+    db.commit()
+
+    if not is_tv_or_movie_tag:
+        return
 
     count = 0
-    # If it's decided to fetch, we fetch lists again
-    for list_type, list_id in fetch_lists_from_tag(http_session, tag_name):
+    # If it's decided to fetch, we fetch lists again with min favorites requirement
+    for list_type, list_id in fetch_lists_from_tag(
+        http_session,
+        tag_name,
+        min_favorites=settings.DISCOVER_LISTS_BY_TAG_MIN_FAVORITES,
+    ):
         if add_placeholder_list(db, list_type, list_id):
             count += 1
 
@@ -94,19 +93,18 @@ def _check_is_tv_or_movie_list(
 ) -> bool:
     list_api = get_list_api_by_list_type(http_session, list_type)
 
-    # check if top 10 items have at least 5 TV or movie items.
+    # check if top 10 items have at least 1 TV or movie items.
     check_count = 10
-    threshold = 5
-    count = 0
 
-    for item in list_api.iter_items(list_id):
-        detail_info = extract_douban_item_detail(item, f"{list_type}/{list_id}")
-        check_count -= 1
-        if detail_info:
-            count += 1
-            if count >= threshold:
-                return True
-        if check_count == 0:
-            break
-
-    return False
+    try:
+        limited_items = islice(list_api.iter_items(list_id), check_count)
+        return any(
+            extract_douban_item_detail(item, f"{list_type}/{list_id}")
+            for item in limited_items
+        )
+    except NoPermissionException as e:
+        logger.warning(
+            f"List {list_type}/{list_id} is private or has no permission to access."
+            f" {str(e)}"
+        )
+        return False

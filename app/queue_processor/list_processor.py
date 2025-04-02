@@ -2,6 +2,7 @@ import logging
 import requests
 from sqlalchemy.orm import Session
 
+from app.http_utils import NoPermissionException
 from app.info_provider.detail import (
     extract_douban_item_detail,
 )
@@ -32,8 +33,19 @@ def process_list(
     # Check if we've processed this list before
     list_record = db.query(List).filter_by(list_type=list_type, list_id=list_id).first()
 
-    # Get list info to check update time
-    list_info = list_api.get_info(list_id)
+    try:
+        # Get list info to check update time
+        list_info = list_api.get_info(list_id)
+    except NoPermissionException as e:
+        logger.warning(
+            f"List {list_type}/{list_id} is private or has no permission to access."
+            f" {str(e)}"
+        )
+        if list_record:
+            logger.info(f"Deleting list {list_type}/{list_id} record from database.")
+            db.delete(list_record)
+            db.commit()
+        return
 
     # Look for update time field
     update_time_str = list_info.get("update_time") or list_info.get("updated_at")

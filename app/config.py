@@ -80,7 +80,7 @@ class Settings(BaseSettings):
     )
 
     DISCOVER_LISTS_BY_TAG_MIN_FAVORITES: int = int(
-        os.getenv("DISCOVER_LISTS_BY_TAG_MIN_FAVORITES", "100")
+        os.getenv("DISCOVER_LISTS_BY_TAG_MIN_FAVORITES", "10")
     )
 
     class Config:
