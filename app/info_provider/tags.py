@@ -1,44 +1,14 @@
 import logging
 from urllib.parse import quote, urlparse
 import requests
-from typing import Any, Iterator, Tuple
-from tqdm import tqdm
+from typing import Iterator, Tuple
 
 from app.http_utils import get_response
 
 
 logger = logging.getLogger(__name__)
 
-
-def read_pages(read_one_page, get_total, get_items, items_per_page) -> Iterator[Any]:
-    total = None
-    start = 0
-    count = items_per_page
-    progress_bar = None
-
-    try:
-        while total is None or start < total:
-            page_data = read_one_page(start, count)
-            if total is None:
-                total = get_total(page_data)
-                # Initialize progress bar after we know the total
-                progress_bar = tqdm(total=total)
-
-            for item in get_items(page_data):
-                yield item
-            if progress_bar:
-                progress_bar.update(min(count, total - start))
-
-            # Due to the logic of douban, the count of returned items
-            # may be less than the specified count per page.
-            # Maybe some items are deleted, hidden, or not available.
-            # So we still add the specified count to start.
-            start += count
-            if start >= total:
-                break
-    finally:
-        if progress_bar:
-            progress_bar.close()
+TAG_LISTS_PAGE_SIZE = 15
 
 
 def fetch_lists_from_tag(
@@ -52,7 +22,9 @@ def fetch_lists_from_tag(
 
     page = 0
     while True:
-        response = get_response(http_session, url, params={"start": page * 15})
+        response = get_response(
+            http_session, url, params={"start": page * TAG_LISTS_PAGE_SIZE}
+        )
 
         # Parse HTML content
         from bs4 import BeautifulSoup
