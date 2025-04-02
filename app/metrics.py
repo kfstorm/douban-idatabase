@@ -4,11 +4,11 @@ import time
 from prometheus_client import (
     Counter,
     Gauge,
-    Summary,
     CollectorRegistry,
     generate_latest,
     multiprocess,
 )
+from prometheus_summary import Summary
 from sqlalchemy.orm import Session
 
 from app.models import Item, Queue, History, List, Tag
@@ -30,7 +30,7 @@ if prometheus_multiproc_dir:
     multiprocess.MultiProcessCollector(registry)
 
 # Define default quantiles for all summary metrics
-DEFAULT_QUANTILES = {0.5: 0.05, 0.9: 0.01, 0.95: 0.005, 0.99: 0.001}
+DEFAULT_INVARIANTS = ((0.50, 0.05), (0.90, 0.01), (0.95, 0.005), (0.99, 0.001))
 
 # API metrics
 api_requests_total = Counter(
@@ -43,7 +43,7 @@ api_request_duration = Summary(
     "douban_idatabase_api_request_duration_seconds",
     "API request duration in seconds",
     ["endpoint", "method"],
-    quantiles=DEFAULT_QUANTILES,
+    invariants=DEFAULT_INVARIANTS,
 )
 
 # Database metrics
@@ -110,7 +110,7 @@ worker_processing_duration = Summary(
     "douban_idatabase_worker_processing_duration_seconds",
     "Queue item processing duration in seconds",
     ["type"],
-    quantiles=DEFAULT_QUANTILES,
+    invariants=DEFAULT_INVARIANTS,
 )
 
 # Backup metrics
@@ -123,7 +123,7 @@ backup_operations = Counter(
 backup_duration = Summary(
     "douban_idatabase_backup_duration_seconds",
     "Backup operation duration in seconds",
-    quantiles=DEFAULT_QUANTILES,
+    invariants=DEFAULT_INVARIANTS,
 )
 
 backup_file_size = Gauge(
@@ -162,7 +162,7 @@ http_request_duration = Summary(
     "douban_idatabase_http_request_duration_seconds",
     "HTTP request duration in seconds",
     ["host"],
-    quantiles=DEFAULT_QUANTILES,
+    invariants=DEFAULT_INVARIANTS,
 )
 
 # Exception counter
