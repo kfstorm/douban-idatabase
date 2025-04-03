@@ -1,5 +1,5 @@
 from datetime import datetime
-from app.info_provider.detail import extract_douban_item_detail
+from app.info_provider.common import extract_douban_item_detail
 from app.info_provider.lists import (
     LIST_ITEMS_PAGE_SIZE,
     LISTS_PAGE_SIZE,

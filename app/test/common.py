@@ -8,6 +8,8 @@ def check_detail(detail: dict):
     assert "rating" in detail
     assert isinstance(detail["rating"], float)
     assert 0 <= detail["rating"] <= 10
+    assert "type" in detail
+    assert detail["type"] in ["movie", "tv"]
     assert "raw_data" in detail
     assert "detail" in detail["raw_data"]
     assert isinstance(detail["raw_data"]["detail"], dict)

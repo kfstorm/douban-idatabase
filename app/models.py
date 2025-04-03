@@ -22,6 +22,7 @@ class Item(Base):
     douban_title = Column(String(128), index=True, nullable=True)
     year = Column(Integer, nullable=True)
     rating = Column(Float, nullable=True)
+    type = Column(String(16), nullable=True, index=True)  # 'movie' or 'tv'
     raw_data = Column(Text, nullable=True)
     update_time = Column(Float, default=now_timestamp, nullable=True, index=True)
 
@@ -44,6 +45,7 @@ class History(Base):
     douban_title = Column(String(128), nullable=True)
     year = Column(Integer, nullable=True)
     rating = Column(Float, nullable=True)
+    type = Column(String(16), nullable=True)  # 'movie' or 'tv'
     raw_data = Column(Text, nullable=True)
     update_time = Column(Float, nullable=True)
 

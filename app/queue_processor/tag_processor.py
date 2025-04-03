@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session
 
 from app.config import settings
 from app.http_utils import NoPermissionException
-from app.info_provider.detail import (
+from app.info_provider.common import (
     extract_douban_item_detail,
 )
 from app.info_provider.lists import get_list_api_by_list_type

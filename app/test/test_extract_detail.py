@@ -1,6 +1,6 @@
 import json
 
-from app.info_provider.detail import extract_douban_item_detail
+from app.info_provider.common import extract_douban_item_detail
 from app.test.common import check_detail
 
 
@@ -45,6 +45,7 @@ def test_extract_from_doulist_movie():
         "douban_title": "咖啡约会",
         "year": 2006,
         "rating": 6.7,
+        "type": "movie",
     }
     _test_extract_base(json_text, source, expected_result)
 
@@ -77,6 +78,7 @@ def test_extract_from_doulist_tv():
         "douban_title": "他在我身边 第一季",
         "year": 2013,
         "rating": 6.7,
+        "type": "tv",
     }
     _test_extract_base(json_text, source, expected_result)
 
@@ -222,6 +224,7 @@ def test_extract_from_type_rank_movie():
         "douban_title": "肖申克的救赎",
         "year": 1994,
         "rating": 9.7,
+        "type": "movie",
     }
     _test_extract_base(json_text, source, expected_result)
 
@@ -294,5 +297,6 @@ def test_extract_from_subject_collection():
         "douban_title": "好景在望",
         "year": 2012,
         "rating": 7.4,
+        "type": "movie",
     }
     _test_extract_base(json_text, source, expected_result)

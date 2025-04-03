@@ -7,7 +7,7 @@ from urllib.parse import parse_qs, urlparse
 
 from app.http_utils import get_json, get_response
 from app.info_provider.common import COMMON_HEADERS
-from app.info_provider.detail import extract_douban_item_detail
+from app.info_provider.common import extract_douban_item_detail
 from app.utils import record_exception_metrics
 
 logger = logging.getLogger(__name__)

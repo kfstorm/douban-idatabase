@@ -1,10 +1,14 @@
 from sqlalchemy import create_engine, inspect, text
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
+import json
 
 from app.utils import record_exception_metrics
 from app.config import settings
 import logging
+
+# Import the extract_douban_item_detail function
+from app.info_provider.common import extract_douban_item_detail
 
 logger = logging.getLogger(__name__)
 
@@ -364,6 +368,123 @@ def migrate_list_add_douban_update_time():
             raise
 
 
+def migrate_item_add_type_column():
+    """Add type column to item table and fill values for existing records"""
+    logger.info("Checking if item table needs type column...")
+
+    inspector = inspect(engine)
+
+    # Check if item table exists
+    if "item" not in inspector.get_table_names():
+        logger.info("item table doesn't exist, skipping migration.")
+        return False
+
+    # Check if type column already exists
+    columns = {col["name"]: col for col in inspector.get_columns("item")}
+    if "type" in columns:
+        logger.info("type column already exists in item table.")
+        return False
+
+    with SessionLocal() as session:
+        try:
+            # Add the type column with string type
+            logger.info("Adding type column to item table...")
+            session.execute(text("ALTER TABLE item ADD COLUMN type VARCHAR(16)"))
+            session.commit()
+            logger.info("Successfully added type column to item table")
+
+            # Update existing records by extracting type from raw_data
+            logger.info("Updating type values for existing records...")
+
+            # Fetch all records with raw_data
+            items_query = text(
+                "SELECT douban_id, raw_data FROM item WHERE raw_data IS NOT NULL"
+            )
+            items_with_data = session.execute(items_query).fetchall()
+
+            total_items = len(items_with_data)
+            logger.info(f"Found {total_items} records with raw_data to process")
+
+            updated_count = 0
+            skipped_count = 0
+
+            # Process each item using extract_douban_item_detail
+            for item_id, raw_data in items_with_data:
+                try:
+                    # Parse the raw_data JSON
+                    data = json.loads(raw_data)
+                    if "detail" in data and "detail_source" in data:
+                        # Use the same extraction logic as for new records
+                        detail_info = extract_douban_item_detail(
+                            data["detail"], data["detail_source"]
+                        )
+
+                        if detail_info and "type" in detail_info:
+                            # Update the type field
+                            update_item_query = text(
+                                "UPDATE item SET type = :type WHERE douban_id = :id"
+                            )
+                            session.execute(
+                                update_item_query,
+                                {"type": detail_info["type"], "id": item_id},
+                            )
+                            updated_count += 1
+                        else:
+                            skipped_count += 1
+                    else:
+                        skipped_count += 1
+                except Exception as e:
+                    logger.warning(f"Error processing item {item_id}: {str(e)}")
+                    skipped_count += 1
+
+            # Commit all updates
+            session.commit()
+
+            logger.info(
+                f"Successfully updated {updated_count} items using extraction logic"
+            )
+            logger.info(f"Skipped {skipped_count} items that couldn't be processed")
+
+            return True
+        except Exception as e:
+            record_exception_metrics(e)
+            session.rollback()
+            logger.error(f"Error during item table type column migration: {str(e)}")
+            raise
+
+
+def migrate_history_add_type_column():
+    """Add type column to history table"""
+    logger.info("Checking if history table needs type column...")
+
+    inspector = inspect(engine)
+
+    # Check if history table exists
+    if "history" not in inspector.get_table_names():
+        logger.info("history table doesn't exist, skipping migration.")
+        return False
+
+    # Check if type column already exists
+    columns = {col["name"]: col for col in inspector.get_columns("history")}
+    if "type" in columns:
+        logger.info("type column already exists in history table.")
+        return False
+
+    with SessionLocal() as session:
+        try:
+            # Add the type column with string type
+            logger.info("Adding type column to history table...")
+            session.execute(text("ALTER TABLE history ADD COLUMN type VARCHAR(16)"))
+            session.commit()
+            logger.info("Successfully added type column to history table")
+            return True
+        except Exception as e:
+            record_exception_metrics(e)
+            session.rollback()
+            logger.error(f"Error during history table type column migration: {str(e)}")
+            raise
+
+
 def init_db():
     """Initialize the database, creating tables and migrating if needed"""
     # Create tables if they don't exist
@@ -384,3 +505,9 @@ def init_db():
 
     # Add douban_update_time column to list table if needed
     migrate_list_add_douban_update_time()
+
+    # Add type column to item table and fill in values for existing records
+    migrate_item_add_type_column()
+
+    # Add type column to history table and correlate with item table
+    migrate_history_add_type_column()

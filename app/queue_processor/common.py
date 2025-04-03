@@ -69,6 +69,7 @@ def merge_item(detail_info: dict, imdb_info: dict) -> Item:
         douban_title=detail_info["douban_title"],
         year=detail_info["year"],
         rating=detail_info["rating"],
+        type=detail_info["type"],
         raw_data=json.dumps(raw_data_obj, ensure_ascii=False),
         update_time=now_timestamp(),
     )
@@ -87,6 +88,7 @@ def save_item_to_db(db: Session, item: Item):
         douban_title=item.douban_title,
         year=item.year,
         rating=item.rating,
+        type=item.type,
         update_time=item.update_time,
         raw_data=item.raw_data,
     )
@@ -102,6 +104,7 @@ def save_item_to_db(db: Session, item: Item):
         existing_item.rating = item.rating
         existing_item.update_time = item.update_time
         existing_item.imdb_id = item.imdb_id
+        existing_item.type = item.type
         existing_item.raw_data = item.raw_data
 
         logger.info(

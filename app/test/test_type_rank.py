@@ -16,6 +16,11 @@ def test_get_types(http_session):
         assert len(type_name) > 0
         assert len(type_id) > 0
     assert TEST_TYPE_ID in [_[1] for _ in types]
+    # sort and print
+    types.sort(key=lambda x: int(x[1]))
+    print("Types sorted by ID:")
+    for type_name, type_id in types:
+        print(f"{type_id}: {type_name}")
 
 
 def test_get_rank_details(http_session):
