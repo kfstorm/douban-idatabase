@@ -274,35 +274,44 @@ def generate_dashboard():
 
     # Database Metrics
     generator.add_row("Database Metrics")
-
-    # Replace item stat panels with graph panel
-    generator.add_graph_panel(
-        "Items by Type and State",
-        "douban_idatabase_items",
-        "{{type}} - {{state}}",
+    generator.add_stat_panel(
+        "Fetched Items", "douban_idatabase_fetched_items_total", show_percentage=True
+    )
+    generator.add_stat_panel(
+        "Placeholder Items",
+        "douban_idatabase_placeholder_items_total",
+        show_percentage=True,
+    )
+    generator.add_stat_panel(
+        "Total Items", "douban_idatabase_items_total", show_percentage=True
     )
 
-    # Replace list stat panels with graph panel
-    generator.add_graph_panel(
-        "Lists by State",
-        "douban_idatabase_lists",
-        "{{state}}",
+    generator.add_stat_panel(
+        "Fetched Lists", "douban_idatabase_fetched_lists_total", show_percentage=True
+    )
+    generator.add_stat_panel(
+        "Placeholder Lists",
+        "douban_idatabase_placeholder_lists_total",
+        show_percentage=True,
+    )
+    generator.add_stat_panel(
+        "Total Lists", "douban_idatabase_lists_total", show_percentage=True
+    )
+    generator.add_stat_panel(
+        "Valid Tags", "douban_idatabase_valid_tags_total", show_percentage=True
+    )
+    generator.add_stat_panel(
+        "Placeholder Tags",
+        "douban_idatabase_placeholder_tags_total",
+        show_percentage=True,
+    )
+    generator.add_stat_panel(
+        "Total Tags", "douban_idatabase_tags_total", show_percentage=True
     )
 
-    # Replace tag stat panels with graph panel
-    generator.add_graph_panel(
-        "Tags by State",
-        "douban_idatabase_tags",
-        "{{state}}",
+    generator.add_stat_panel(
+        "Queue Size", "douban_idatabase_queue_size", show_percentage=True
     )
-
-    # Replace queue size stat panel with graph panel
-    generator.add_graph_panel(
-        "Queue Size by Type",
-        "douban_idatabase_queue_size",
-        "{{type}}",
-    )
-
     generator.add_stat_panel(
         "History Entries", "douban_idatabase_history_total", show_percentage=True
     )
