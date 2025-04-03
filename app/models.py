@@ -9,7 +9,6 @@ from sqlalchemy import (
 from app.database import Base
 from sqlalchemy import and_
 import logging
-from app.utils import now_timestamp
 
 logger = logging.getLogger(__name__)
 
@@ -24,7 +23,7 @@ class Item(Base):
     rating = Column(Float, nullable=True)
     type = Column(String(16), nullable=True, index=True)  # 'movie' or 'tv'
     raw_data = Column(Text, nullable=True)
-    update_time = Column(Float, default=now_timestamp, nullable=True, index=True)
+    update_time = Column(Float, nullable=True, index=True)
 
 
 class Queue(Base):
@@ -33,7 +32,7 @@ class Queue(Base):
     type = Column(String(32), primary_key=True)
     id = Column(String(128), primary_key=True)
     params = Column(String(1024))
-    upsert_time = Column(Float, default=now_timestamp, index=True)
+    upsert_time = Column(Float, index=True)
 
 
 class History(Base):
@@ -78,7 +77,7 @@ class DeletedItem(Base):
     __tablename__ = "deleted_item"
 
     douban_id = Column(String(16), primary_key=True, index=True)
-    delete_time = Column(Float, default=now_timestamp, index=True)
+    delete_time = Column(Float, index=True)
 
 
 def get_items(db, douban_id: str = None, imdb_id: str = None, douban_title: str = None):

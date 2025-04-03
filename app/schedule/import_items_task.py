@@ -4,7 +4,7 @@ import os
 from sqlalchemy.orm import Session
 
 from app.config import settings
-from app.models import Item
+from app.models import add_placeholder_item
 from app.utils import record_exception_metrics
 
 logger = logging.getLogger(__name__)
@@ -41,15 +41,7 @@ def import_douban_ids_from_csv(db: Session):
                 for row in reader:
                     if len(row) >= 1 and row[0].isdigit():
                         douban_id = row[0]
-
-                        # Check if this Douban ID already exists in the item table
-                        existing_item = (
-                            db.query(Item).filter(Item.douban_id == douban_id).first()
-                        )
-
-                        if not existing_item:
-                            # Add new Douban ID to the item table as a placeholder
-                            db.add(Item(douban_id=douban_id, update_time=None))
+                        if add_placeholder_item(db, douban_id):
                             imported_count += 1
                         else:
                             existed_count += 1
