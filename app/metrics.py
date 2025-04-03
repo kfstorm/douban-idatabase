@@ -214,7 +214,7 @@ def update_db_metrics(db: Session):
                 db_queue_size.labels(type=queue_type).set(count)
 
             # Update history count
-            db_history_total.set(db.query(func.count(History.id)).scalar() or 0)
+            db_history_total.set(db.query(func.count(History.change_id)).scalar() or 0)
 
         # Set database file size (SQLite specific)
         # - outside transaction as it doesn't need DB access
