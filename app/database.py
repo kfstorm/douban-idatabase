@@ -396,20 +396,20 @@ def migrate_item_add_type_column():
             # Update existing records by extracting type from raw_data
             logger.info("Updating type values for existing records...")
 
-            # Fetch all records with raw_data
+            # Use batching instead of fetchall() to prevent OOM
             items_query = text(
                 "SELECT douban_id, raw_data FROM item WHERE raw_data IS NOT NULL"
             )
-            items_with_data = session.execute(items_query).fetchall()
-
-            total_items = len(items_with_data)
-            logger.info(f"Found {total_items} records with raw_data to process")
+            # Result is streamed - rows are fetched one at a time during iteration
+            result = session.execute(items_query)
 
             updated_count = 0
             skipped_count = 0
+            total_items = 0
 
             # Process each item using extract_douban_item_detail
-            for item_id, raw_data in items_with_data:
+            for item_id, raw_data in result:
+                total_items += 1
                 try:
                     # Parse the raw_data JSON
                     data = json.loads(raw_data)
@@ -436,6 +436,11 @@ def migrate_item_add_type_column():
                 except Exception as e:
                     logger.warning(f"Error processing item {item_id}: {str(e)}")
                     skipped_count += 1
+
+                # Commit in batches to avoid long-running transactions
+                if total_items % 1000 == 0:
+                    session.commit()
+                    logger.info(f"Processed {total_items} items so far")
 
             # Commit all updates
             session.commit()
