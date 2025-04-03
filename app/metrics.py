@@ -12,6 +12,7 @@ from prometheus_client import (
 from sqlalchemy.orm import Session
 
 from app.models import Item, Queue, History, List, Tag
+from app.utils import record_exception_metrics
 
 logger = logging.getLogger(__name__)
 
@@ -144,75 +145,93 @@ def update_db_metrics(db: Session):
     """Update all database-related metrics"""
     from app.config import settings
     from sqlalchemy import func, case
+    from sqlalchemy.exc import SQLAlchemyError, TimeoutError
 
     db_path = settings.SQLALCHEMY_DATABASE_URL
 
     try:
-        item_stats = (
-            db.query(
-                func.coalesce(Item.type, "unknown").label("type"),
+        # Use a single transaction for all metrics queries
+        with db.begin():
+            # Get item statistics with a single query
+            item_stats = (
+                db.query(
+                    func.coalesce(Item.type, "unknown").label("type"),
+                    func.sum(
+                        case((Item.update_time == None, 1), else_=0)  # noqa: E711
+                    ).label("placeholder_count"),
+                    func.sum(
+                        case((Item.update_time != None, 1), else_=0)  # noqa: E711
+                    ).label("fetched_count"),
+                )
+                .group_by(func.coalesce(Item.type, "unknown"))
+                .all()
+            )
+
+            for item_type, placeholder_count, fetched_count in item_stats:
+                db_items.labels(type=item_type, state="fetched").set(fetched_count)
+                db_items.labels(type=item_type, state="placeholder").set(
+                    placeholder_count
+                )
+
+            # Get list statistics
+            list_stats = db.query(
                 func.sum(
-                    case((Item.update_time == None, 1), else_=0)  # noqa: E711
+                    case((List.last_check_time == None, 1), else_=0)  # noqa: E711
                 ).label("placeholder_count"),
                 func.sum(
-                    case((Item.update_time != None, 1), else_=0)  # noqa: E711
+                    case((List.last_check_time != None, 1), else_=0)  # noqa: E711
                 ).label("fetched_count"),
+            ).one()
+
+            db_lists.labels(state="fetched").set(list_stats.fetched_count)
+            db_lists.labels(state="placeholder").set(list_stats.placeholder_count)
+
+            # Get tag statistics
+            tag_stats = db.query(
+                func.sum(case((Tag.fetch == True, 1), else_=0)).label(  # noqa: E712
+                    "valid_count"
+                ),
+                func.sum(case((Tag.fetch == False, 1), else_=0)).label(  # noqa: E712
+                    "not_valid_count"
+                ),
+                func.sum(
+                    case((Tag.last_check_time == None, 1), else_=0)  # noqa: E711
+                ).label("placeholder_count"),
+            ).one()
+
+            db_tags.labels(state="valid").set(tag_stats.valid_count)
+            db_tags.labels(state="not_valid").set(tag_stats.not_valid_count)
+            db_tags.labels(state="placeholder").set(tag_stats.placeholder_count)
+
+            # Get queue statistics
+            queue_stats = (
+                db.query(Queue.type, func.count(Queue.type).label("count"))
+                .group_by(Queue.type)
+                .all()
             )
-            .group_by(func.coalesce(Item.type, "unknown"))
-            .all()
-        )
 
-        for item_type, placeholder_count, fetched_count in item_stats:
-            db_items.labels(type=item_type, state="fetched").set(fetched_count)
-            db_items.labels(type=item_type, state="placeholder").set(placeholder_count)
+            for queue_type, count in queue_stats:
+                db_queue_size.labels(type=queue_type).set(count)
 
-        list_stats = db.query(
-            func.sum(
-                case((List.last_check_time == None, 1), else_=0)  # noqa: E711
-            ).label("placeholder_count"),
-            func.sum(
-                case((List.last_check_time != None, 1), else_=0)  # noqa: E711
-            ).label("fetched_count"),
-        ).one()
-
-        db_lists.labels(state="fetched").set(list_stats.fetched_count)
-        db_lists.labels(state="placeholder").set(list_stats.placeholder_count)
-
-        tag_stats = db.query(
-            func.sum(case((Tag.fetch == True, 1), else_=0)).label(  # noqa: E712
-                "valid_count"
-            ),
-            func.sum(case((Tag.fetch == False, 1), else_=0)).label(  # noqa: E712
-                "not_valid_count"
-            ),
-            func.sum(
-                case((Tag.last_check_time == None, 1), else_=0)  # noqa: E711
-            ).label("placeholder_count"),
-        ).one()
-
-        db_tags.labels(state="valid").set(tag_stats.valid_count)
-        db_tags.labels(state="not_valid").set(tag_stats.not_valid_count)
-        db_tags.labels(state="placeholder").set(tag_stats.placeholder_count)
-
-        queue_stats = (
-            db.query(Queue.type, func.count(Queue.type).label("count"))
-            .group_by(Queue.type)
-            .all()
-        )
-
-        for queue_type, count in queue_stats:
-            db_queue_size.labels(type=queue_type).set(count)
-
-        # Update remaining metrics
-        db_history_total.set(db.query(History).count())
+            # Update history count
+            db_history_total.set(db.query(func.count(History.id)).scalar() or 0)
 
         # Set database file size (SQLite specific)
+        # - outside transaction as it doesn't need DB access
         if db_path.startswith("sqlite:///"):
             db_file = db_path[10:]
             if os.path.exists(db_file):
                 database_size.set(os.path.getsize(db_file))
+
+    except TimeoutError as e:
+        logger.error(f"Database connection timeout during metrics collection: {e}")
+        record_exception_metrics(e)
+    except SQLAlchemyError as e:
+        logger.error(f"Database error during metrics collection: {e}")
+        record_exception_metrics(e)
     except Exception as e:
         logger.error(f"Failed to collect metrics: {e}")
+        record_exception_metrics(e)
 
 
 def get_metrics():
