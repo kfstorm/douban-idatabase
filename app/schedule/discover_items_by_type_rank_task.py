@@ -5,46 +5,60 @@ from sqlalchemy.orm import Session
 from app.info_provider.type_rank import get_types, TYPE_RANK_INTERVALS
 from app.models import Queue
 from app.utils import now_timestamp
+from app.schedule.base_task import BaseTask
+from app.schedule.task_registry import register_task
 
 logger = logging.getLogger(__name__)
 
 
-def discover_items_by_type_rank(db: Session, http_session: requests.Session):
-    """
-    Discover items by type rank.
-    Gets all available types and adds them to the queue with
-    type='type_rank' and id='<type_id>/<interval_id>'.
-    """
-    logger.info("Starting discovery of items by type rank...")
+@register_task
+class DiscoverItemsByTypeRankTask(BaseTask):
+    """Task to discover items by type ranking"""
 
-    added_count = 0
+    @property
+    def task_type(self) -> str:
+        return "discover_items_by_type_rank"
 
-    # Get all available types
-    types = get_types(http_session)
-    logger.info(f"Found {len(types)} types")
+    @property
+    def default_interval(self) -> int:
+        return 86400  # 1 day
 
-    # For each type and interval combination, add to queue
-    for type_name, type_id in types:
-        for interval_id in TYPE_RANK_INTERVALS:
-            queue_id = f"{type_id}/{interval_id}"
+    def execute(self, db: Session, http_session: requests.Session) -> None:
+        """
+        Discover items by type rank.
+        Gets all available types and adds them to the queue with
+        type='type_rank' and id='<type_id>/<interval_id>'.
+        """
+        logger.info("Starting discovery of items by type rank...")
 
-            # Check if already in queue
-            existing_queue_item = (
-                db.query(Queue)
-                .filter(Queue.type == "type_rank", Queue.id == queue_id)
-                .first()
-            )
+        added_count = 0
 
-            if not existing_queue_item:
-                # Add to queue
-                queue_item = Queue(
-                    type="type_rank",
-                    id=queue_id,
-                    params=type_name,  # Store type name as params for reference
-                    upsert_time=now_timestamp(),
+        # Get all available types
+        types = get_types(http_session)
+        logger.info(f"Found {len(types)} types")
+
+        # For each type and interval combination, add to queue
+        for type_name, type_id in types:
+            for interval_id in TYPE_RANK_INTERVALS:
+                queue_id = f"{type_id}/{interval_id}"
+
+                # Check if already in queue
+                existing_queue_item = (
+                    db.query(Queue)
+                    .filter(Queue.type == "type_rank", Queue.id == queue_id)
+                    .first()
                 )
-                db.add(queue_item)
-                added_count += 1
 
-    db.commit()
-    logger.info(f"Added {added_count} type rank combinations to queue")
+                if not existing_queue_item:
+                    # Add to queue
+                    queue_item = Queue(
+                        type="type_rank",
+                        id=queue_id,
+                        params=type_name,  # Store type name as params for reference
+                        upsert_time=now_timestamp(),
+                    )
+                    db.add(queue_item)
+                    added_count += 1
+
+        db.commit()
+        logger.info(f"Added {added_count} type rank combinations to queue")

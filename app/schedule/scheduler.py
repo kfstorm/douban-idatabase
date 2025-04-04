@@ -1,29 +1,28 @@
 import logging
 import threading
 import time
+from typing import Optional
 import requests
 from sqlalchemy.orm import Session
 
 from app.database import SessionLocal
-from app.queue_processor.worker import process_queue_items
-from app.schedule.add_recent_items_task import (
-    add_recent_items,
-)
-from app.schedule.discover_lists_by_google_task import discover_lists_by_google
-from app.schedule.discover_lists_task import discover_lists
 from app.models import Schedule
 from app.http_utils import new_http_session, RateLimitException
-from app.schedule.discover_tags_by_google_task import discover_tags_by_google
-from app.schedule.import_items_task import import_douban_ids_from_csv
-from app.schedule.refresh_task import refresh
 from app.utils import (
     now_timestamp,
     timestamp_to_local_time_str,
     record_exception_metrics,
 )
-from app.schedule.backup_task import perform_backup
-from app.schedule.discover_items_by_type_rank_task import discover_items_by_type_rank
-from app.config import settings
+
+# Import task registry and task registration
+from app.schedule.task_registry import (
+    create_task_instance,
+    get_all_task_types,
+    register_all_tasks,
+)
+
+# Register all tasks at module load time
+register_all_tasks()
 
 logger = logging.getLogger(__name__)
 
@@ -31,29 +30,13 @@ logger = logging.getLogger(__name__)
 running = False
 scheduler_thread = None
 
-# Schedule types
-SCHEDULE_TYPE_GOOGLE_SEARCH = "google_search"
-SCHEDULE_TYPE_PROCESS_QUEUE = "process_queue"
-SCHEDULE_TYPE_BOOTSTRAP_LISTS = "bootstrap_lists"
-SCHEDULE_TYPE_REFRESH = "refresh"
-SCHEDULE_TYPE_DATABASE_BACKUP = "database_backup"
-SCHEDULE_TYPE_IMPORT_DOUBAN_IDS_FROM_CSV = "import_douban_ids_from_csv"
-SCHEDULE_TYPE_DISCOVER_LISTS_BY_GOOGLE = "discover_lists_by_google"
-SCHEDULE_TYPE_DISCOVER_TAGS_BY_GOOGLE = "discover_tags_by_google"
-SCHEDULE_TYPE_DISCOVER_ITEMS_BY_TYPE_RANK = "discover_items_by_type_rank"
 
-# Schedule intervals (in seconds)
-SCHEDULE_INTERVALS = {
-    SCHEDULE_TYPE_GOOGLE_SEARCH: 3600,  # 1 hour
-    SCHEDULE_TYPE_PROCESS_QUEUE: 1,  # 1 second
-    SCHEDULE_TYPE_BOOTSTRAP_LISTS: 86400,  # 1 day
-    SCHEDULE_TYPE_REFRESH: 3600,  # 1 hour
-    SCHEDULE_TYPE_DATABASE_BACKUP: settings.BACKUP_INTERVAL_SECONDS,  # From settings
-    SCHEDULE_TYPE_IMPORT_DOUBAN_IDS_FROM_CSV: 86400,  # 1 day
-    SCHEDULE_TYPE_DISCOVER_LISTS_BY_GOOGLE: 86400,  # 1 day
-    SCHEDULE_TYPE_DISCOVER_TAGS_BY_GOOGLE: 86400,  # 1 day
-    SCHEDULE_TYPE_DISCOVER_ITEMS_BY_TYPE_RANK: 86400,  # 1 day
-}
+def should_log_schedule(task_interval: int) -> bool:
+    """
+    Determine if the schedule type should be logged based on its interval.
+    Only print logs for schedules with intervals >= 1 hour (3600 seconds).
+    """
+    return task_interval >= 3600
 
 
 def initialize_schedules(db: Session):
@@ -62,13 +45,13 @@ def initialize_schedules(db: Session):
 
     # Initialize all schedule types
     added_schedules = set()
-    for schedule_type in SCHEDULE_INTERVALS.keys():
-        schedule = db.query(Schedule).filter(Schedule.type == schedule_type).first()
+    for task_type in get_all_task_types():
+        schedule = db.query(Schedule).filter(Schedule.type == task_type).first()
         if not schedule:
-            logger.info(f"Creating default schedule for {schedule_type}")
-            schedule = Schedule(type=schedule_type, next_run=now)
+            logger.info(f"Creating default schedule for {task_type}")
+            schedule = Schedule(type=task_type, next_run=now)
             db.add(schedule)
-            added_schedules.add(schedule_type)
+            added_schedules.add(task_type)
 
     if added_schedules:
         db.commit()
@@ -78,16 +61,16 @@ def update_schedule_next_run(db: Session, schedule_type: str, next_run_time: flo
     """Update the next run time for a scheduled task"""
     schedule = db.query(Schedule).filter(Schedule.type == schedule_type).first()
     if schedule:
+        task = create_task_instance(schedule_type)
+        interval = task.default_interval
         if next_run_time:
             schedule.next_run = next_run_time
         else:
-            now = now_timestamp()
-            interval = SCHEDULE_INTERVALS.get(
-                schedule_type, 3600
-            )  # Default to 1 hour if not found
-            schedule.next_run = now + interval
+            schedule.next_run = now_timestamp() + interval
+
         db.commit()
-        if should_log_schedule(schedule.type):
+
+        if should_log_schedule(interval):
             logger.info(
                 f"Updated schedule for {schedule_type}"
                 f", next run at {timestamp_to_local_time_str(schedule.next_run)}"
@@ -109,48 +92,36 @@ def get_next_schedule_run(db: Session):
 
 def execute_scheduled_task(
     db: Session, http_session: requests.Session, schedule_type: str
-) -> float:
-    """Execute a specific scheduled task based on its type"""
+) -> Optional[float]:
+    """
+    Execute a specific scheduled task based on its type.
+
+    Returns:
+        Optional[float]: Next run time if rate limited, or None for default scheduling
+    """
     try:
-        if schedule_type == SCHEDULE_TYPE_GOOGLE_SEARCH:
-            add_recent_items(db, http_session)
-        elif schedule_type == SCHEDULE_TYPE_PROCESS_QUEUE:
-            process_queue_items(db, http_session)
-        elif schedule_type == SCHEDULE_TYPE_BOOTSTRAP_LISTS:
-            discover_lists(db, http_session)
-        elif schedule_type == SCHEDULE_TYPE_REFRESH:
-            refresh(db)
-        elif schedule_type == SCHEDULE_TYPE_DATABASE_BACKUP:
-            perform_backup()
-        elif schedule_type == SCHEDULE_TYPE_IMPORT_DOUBAN_IDS_FROM_CSV:
-            import_douban_ids_from_csv(db)
-        elif schedule_type == SCHEDULE_TYPE_DISCOVER_LISTS_BY_GOOGLE:
-            discover_lists_by_google(db, http_session)
-        elif schedule_type == SCHEDULE_TYPE_DISCOVER_TAGS_BY_GOOGLE:
-            discover_tags_by_google(db, http_session)
-        elif schedule_type == SCHEDULE_TYPE_DISCOVER_ITEMS_BY_TYPE_RANK:
-            discover_items_by_type_rank(db, http_session)
-        else:
-            logger.warning(f"Unknown schedule type: {schedule_type}")
+        # Create a task instance from the registry
+        task = create_task_instance(schedule_type)
+
+        # Execute the task
+        task.execute(db, http_session)
+
+        # Return None to use default scheduling
+        return None
     except RateLimitException as e:
         record_exception_metrics(e)
         logger.warning(
             f"Rate limited while executing scheduled task {schedule_type}: {str(e)}"
         )
         return e.next_call_time
+    except KeyError:
+        logger.warning(f"Unknown schedule type: {schedule_type}")
+        return None
     except Exception as e:
         record_exception_metrics(e)
-        db.rollback()
         logger.exception(f"Error executing scheduled task {schedule_type}: {e}")
-
-
-def should_log_schedule(schedule_type: str) -> bool:
-    """
-    Determine if the schedule type should be logged based on its interval
-    """
-    interval = SCHEDULE_INTERVALS.get(schedule_type)
-    # Only print logs for schedules with long intervals
-    return interval >= 3600
+        db.rollback()
+        return None
 
 
 def unified_scheduler():
@@ -168,30 +139,37 @@ def unified_scheduler():
 
                 # Check for scheduled tasks that need to run
                 schedule = get_next_schedule_run(db)
-                if schedule and schedule.type not in SCHEDULE_INTERVALS:
+                if not schedule:
+                    # No tasks due for execution
+                    time.sleep(1)
+                    continue
+
+                try:
+                    # Get task for logging purposes
+                    task = create_task_instance(schedule.type)
+
+                    # Log task execution if interval is at least 1 hour
+                    if should_log_schedule(task.default_interval):
+                        logger.info(f"Running scheduled task: {schedule.type}")
+                except KeyError:
                     logger.warning(f"Unknown schedule type: {schedule.type}")
+                    # Delete the invalid schedule
                     db.delete(schedule)
                     db.commit()
                     continue
 
-                if schedule:
-                    if should_log_schedule(schedule.type):
-                        logger.info(f"Running scheduled task: {schedule.type}")
+                # Execute the task
+                next_run_time = execute_scheduled_task(db, http_session, schedule.type)
 
-                    # Execute the appropriate task based on schedule type
-                    next_run_time = execute_scheduled_task(
-                        db, http_session, schedule.type
-                    )
+                # Update the next run time
+                update_schedule_next_run(db, schedule.type, next_run_time)
 
-                    # Update the next run time
-                    update_schedule_next_run(db, schedule.type, next_run_time)
             except Exception as e:
                 record_exception_metrics(e)
-                db.rollback()
                 logger.exception(f"Error in unified scheduler: {e}")
+                db.rollback()
 
         # Sleep for a short time before checking again
-        # Using a short sleep time to be responsive to any tasks
         time.sleep(1)
 
     logger.info("Unified scheduler stopped")
@@ -226,10 +204,6 @@ def stop_scheduler():
 
     if scheduler_thread.is_alive():
         logger.warning("Scheduler thread did not terminate within timeout")
-
-        # In Python, we can't forcefully kill a thread safely
-        # But setting daemon=True (which we do when creating it)
-        # ensures it won't prevent application shutdown
         logger.info("Thread will be terminated when process exits")
     else:
         logger.info("Scheduler thread stopped successfully")
