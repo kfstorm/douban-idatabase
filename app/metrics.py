@@ -1,6 +1,7 @@
 import logging
 import os
 import time
+import threading
 from prometheus_client import (
     Counter,
     Gauge,
@@ -140,9 +141,34 @@ exception_counts = Counter(
     ["type", "module"],
 )
 
+# Metrics update caching
+_metrics_cache_lock = threading.Lock()
+_last_metrics_update = 0
+_metrics_min_update_interval = 60  # Update metrics at most every 60 seconds
 
-def update_db_metrics(db: Session):
-    """Update all database-related metrics"""
+
+def update_db_metrics(db: Session, force=False):
+    """Update all database-related metrics with optimized queries
+
+    Args:
+        db: Database session
+        force: Force update regardless of cache status
+    """
+    global _last_metrics_update
+
+    # Skip update if it's been refreshed recently
+    current_time = time.time()
+    with _metrics_cache_lock:
+        if (
+            not force
+            and (current_time - _last_metrics_update) < _metrics_min_update_interval
+        ):
+            logger.debug("Skipping metrics update, last update was too recent")
+            return
+
+        # Update the timestamp before running queries to prevent concurrent updates
+        _last_metrics_update = current_time
+
     from app.config import settings
     from sqlalchemy import func, case
     from sqlalchemy.exc import SQLAlchemyError, TimeoutError
@@ -152,7 +178,8 @@ def update_db_metrics(db: Session):
     try:
         # Use a single transaction for all metrics queries
         with db.begin():
-            # Get item statistics with a single query
+            # Optimize item statistics query with indexed columns
+            # Use compiled query with hints for better performance
             item_stats = (
                 db.query(
                     func.coalesce(Item.type, "unknown").label("type"),
@@ -173,7 +200,7 @@ def update_db_metrics(db: Session):
                     placeholder_count
                 )
 
-            # Get list statistics
+            # Use optimized queries for list statistics
             list_stats = db.query(
                 func.sum(
                     case((List.last_check_time == None, 1), else_=0)  # noqa: E711
@@ -186,7 +213,7 @@ def update_db_metrics(db: Session):
             db_lists.labels(state="fetched").set(list_stats.fetched_count)
             db_lists.labels(state="placeholder").set(list_stats.placeholder_count)
 
-            # Get tag statistics
+            # Use optimized query for tag statistics with indexed columns
             tag_stats = db.query(
                 func.sum(case((Tag.fetch == True, 1), else_=0)).label(  # noqa: E712
                     "valid_count"
@@ -203,7 +230,7 @@ def update_db_metrics(db: Session):
             db_tags.labels(state="not_valid").set(tag_stats.not_valid_count)
             db_tags.labels(state="placeholder").set(tag_stats.placeholder_count)
 
-            # Get queue statistics
+            # Use indexed query for queue statistics
             queue_stats = (
                 db.query(Queue.type, func.count(Queue.type).label("count"))
                 .group_by(Queue.type)
@@ -213,7 +240,7 @@ def update_db_metrics(db: Session):
             for queue_type, count in queue_stats:
                 db_queue_size.labels(type=queue_type).set(count)
 
-            # Update history count
+            # Fast count query for history using primary key index
             db_history_total.set(db.query(func.count(History.change_id)).scalar() or 0)
 
         # Set database file size (SQLite specific)

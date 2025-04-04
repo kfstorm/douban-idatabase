@@ -6,6 +6,7 @@ from sqlalchemy import (
     Float,
     Text,
     Boolean,
+    Index,
 )
 from sqlalchemy import and_
 from sqlalchemy.orm import Session
@@ -28,6 +29,9 @@ class Item(Base):
     raw_data = Column(Text, nullable=True)
     update_time = Column(Float, nullable=True, index=True)
 
+    # Add composite index for faster metrics queries
+    __table_args__ = (Index("idx_item_type_update_time", type, update_time),)
+
 
 class Queue(Base):
     __tablename__ = "queue"
@@ -36,6 +40,9 @@ class Queue(Base):
     id = Column(String(128), primary_key=True)
     params = Column(String(1024))
     upsert_time = Column(Float, index=True)
+
+    # Add index for faster type-based counting
+    __table_args__ = (Index("idx_queue_type", type),)
 
 
 class History(Base):
@@ -64,7 +71,7 @@ class List(Base):
 
     list_type = Column(String(32), primary_key=True)
     list_id = Column(String(128), primary_key=True)
-    last_check_time = Column(Float, nullable=True)
+    last_check_time = Column(Float, nullable=True, index=True)  # Add index
     douban_update_time = Column(Float, nullable=True)
 
 
@@ -72,8 +79,11 @@ class Tag(Base):
     __tablename__ = "tag"
 
     tag_name = Column(String(32), primary_key=True)
-    fetch = Column(Boolean, nullable=True)
-    last_check_time = Column(Float, nullable=True)
+    fetch = Column(Boolean, nullable=True, index=True)  # Add index
+    last_check_time = Column(Float, nullable=True, index=True)  # Add index
+
+    # Add composite index for faster metrics queries
+    __table_args__ = (Index("idx_tag_fetch_last_check", fetch, last_check_time),)
 
 
 class DeletedItem(Base):

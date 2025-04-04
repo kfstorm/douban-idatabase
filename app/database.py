@@ -490,6 +490,60 @@ def migrate_history_add_type_column():
             raise
 
 
+def migrate_add_metrics_indices():
+    """Add indices for metrics query optimization to existing tables"""
+    logger.info("Adding optimized indices for metrics queries...")
+
+    with SessionLocal() as session:
+        try:
+            # Create indices for Item table
+            logger.info("Adding composite index for Item table...")
+            session.execute(
+                text(
+                    "CREATE INDEX IF NOT EXISTS idx_item_type_update_time ON item(type, update_time)"  # noqa: B950
+                )
+            )
+
+            # Create indices for Queue table
+            logger.info("Adding index for Queue table...")
+            session.execute(
+                text("CREATE INDEX IF NOT EXISTS idx_queue_type ON queue(type)")
+            )
+
+            # Create indices for List table
+            logger.info("Ensuring index for List.last_check_time exists...")
+            session.execute(
+                text(
+                    "CREATE INDEX IF NOT EXISTS idx_list_last_check_time ON list(last_check_time)"  # noqa: B950
+                )
+            )
+
+            # Create indices for Tag table
+            logger.info("Ensuring indices for Tag table exist...")
+            session.execute(
+                text("CREATE INDEX IF NOT EXISTS idx_tag_fetch ON tag(fetch)")
+            )
+            session.execute(
+                text(
+                    "CREATE INDEX IF NOT EXISTS idx_tag_last_check_time ON tag(last_check_time)"  # noqa: B950
+                )
+            )
+            session.execute(
+                text(
+                    "CREATE INDEX IF NOT EXISTS idx_tag_fetch_last_check ON tag(fetch, last_check_time)"  # noqa: B950
+                )
+            )
+
+            session.commit()
+            logger.info("Successfully added all metrics query optimization indices")
+            return True
+        except Exception as e:
+            record_exception_metrics(e)
+            session.rollback()
+            logger.error(f"Error adding metrics indices: {str(e)}")
+            return False
+
+
 def init_db():
     """Initialize the database, creating tables and migrating if needed"""
     # Create tables if they don't exist
@@ -499,20 +553,11 @@ def init_db():
     if settings.SQLALCHEMY_DATABASE_URL.startswith("sqlite:///"):
         enable_wal_mode()
 
-    # Migrate datetime columns to float if needed
+    # Run migrations
     migrate_datetime_to_float()
-
-    # Migrate known_douban_id to item table
     migrate_known_douban_id_to_item()
-
-    # Migrate douban_id from int to string
     migrate_douban_id_to_string()
-
-    # Add douban_update_time column to list table if needed
     migrate_list_add_douban_update_time()
-
-    # Add type column to item table and fill in values for existing records
     migrate_item_add_type_column()
-
-    # Add type column to history table and correlate with item table
     migrate_history_add_type_column()
+    migrate_add_metrics_indices()
