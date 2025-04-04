@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session, selectinload
 from sqlalchemy import and_
 
 from app.config import settings
-from app.models import Item, List, Queue, Tag
+from app.models import Item, List, Queue, Tag, add_to_queue
 from app.queue_processor.common import (
     allow_update_item,
     allow_update_list,
@@ -182,11 +182,4 @@ class RefreshTask(BaseTask):
         """
         Common method to add an item to the queue.
         """
-        # Add to queue
-        queue_item = Queue(
-            type=item_type,
-            id=item_id,
-            params=params,
-            upsert_time=now_timestamp(),
-        )
-        db.add(queue_item)
+        add_to_queue(db, item_type, item_id, params)

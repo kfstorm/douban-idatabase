@@ -3,8 +3,7 @@ import requests
 from sqlalchemy.orm import Session
 
 from app.info_provider.type_rank import get_types, TYPE_RANK_INTERVALS
-from app.models import Queue
-from app.utils import now_timestamp
+from app.models import add_to_queue
 from app.schedule.base_task import BaseTask
 from app.schedule.task_registry import register_task
 
@@ -42,22 +41,12 @@ class DiscoverItemsByTypeRankTask(BaseTask):
             for interval_id in TYPE_RANK_INTERVALS:
                 queue_id = f"{type_id}/{interval_id}"
 
-                # Check if already in queue
-                existing_queue_item = (
-                    db.query(Queue)
-                    .filter(Queue.type == "type_rank", Queue.id == queue_id)
-                    .first()
-                )
-
-                if not existing_queue_item:
-                    # Add to queue
-                    queue_item = Queue(
-                        type="type_rank",
-                        id=queue_id,
-                        params=type_name,  # Store type name as params for reference
-                        upsert_time=now_timestamp(),
-                    )
-                    db.add(queue_item)
+                if add_to_queue(
+                    db,
+                    "type_rank",
+                    queue_id,
+                    type_name,  # Store type name as params for reference)
+                ):
                     added_count += 1
 
         db.commit()

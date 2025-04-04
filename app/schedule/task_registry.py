@@ -53,3 +53,4 @@ def register_all_tasks():
     from app.schedule.backup_task import BackupTask
     from app.schedule.import_items_task import ImportItemsTask
     from app.schedule.process_queue_task import ProcessQueueTask
+    from app.schedule.fetch_sitemap_task import FetchSitemapTask

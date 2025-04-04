@@ -1,3 +1,4 @@
+import logging
 from sqlalchemy import (
     Column,
     Integer,
@@ -6,9 +7,11 @@ from sqlalchemy import (
     Text,
     Boolean,
 )
-from app.database import Base
 from sqlalchemy import and_
-import logging
+from sqlalchemy.orm import Session
+
+from app.database import Base
+from app.utils import now_timestamp
 
 logger = logging.getLogger(__name__)
 
@@ -80,7 +83,9 @@ class DeletedItem(Base):
     delete_time = Column(Float, index=True)
 
 
-def get_items(db, douban_id: str = None, imdb_id: str = None, douban_title: str = None):
+def get_items(
+    db: Session, douban_id: str = None, imdb_id: str = None, douban_title: str = None
+):
     query = db.query(Item)
     filters = []
 
@@ -99,7 +104,7 @@ def get_items(db, douban_id: str = None, imdb_id: str = None, douban_title: str 
     return query.limit(5).all()
 
 
-def add_placeholder_item(db, douban_id: str) -> bool:
+def add_placeholder_item(db: Session, douban_id: str) -> bool:
     """
     Add a placeholder item to the item table if it doesn't exist.
 
@@ -126,7 +131,7 @@ def add_placeholder_item(db, douban_id: str) -> bool:
         return False
 
 
-def add_placeholder_list(db, list_type: str, list_id: str) -> bool:
+def add_placeholder_list(db: Session, list_type: str, list_id: str) -> bool:
     """
     Add a placeholder list to the list table if it doesn't exist.
 
@@ -158,7 +163,7 @@ def add_placeholder_list(db, list_type: str, list_id: str) -> bool:
         return False
 
 
-def add_placeholder_tag(db, tag_name: str) -> bool:
+def add_placeholder_tag(db: Session, tag_name: str) -> bool:
     """
     Add a placeholder tag to the tag table if it doesn't exist.
 
@@ -184,3 +189,30 @@ def add_placeholder_tag(db, tag_name: str) -> bool:
         return True
     else:
         return False
+
+
+def add_to_queue(
+    db: Session, queue_type: str, item_id: str, params: str = None
+) -> None:
+    """
+    Add an item to the queue if it doesn't exist
+
+    Args:
+        db: Database session
+        queue_type: Type of queue item (e.g., 'douban_id', 'sitemap')
+        item_id: ID of the item
+        params: Optional parameters for the queue item
+    """
+    existing_item = (
+        db.query(Queue).filter(Queue.type == queue_type, Queue.id == item_id).first()
+    )
+
+    if not existing_item:
+        queue_item = Queue(
+            type=queue_type, id=item_id, params=params, upsert_time=now_timestamp()
+        )
+        db.add(queue_item)
+        db.commit()
+        logger.info(f"Added {queue_type} item to queue: {item_id}")
+        return True
+    return False

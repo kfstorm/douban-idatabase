@@ -7,6 +7,7 @@ from app.queue_processor.douban_id_processor import process_douban_id
 from app.queue_processor.list_processor import process_list
 from app.queue_processor.tag_processor import process_tag
 from app.queue_processor.type_rank_processor import process_type_rank
+from app.queue_processor.sitemap_processor import process_sitemap
 from app.utils import (
     now_timestamp,
     record_exception_metrics,
@@ -75,6 +76,8 @@ def process_queue_items(db: Session, http_session: requests.Session) -> None:
                 process_tag(db, http_session, queue_item)
             elif item_type == "type_rank":
                 process_type_rank(db, http_session, queue_item)
+            elif item_type == "sitemap":
+                process_sitemap(db, http_session, queue_item)
             else:
                 logger.warning(f"Unsupported queue item type: {item_type}")
 
