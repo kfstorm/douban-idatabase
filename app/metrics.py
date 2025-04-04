@@ -12,6 +12,7 @@ from prometheus_client import (
 from sqlalchemy.orm import Session
 
 from app.models import Item, Queue, History, List, Tag
+from app.utils import record_exception_metrics
 
 logger = logging.getLogger(__name__)
 
@@ -48,57 +49,22 @@ api_request_duration = Histogram(
     buckets=DURATION_BUCKETS,
 )
 
-# Database metrics
-db_items_total = Gauge(
-    "douban_idatabase_items_total",
-    "Total number of items in the database",
+# Database metrics - refactored to use tags
+db_items = Gauge(
+    "douban_idatabase_items", "Number of items in the database", ["type", "state"]
 )
 
-db_fetched_items_total = Gauge(
-    "douban_idatabase_fetched_items_total",
-    "Total number of fetched items (with update_time)",
+db_lists = Gauge("douban_idatabase_lists", "Number of lists in the database", ["state"])
+
+db_tags = Gauge("douban_idatabase_tags", "Number of tags in the database", ["state"])
+
+# Keep these as they serve different purposes
+db_queue_size = Gauge(
+    "douban_idatabase_queue_size", "Current size of the queue", ["type"]
 )
-
-db_placeholder_items_total = Gauge(
-    "douban_idatabase_placeholder_items_total",
-    "Total number of placeholder items without data",
-)
-
-db_queue_size = Gauge("douban_idatabase_queue_size", "Current size of the queue")
-
 db_history_total = Gauge(
     "douban_idatabase_history_total",
     "Total number of history entries",
-)
-
-db_lists_total = Gauge(
-    "douban_idatabase_lists_total",
-    "Total number of lists in the database",
-)
-
-db_fetched_lists_total = Gauge(
-    "douban_idatabase_fetched_lists_total",
-    "Total number of fetched lists (with check time)",
-)
-
-db_placeholder_lists_total = Gauge(
-    "douban_idatabase_placeholder_lists_total",
-    "Total number of placeholder lists without check time",
-)
-
-db_tags_total = Gauge(
-    "douban_idatabase_tags_total",
-    "Total number of tags in the database",
-)
-
-db_valid_tags_total = Gauge(
-    "douban_idatabase_valid_tags_total",
-    "Total number of valid tags (fetch=True)",
-)
-
-db_placeholder_tags_total = Gauge(
-    "douban_idatabase_placeholder_tags_total",
-    "Total number of placeholder tags without check time",
 )
 
 # Worker metrics
@@ -178,58 +144,94 @@ exception_counts = Counter(
 def update_db_metrics(db: Session):
     """Update all database-related metrics"""
     from app.config import settings
+    from sqlalchemy import func, case
+    from sqlalchemy.exc import SQLAlchemyError, TimeoutError
 
     db_path = settings.SQLALCHEMY_DATABASE_URL
 
     try:
-        total_items = db.query(Item).count()
-        db_items_total.set(total_items)
+        # Use a single transaction for all metrics queries
+        with db.begin():
+            # Get item statistics with a single query
+            item_stats = (
+                db.query(
+                    func.coalesce(Item.type, "unknown").label("type"),
+                    func.sum(
+                        case((Item.update_time == None, 1), else_=0)  # noqa: E711
+                    ).label("placeholder_count"),
+                    func.sum(
+                        case((Item.update_time != None, 1), else_=0)  # noqa: E711
+                    ).label("fetched_count"),
+                )
+                .group_by(func.coalesce(Item.type, "unknown"))
+                .all()
+            )
 
-        # Count placeholders (items with update_time is NULL)
-        placeholder_count = (
-            db.query(Item).filter(Item.update_time == None).count()  # noqa: E711
-        )
-        db_placeholder_items_total.set(placeholder_count)
+            for item_type, placeholder_count, fetched_count in item_stats:
+                db_items.labels(type=item_type, state="fetched").set(fetched_count)
+                db_items.labels(type=item_type, state="placeholder").set(
+                    placeholder_count
+                )
 
-        # Set fetched items count (total - placeholders)
-        db_fetched_items_total.set(total_items - placeholder_count)
+            # Get list statistics
+            list_stats = db.query(
+                func.sum(
+                    case((List.last_check_time == None, 1), else_=0)  # noqa: E711
+                ).label("placeholder_count"),
+                func.sum(
+                    case((List.last_check_time != None, 1), else_=0)  # noqa: E711
+                ).label("fetched_count"),
+            ).one()
 
-        db_queue_size.set(db.query(Queue).count())
-        db_history_total.set(db.query(History).count())
+            db_lists.labels(state="fetched").set(list_stats.fetched_count)
+            db_lists.labels(state="placeholder").set(list_stats.placeholder_count)
 
-        total_lists = db.query(List).count()
-        db_lists_total.set(total_lists)
+            # Get tag statistics
+            tag_stats = db.query(
+                func.sum(case((Tag.fetch == True, 1), else_=0)).label(  # noqa: E712
+                    "valid_count"
+                ),
+                func.sum(case((Tag.fetch == False, 1), else_=0)).label(  # noqa: E712
+                    "not_valid_count"
+                ),
+                func.sum(
+                    case((Tag.last_check_time == None, 1), else_=0)  # noqa: E711
+                ).label("placeholder_count"),
+            ).one()
 
-        # Count placeholder lists (lists with last_check_time is NULL)
-        placeholder_lists_count = (
-            db.query(List).filter(List.last_check_time == None).count()  # noqa: E711
-        )
-        db_placeholder_lists_total.set(placeholder_lists_count)
+            db_tags.labels(state="valid").set(tag_stats.valid_count)
+            db_tags.labels(state="not_valid").set(tag_stats.not_valid_count)
+            db_tags.labels(state="placeholder").set(tag_stats.placeholder_count)
 
-        # Set fetched lists count (total - placeholders)
-        db_fetched_lists_total.set(total_lists - placeholder_lists_count)
+            # Get queue statistics
+            queue_stats = (
+                db.query(Queue.type, func.count(Queue.type).label("count"))
+                .group_by(Queue.type)
+                .all()
+            )
 
-        # Tag metrics
-        total_tags = db.query(Tag).count()
-        db_tags_total.set(total_tags)
+            for queue_type, count in queue_stats:
+                db_queue_size.labels(type=queue_type).set(count)
 
-        # Count valid tags (fetch=True)
-        valid_tags_count = db.query(Tag).filter(Tag.fetch == True).count()  # noqa: E712
-        db_valid_tags_total.set(valid_tags_count)
-
-        # Count placeholder tags (last_check_time is NULL)
-        placeholder_tags_count = (
-            db.query(Tag).filter(Tag.last_check_time == None).count()  # noqa: E711
-        )
-        db_placeholder_tags_total.set(placeholder_tags_count)
+            # Update history count
+            db_history_total.set(db.query(func.count(History.change_id)).scalar() or 0)
 
         # Set database file size (SQLite specific)
+        # - outside transaction as it doesn't need DB access
         if db_path.startswith("sqlite:///"):
             db_file = db_path[10:]
             if os.path.exists(db_file):
                 database_size.set(os.path.getsize(db_file))
+
+    except TimeoutError as e:
+        logger.error(f"Database connection timeout during metrics collection: {e}")
+        record_exception_metrics(e)
+    except SQLAlchemyError as e:
+        logger.error(f"Database error during metrics collection: {e}")
+        record_exception_metrics(e)
     except Exception as e:
         logger.error(f"Failed to collect metrics: {e}")
+        record_exception_metrics(e)
 
 
 def get_metrics():
