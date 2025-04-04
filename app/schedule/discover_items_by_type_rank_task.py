@@ -20,7 +20,8 @@ class DiscoverItemsByTypeRankTask(BaseTask):
 
     @property
     def default_interval(self) -> int:
-        return 86400  # 1 day
+        # Run weekly (7 days)
+        return 7 * 24 * 60 * 60
 
     def execute(self, db: Session, http_session: requests.Session) -> None:
         """

@@ -29,7 +29,7 @@ class RefreshTask(BaseTask):
 
     @property
     def default_interval(self) -> int:
-        return 3600  # 1 hour
+        return 4 * 60 * 60  # 4 hours
 
     def execute(self, db: Session, http_session: requests.Session) -> None:
         """
