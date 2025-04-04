@@ -22,7 +22,9 @@ def process_sitemap(
 
     # Fetch Douban IDs from the sitemap
     added_count = 0
+    found_count = 0
     for douban_id in fetch_douban_ids_from_sitemap(http_session, sitemap_url):
+        found_count += 1
         # Add as placeholder item if it doesn't exist
         if add_placeholder_item(db, douban_id):
             added_count += 1
@@ -31,11 +33,13 @@ def process_sitemap(
             if added_count % 100 == 0:
                 db.commit()
                 logger.info(
-                    f"Added {added_count} placeholder items so far from {sitemap_url}"
+                    f"Added {added_count}/{found_count} placeholder items"
+                    f" so far from {sitemap_url}"
                 )
 
     # Final commit for remaining items
     db.commit()
     logger.info(
-        f"Successfully added {added_count} placeholder items from {sitemap_url}"
+        f"Successfully added {added_count}/{found_count} placeholder items"
+        f" from {sitemap_url}"
     )
