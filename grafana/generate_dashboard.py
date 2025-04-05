@@ -6,7 +6,7 @@ This script reduces boilerplate by using templates and helper functions.
 
 import json
 import os
-from typing import Dict
+from typing import Dict, Union
 
 # Base dashboard structure
 DASHBOARD_BASE = {
@@ -154,8 +154,7 @@ class DashboardGenerator:
     def add_graph_panel(
         self,
         title: str,
-        metric: str,
-        legend_format: str,
+        metrics: list,
         height: int = 8,
         width: int = 12,
         y_axis_label: str = None,
@@ -164,6 +163,19 @@ class DashboardGenerator:
         """Add a time series graph panel to the dashboard"""
         panel_id = self.next_panel_id
         self.next_panel_id += 1
+
+        targets = []
+        # Multiple targets with their own expressions and legend formats
+        for idx, target_info in enumerate(metrics):
+            targets.append(
+                {
+                    "exemplar": True,
+                    "expr": target_info["expr"],
+                    "interval": "",
+                    "legendFormat": target_info["legendFormat"],
+                    "refId": chr(65 + idx),  # A, B, C, etc.
+                }
+            )
 
         panel = {
             "aliasColors": {},
@@ -199,15 +211,7 @@ class DashboardGenerator:
             "spaceLength": 10,
             "stack": False,
             "steppedLine": False,
-            "targets": [
-                {
-                    "exemplar": True,
-                    "expr": metric,
-                    "interval": "",
-                    "legendFormat": legend_format,
-                    "refId": "A",
-                }
-            ],
+            "targets": targets,
             "thresholds": [],
             "timeFrom": None,
             "timeRegions": [],
@@ -252,6 +256,7 @@ class DashboardGenerator:
         return result
 
 
+# flake8: noqa: B950
 def generate_dashboard():
     """Generate the complete Douban iDatabase dashboard"""
     generator = DashboardGenerator()
@@ -278,29 +283,25 @@ def generate_dashboard():
     # Replace item stat panels with graph panel
     generator.add_graph_panel(
         "Items by Type and State",
-        "douban_idatabase_items",
-        "{{type}} - {{state}}",
+        [{"expr": "douban_idatabase_items", "legendFormat": "{{type}} - {{state}}"}],
     )
 
     # Replace list stat panels with graph panel
     generator.add_graph_panel(
         "Lists by State",
-        "douban_idatabase_lists",
-        "{{state}}",
+        [{"expr": "douban_idatabase_lists", "legendFormat": "{{state}}"}],
     )
 
     # Replace tag stat panels with graph panel
     generator.add_graph_panel(
         "Tags by State",
-        "douban_idatabase_tags",
-        "{{state}}",
+        [{"expr": "douban_idatabase_tags", "legendFormat": "{{state}}"}],
     )
 
     # Replace queue size stat panel with graph panel
     generator.add_graph_panel(
         "Queue Size by Type",
-        "douban_idatabase_queue_size",
-        "{{type}}",
+        [{"expr": "douban_idatabase_queue_size", "legendFormat": "{{type}}"}],
     )
 
     generator.add_stat_panel(
@@ -311,14 +312,26 @@ def generate_dashboard():
     generator.add_row("API Metrics")
     generator.add_graph_panel(
         "API Requests by Endpoint",
-        "rate(douban_idatabase_api_requests_total[5m])",
-        "{{endpoint}} - {{method}} - {{status}}",
+        [
+            {
+                "expr": "rate(douban_idatabase_api_requests_total[5m])",
+                "legendFormat": "{{endpoint}} - {{method}} - {{status}}",
+            }
+        ],
         y_axis_format="reqps",
     )
     generator.add_graph_panel(
-        "API Response Time (p95)",
-        "histogram_quantile(0.95, sum(rate(douban_idatabase_api_request_duration_seconds_bucket[5m])) by (le, endpoint, method))",  # noqa: B950
-        "{{endpoint}} - {{method}} (p95)",
+        "API Response Time (avg and p95)",
+        [
+            {
+                "expr": "histogram_quantile(0.95, sum(rate(douban_idatabase_api_request_duration_seconds_bucket[5m])) by (le, endpoint, method))",
+                "legendFormat": "{{endpoint}} - {{method}} (p95)",
+            },
+            {
+                "expr": "avg(rate(douban_idatabase_api_request_duration_seconds_sum[5m]) / rate(douban_idatabase_api_request_duration_seconds_count[5m])) by (endpoint, method)",
+                "legendFormat": "{{endpoint}} - {{method}} (avg)",
+            },
+        ],
         y_axis_format="s",
     )
 
@@ -326,14 +339,26 @@ def generate_dashboard():
     generator.add_row("Worker Metrics")
     generator.add_graph_panel(
         "Worker Processed Items",
-        "rate(douban_idatabase_worker_processed_items_total[5m])",
-        "{{type}} - {{status}}",
+        [
+            {
+                "expr": "rate(douban_idatabase_worker_processed_items_total[5m])",
+                "legendFormat": "{{type}} - {{status}}",
+            }
+        ],
         y_axis_format="recps",
     )
     generator.add_graph_panel(
-        "Worker Processing Time (p95)",
-        "histogram_quantile(0.95, sum(rate(douban_idatabase_worker_processing_duration_seconds_bucket[5m])) by (le, type))",  # noqa: B950
-        "{{type}} (p95)",
+        "Worker Processing Time (avg and p95)",
+        [
+            {
+                "expr": "histogram_quantile(0.95, sum(rate(douban_idatabase_worker_processing_duration_seconds_bucket[5m])) by (le, type))",
+                "legendFormat": "{{type}} (p95)",
+            },
+            {
+                "expr": "avg(rate(douban_idatabase_worker_processing_duration_seconds_sum[5m]) / rate(douban_idatabase_worker_processing_duration_seconds_count[5m])) by (type)",
+                "legendFormat": "{{type}} (avg)",
+            },
+        ],
         y_axis_format="s",
     )
 
@@ -341,13 +366,17 @@ def generate_dashboard():
     generator.add_row("Backup Metrics")
     generator.add_graph_panel(
         "Backup Operations",
-        "rate(douban_idatabase_backup_operations_total[1h])",
-        "{{status}}",
+        [
+            {
+                "expr": "rate(douban_idatabase_backup_operations_total[1h])",
+                "legendFormat": "{{status}}",
+            }
+        ],
         y_axis_label="operations/hour",
     )
     generator.add_stat_panel(
         "Backup Duration (p95)",
-        "histogram_quantile(0.95, sum(rate(douban_idatabase_backup_duration_seconds_bucket[24h])) by (le))",  # noqa: B950
+        "histogram_quantile(0.95, sum(rate(douban_idatabase_backup_duration_seconds_bucket[24h])) by (le))",
         unit="s",
         show_percentage=True,
         aggregation=None,  # No additional aggregation needed
@@ -363,8 +392,12 @@ def generate_dashboard():
     generator.add_row("Rate Limiting")
     generator.add_graph_panel(
         "Rate Limit Hits",
-        "rate(douban_idatabase_rate_limit_hits_total[5m])",
-        "{{host}}",
+        [
+            {
+                "expr": "rate(douban_idatabase_rate_limit_hits_total[5m])",
+                "legendFormat": "{{host}}",
+            }
+        ],
         width=24,
         y_axis_format="ops",
     )
@@ -373,14 +406,26 @@ def generate_dashboard():
     generator.add_row("HTTP Metrics")
     generator.add_graph_panel(
         "HTTP Requests by Host and Status",
-        "rate(douban_idatabase_http_requests_total[5m])",
-        "{{host}} - {{status_code}}",
+        [
+            {
+                "expr": "rate(douban_idatabase_http_requests_total[5m])",
+                "legendFormat": "{{host}} - {{status_code}}",
+            }
+        ],
         y_axis_format="reqps",
     )
     generator.add_graph_panel(
-        "HTTP Response Time by Host (p95)",
-        "histogram_quantile(0.95, sum(rate(douban_idatabase_http_request_duration_seconds_bucket[5m])) by (le, host))",  # noqa: B950
-        "{{host}} (p95)",
+        "HTTP Response Time by Host (avg and p95)",
+        [
+            {
+                "expr": "histogram_quantile(0.95, sum(rate(douban_idatabase_http_request_duration_seconds_bucket[5m])) by (le, host))",
+                "legendFormat": "{{host}} (p95)",
+            },
+            {
+                "expr": "avg(rate(douban_idatabase_http_request_duration_seconds_sum[5m]) / rate(douban_idatabase_http_request_duration_seconds_count[5m])) by (host)",
+                "legendFormat": "{{host}} (avg)",
+            },
+        ],
         y_axis_format="s",
     )
 
@@ -388,8 +433,12 @@ def generate_dashboard():
     generator.add_row("Exceptions")
     generator.add_graph_panel(
         "Exception Rate by Type and Module",
-        "rate(douban_idatabase_exceptions_total[5m])",
-        "{{type}} - {{module}}",
+        [
+            {
+                "expr": "rate(douban_idatabase_exceptions_total[5m])",
+                "legendFormat": "{{type}} - {{module}}",
+            }
+        ],
         width=24,
         y_axis_format="ops",
         y_axis_label="exceptions/sec",
@@ -421,8 +470,12 @@ def generate_dashboard():
     # User API Requests
     generator.add_graph_panel(
         "API Requests by User",
-        "sum(rate(douban_idatabase_user_requests_total[5m])) by (user_id)",
-        "User {{user_id}}",
+        [
+            {
+                "expr": "sum(rate(douban_idatabase_user_requests_total[5m])) by (user_id)",
+                "legendFormat": "User {{user_id}}",
+            }
+        ],
         height=8,
         width=12,
         y_axis_format="reqps",
@@ -431,21 +484,26 @@ def generate_dashboard():
     # Top Users by API Requests
     generator.add_graph_panel(
         "Top 5 Users by API Requests",
-        "topk(5, sum(rate(douban_idatabase_user_requests_total[5m])) by (user_id))",
-        "User {{user_id}}",
+        [
+            {
+                "expr": "topk(5, sum(rate(douban_idatabase_user_requests_total[5m])) by (user_id))",
+                "legendFormat": "User {{user_id}}",
+            }
+        ],
         height=8,
         width=12,
         y_axis_format="reqps",
     )
 
-    # Rate Limiting
-    generator.add_row("Rate Limiting")
-
     # Rate Limit Usage
     generator.add_graph_panel(
         "Rate Limit Current Usage by User",
-        "douban_idatabase_user_rate_limit_current",
-        "User {{user_id}}",
+        [
+            {
+                "expr": "douban_idatabase_user_rate_limit_current",
+                "legendFormat": "User {{user_id}}",
+            }
+        ],
         height=8,
         width=12,
     )
@@ -453,8 +511,12 @@ def generate_dashboard():
     # Rate Limit Hits
     generator.add_graph_panel(
         "Rate Limit Hits",
-        "rate(douban_idatabase_user_rate_limit_hits_total[5m])",
-        "User {{user_id}}",
+        [
+            {
+                "expr": "rate(douban_idatabase_user_rate_limit_hits_total[5m])",
+                "legendFormat": "User {{user_id}}",
+            }
+        ],
         height=8,
         width=12,
         y_axis_format="rpm",
