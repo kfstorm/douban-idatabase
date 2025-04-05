@@ -90,6 +90,19 @@ class Settings(BaseSettings):
         "DISABLE_SCHEDULER", False
     )  # Disable scheduler for testing purposes
 
+    # Anonymous API access settings
+    ALLOW_ANONYMOUS_API_ACCESS: bool = _parse_bool_env_var(
+        "ALLOW_ANONYMOUS_API_ACCESS", False
+    )
+
+    # Global rate limiting settings for anonymous users (IP-based)
+    ANONYMOUS_RATE_LIMIT: int = int(
+        os.getenv("ANONYMOUS_RATE_LIMIT", "1000")
+    )  # requests
+    ANONYMOUS_WINDOW_SIZE: int = int(
+        os.getenv("ANONYMOUS_WINDOW_SIZE", "3600")
+    )  # seconds (1 hour)
+
     class Config:
         env_file = ".env"
         env_file_encoding = "utf-8"

@@ -41,11 +41,23 @@ async def verify_api_key(
     api_key = api_key_header or api_key_query
 
     if not api_key:
-        # If no API key is provided, return 401 Unauthorized
+        # If anonymous access is allowed, use IP-based rate limiting
+        if settings.ALLOW_ANONYMOUS_API_ACCESS:
+            # Get client IP address
+            client_ip = request.client.host
+            anonymous_info = {
+                "user_id": client_ip,
+                "rate_limit": settings.ANONYMOUS_RATE_LIMIT,
+                "window_size": settings.ANONYMOUS_WINDOW_SIZE,
+                "admin": False,
+            }
+            request.state.user_info = anonymous_info
+            return anonymous_info
+        # If no API key is provided and anonymous access is not allowed,
+        # return 401 Unauthorized
         raise HTTPException(status_code=401, detail="API Key required")
-
-    # Check if API key exists in user table
-    if api_key:
+    else:
+        # Check if API key exists in user table
         user = models.get_user_by_api_key(db, api_key)
         if user and not user.disabled:
             user_info = {
@@ -56,8 +68,7 @@ async def verify_api_key(
             }
             request.state.user_info = user_info
             return user_info
-
-    raise HTTPException(status_code=403, detail="Invalid API Key")
+        raise HTTPException(status_code=403, detail="Invalid API Key")
 
 
 # API rate limiting - applied globally after authentication
