@@ -14,9 +14,15 @@
   },
   "content_scripts": [
     {
-      "matches": ["https://home.kfstorm.com/radarr/*", "*://*.radarr.video/*", "*://localhost:*/*"],
+      "matches": ["<all_urls>"],
       "js": ["content.js"],
       "css": ["styles.css"]
+    }
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": ["radarr-api-access.js"],
+      "matches": ["<all_urls>"]
     }
   ],
   "options_page": "options.html"

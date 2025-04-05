@@ -2,8 +2,6 @@
 function saveOptions() {
   const doubanIdatabaseApiBaseUrl = document.getElementById('doubanIdatabaseApiBaseUrl').value.trim();
   const doubanIdatabaseApiKey = document.getElementById('doubanIdatabaseApiKey').value.trim();
-  const radarrApiRoot = document.getElementById('radarrApiRoot').value.trim();
-  const radarrApiKey = document.getElementById('radarrApiKey').value.trim();
   const goodRatingThreshold = parseFloat(document.getElementById('goodRatingThreshold').value) || 8.0;
   const mediumRatingThreshold = parseFloat(document.getElementById('mediumRatingThreshold').value) || 7.0;
   const goodRatingColor = document.getElementById('goodRatingColor').value;
@@ -14,8 +12,6 @@ function saveOptions() {
   chrome.storage.sync.set({
     doubanIdatabaseApiBaseUrl: doubanIdatabaseApiBaseUrl || 'http://localhost:8000',
     doubanIdatabaseApiKey: doubanIdatabaseApiKey,
-    radarrApiRoot: radarrApiRoot,
-    radarrApiKey: radarrApiKey,
     goodRatingThreshold: goodRatingThreshold,
     mediumRatingThreshold: mediumRatingThreshold,
     goodRatingColor: goodRatingColor,
@@ -40,8 +36,6 @@ function restoreOptions() {
   chrome.storage.sync.get({
     doubanIdatabaseApiBaseUrl: 'http://localhost:8000',
     doubanIdatabaseApiKey: '',
-    radarrApiRoot: '',
-    radarrApiKey: '',
     goodRatingThreshold: 8.0,
     mediumRatingThreshold: 7.0,
     goodRatingColor: '#2e963d', // green
@@ -51,8 +45,6 @@ function restoreOptions() {
   }, function(items) {
     document.getElementById('doubanIdatabaseApiBaseUrl').value = items.doubanIdatabaseApiBaseUrl;
     document.getElementById('doubanIdatabaseApiKey').value = items.doubanIdatabaseApiKey;
-    document.getElementById('radarrApiRoot').value = items.radarrApiRoot;
-    document.getElementById('radarrApiKey').value = items.radarrApiKey;
     document.getElementById('goodRatingThreshold').value = items.goodRatingThreshold;
     document.getElementById('mediumRatingThreshold').value = items.mediumRatingThreshold;
     document.getElementById('goodRatingColor').value = items.goodRatingColor;

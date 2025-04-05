@@ -23,12 +23,65 @@ let movieCache = null;
 let lastMovieCacheTime = 0;
 const MOVIE_CACHE_TTL = 5 * 60 * 1000; // 5 minutes cache validity
 
+// Add flag to track if we're on a Radarr page
+let isRadarrPage = false;
+
+// Function to check if we're on a Radarr page
+function checkIfRadarrPage() {
+  // Check for Radarr meta tag in head
+  const metaTags = document.querySelectorAll('meta[name="description"]');
+  for (const tag of metaTags) {
+    if (tag.content === "Radarr") {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+// Function to inject a script into the page context to access window.Radarr
+function injectRadarrApiScript() {
+  // Only proceed if we think this is a Radarr page
+  if (!isRadarrPage) {
+    return;
+  }
+
+  // Use the extension's own script file instead of inline script
+  const script = document.createElement('script');
+  script.src = chrome.runtime.getURL('radarr-api-access.js');
+  (document.head || document.documentElement).appendChild(script);
+
+  // Clean up after the script has loaded
+  script.onload = function() {
+    script.remove();
+  };
+}
+
+// Listen for messages from the injected script
+window.addEventListener('message', function(event) {
+  // Make sure the message is from our page
+  if (event.source !== window) return;
+
+  if (event.data.type === 'RADARR_API_DATA') {
+    const apiInfo = event.data.payload;
+    if (apiInfo.apiRoot && apiInfo.apiKey) {
+      radarrApiRoot = apiInfo.apiRoot;
+      radarrApiKey = apiInfo.apiKey;
+      console.log('Successfully retrieved Radarr API details');
+
+      // Immediately check for movie items once we have the API details
+      checkForMovieItems(true);
+    } else if (isRadarrPage) {
+      // Only log the warning if we believe this is a Radarr page
+      console.warn('Radarr API details not found in page context');
+    }
+  }
+});
+
 // First, get the API settings from storage
 chrome.storage.sync.get([
   'doubanIdatabaseApiBaseUrl',
   'doubanIdatabaseApiKey',
-  'radarrApiRoot',
-  'radarrApiKey',
   'goodRatingThreshold',
   'mediumRatingThreshold',
   'goodRatingColor',
@@ -42,14 +95,6 @@ chrome.storage.sync.get([
 
   if (data.doubanIdatabaseApiKey) {
     doubanIdatabaseApiKey = data.doubanIdatabaseApiKey;
-  }
-
-  if (data.radarrApiRoot) {
-    radarrApiRoot = data.radarrApiRoot;
-  }
-
-  if (data.radarrApiKey) {
-    radarrApiKey = data.radarrApiKey;
   }
 
   // Set rating thresholds and colors if available
@@ -87,6 +132,17 @@ chrome.storage.sync.get([
 
 // Main function to process the Radarr page
 function processRadarrPage() {
+  // Only check if we're on a Radarr page once
+  isRadarrPage = checkIfRadarrPage();
+
+  // Only continue if we think this is a Radarr page
+  if (!isRadarrPage) {
+    return;
+  }
+
+  // Try to get Radarr API details from page context
+  injectRadarrApiScript();
+
   // Use MutationObserver to detect when new movie items are added to the page
   const observer = new MutationObserver(function(mutations) {
     mutations.forEach(function(mutation) {
@@ -173,6 +229,11 @@ function processUnprocessedElements() {
 
 // Function to check for movie items and extract IMDb IDs
 function checkForMovieItems(force = false) {
+  // Skip if not on a Radarr page
+  if (!isRadarrPage) {
+    return;
+  }
+
   // Check if enough time has passed since the last call or if forcing
   const currentTime = Date.now();
   if (!force && currentTime - lastCheckTime < 500) {
@@ -183,10 +244,14 @@ function checkForMovieItems(force = false) {
   // Update the last check time
   lastCheckTime = currentTime;
 
-  // Check if we have the necessary Radarr API settings
-  if (radarrApiRoot && radarrApiKey) {
-    fetchMoviesFromRadarrAPI();
+  // If we don't have API settings yet, try to get them
+  if (!radarrApiRoot || !radarrApiKey) {
+    injectRadarrApiScript();
+    return;
   }
+
+  // Otherwise fetch movies from Radarr API
+  fetchMoviesFromRadarrAPI();
 }
 
 // Function to fetch movies from Radarr API
@@ -199,7 +264,7 @@ function fetchMoviesFromRadarrAPI() {
     return;
   }
 
-  fetch(`${radarrApiRoot}/api/v3/movie?apikey=${radarrApiKey}`)
+  fetch(`${radarrApiRoot}/movie?apikey=${radarrApiKey}`)
     .then(response => {
       if (!response.ok) {
         throw new Error('Radarr API request failed');
