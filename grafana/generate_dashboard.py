@@ -335,6 +335,75 @@ def generate_dashboard():
         y_axis_format="s",
     )
 
+    # User Metrics
+    generator.add_row("User Metrics")
+
+    # User API Requests
+    generator.add_graph_panel(
+        "API Requests by User",
+        [
+            {
+                "expr": "sum(rate(douban_idatabase_user_requests_total[5m])) by (user_id)",
+                "legendFormat": "User {{user_id}}",
+            }
+        ],
+        height=8,
+        width=12,
+        y_axis_format="reqps",
+    )
+
+    # Top Users by API Requests
+    generator.add_graph_panel(
+        "Top 5 Users by API Requests",
+        [
+            {
+                "expr": "topk(5, sum(rate(douban_idatabase_user_requests_total[5m])) by (user_id))",
+                "legendFormat": "User {{user_id}}",
+            }
+        ],
+        height=8,
+        width=12,
+        y_axis_format="reqps",
+    )
+
+    # Rate Limit Usage
+    generator.add_graph_panel(
+        "Rate Limit Current Usage by User",
+        [
+            {
+                "expr": "douban_idatabase_user_rate_limit_current",
+                "legendFormat": "User {{user_id}}",
+            }
+        ],
+        height=8,
+        width=12,
+    )
+
+    # Rate Limit Hits
+    generator.add_graph_panel(
+        "Rate Limit Hits",
+        [
+            {
+                "expr": "rate(douban_idatabase_user_rate_limit_hits_total[5m])",
+                "legendFormat": "User {{user_id}}",
+            }
+        ],
+        height=8,
+        width=12,
+        y_axis_format="rpm",
+    )
+
+    # Rate Limit Heat Map
+    generator.add_stat_panel(
+        "Total Rate Limit Hits (1h)",
+        "sum(increase(douban_idatabase_user_rate_limit_hits_total[1h]))",
+        height=4,
+        width=8,
+        color_mode="value",
+        threshold_mode="absolute",
+        aggregation=None,
+    )
+
     # Worker Metrics
     generator.add_row("Worker Metrics")
     generator.add_graph_panel(
@@ -462,75 +531,6 @@ def generate_dashboard():
         threshold_mode="absolute",
         unit="short",
         aggregation=None,  # No additional aggregation needed - already using sum
-    )
-
-    # User Metrics
-    generator.add_row("User Metrics")
-
-    # User API Requests
-    generator.add_graph_panel(
-        "API Requests by User",
-        [
-            {
-                "expr": "sum(rate(douban_idatabase_user_requests_total[5m])) by (user_id)",
-                "legendFormat": "User {{user_id}}",
-            }
-        ],
-        height=8,
-        width=12,
-        y_axis_format="reqps",
-    )
-
-    # Top Users by API Requests
-    generator.add_graph_panel(
-        "Top 5 Users by API Requests",
-        [
-            {
-                "expr": "topk(5, sum(rate(douban_idatabase_user_requests_total[5m])) by (user_id))",
-                "legendFormat": "User {{user_id}}",
-            }
-        ],
-        height=8,
-        width=12,
-        y_axis_format="reqps",
-    )
-
-    # Rate Limit Usage
-    generator.add_graph_panel(
-        "Rate Limit Current Usage by User",
-        [
-            {
-                "expr": "douban_idatabase_user_rate_limit_current",
-                "legendFormat": "User {{user_id}}",
-            }
-        ],
-        height=8,
-        width=12,
-    )
-
-    # Rate Limit Hits
-    generator.add_graph_panel(
-        "Rate Limit Hits",
-        [
-            {
-                "expr": "rate(douban_idatabase_user_rate_limit_hits_total[5m])",
-                "legendFormat": "User {{user_id}}",
-            }
-        ],
-        height=8,
-        width=12,
-        y_axis_format="rpm",
-    )
-
-    # Rate Limit Heat Map
-    generator.add_stat_panel(
-        "Total Rate Limit Hits (1h)",
-        "sum(increase(douban_idatabase_user_rate_limit_hits_total[1h]))",
-        height=4,
-        width=8,
-        color_mode="value",
-        threshold_mode="absolute",
-        aggregation=None,
     )
 
     return generator.generate_dashboard()
