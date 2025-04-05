@@ -414,7 +414,7 @@ function displayDoubanRating(ratingValue, url, movieElement) {
   if (url) {
     ratingElement.href = url;
     ratingElement.target = '_blank'; // Open in new tab
-    ratingElement.title = 'Click to view on Douban';
+    ratingElement.title = '点击查看豆瓣详情';
   }
 
   // Ensure parent element has position relative for absolute positioning to work

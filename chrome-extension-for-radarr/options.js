@@ -21,7 +21,7 @@ function saveOptions() {
   }, function() {
     // Update status to let user know options were saved
     const status = document.getElementById('status');
-    status.textContent = 'Options saved!';
+    status.textContent = '设置已保存！';
     status.className = 'status success';
     status.style.display = 'block';
 

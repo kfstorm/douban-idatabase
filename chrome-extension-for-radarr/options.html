@@ -2,7 +2,7 @@
 <html>
 <head>
   <meta charset="UTF-8">
-  <title>Douban Ratings for Radarr - Options</title>
+  <title>Radarr 豆瓣评分 - 设置</title>
   <style>
     body {
       font-family: Arial, sans-serif;
@@ -66,70 +66,70 @@
   </style>
 </head>
 <body>
-  <h1>Douban Ratings for Radarr - Options</h1>
+  <h1>Radarr 豆瓣评分 - 设置</h1>
 
   <div class="form-group">
-    <label for="doubanIdatabaseApiBaseUrl">douban-idatabase API Base URL:</label>
+    <label for="doubanIdatabaseApiBaseUrl">豆瓣数据库 API 基础网址:</label>
     <input type="text" id="doubanIdatabaseApiBaseUrl" placeholder="http://localhost:8000">
-    <small>Enter the URL of your Douban IDatabase API server</small>
+    <small>输入您的豆瓣数据库 API 服务器地址</small>
   </div>
 
   <div class="form-group">
-    <label for="doubanIdatabaseApiKey">douban-idatabase API Key:</label>
-    <input type="text" id="doubanIdatabaseApiKey" placeholder="Your douban-idatabase API key">
-    <small>Enter your douban-idatabase API key (if required)</small>
+    <label for="doubanIdatabaseApiKey">豆瓣数据库 API 密钥:</label>
+    <input type="text" id="doubanIdatabaseApiKey" placeholder="您的豆瓣数据库 API 密钥">
+    <small>输入您的豆瓣数据库 API 密钥（如需要）</small>
   </div>
 
   <div class="rating-config">
-    <h2>Rating Display Settings</h2>
+    <h2>评分显示设置</h2>
 
     <div class="form-group">
-      <label for="goodRatingThreshold">Good Rating Threshold:</label>
+      <label for="goodRatingThreshold">好评阈值:</label>
       <input type="number" id="goodRatingThreshold" step="0.1" min="0" max="10" placeholder="8.0">
-      <small>Ratings above this value will be shown in green (default: 8.0)</small>
+      <small>高于此值的评分将显示为绿色（默认：8.0）</small>
     </div>
 
     <div class="form-group">
-      <label for="mediumRatingThreshold">Medium Rating Threshold:</label>
+      <label for="mediumRatingThreshold">中评阈值:</label>
       <input type="number" id="mediumRatingThreshold" step="0.1" min="0" max="10" placeholder="7.0">
-      <small>Ratings above this value but below good threshold will be shown in yellow (default: 7.0)</small>
+      <small>高于此值但低于好评阈值的评分将显示为黄色（默认：7.0）</small>
     </div>
 
     <div class="form-group">
       <div class="color-label-container">
-        <label for="goodRatingColor">Good Rating Color:</label>
-        <span class="color-preview" id="goodColorPreview">Good</span>
+        <label for="goodRatingColor">好评颜色:</label>
+        <span class="color-preview" id="goodColorPreview">好评</span>
       </div>
       <input type="color" id="goodRatingColor">
     </div>
 
     <div class="form-group">
       <div class="color-label-container">
-        <label for="mediumRatingColor">Medium Rating Color:</label>
-        <span class="color-preview" id="mediumColorPreview">Medium</span>
+        <label for="mediumRatingColor">中评颜色:</label>
+        <span class="color-preview" id="mediumColorPreview">中评</span>
       </div>
       <input type="color" id="mediumRatingColor">
     </div>
 
     <div class="form-group">
       <div class="color-label-container">
-        <label for="lowRatingColor">Low Rating Color:</label>
-        <span class="color-preview" id="lowColorPreview">Low</span>
+        <label for="lowRatingColor">低评颜色:</label>
+        <span class="color-preview" id="lowColorPreview">低评</span>
       </div>
       <input type="color" id="lowRatingColor">
     </div>
 
     <div class="form-group">
       <div class="color-label-container">
-        <label for="noRatingColor">No Rating Color:</label>
-        <span class="color-preview" id="noColorPreview">No Rating</span>
+        <label for="noRatingColor">无评分颜色:</label>
+        <span class="color-preview" id="noColorPreview">无评分</span>
       </div>
       <input type="color" id="noRatingColor">
-      <small>Color used for movies without a Douban rating</small>
+      <small>用于没有豆瓣评分的电影的颜色</small>
     </div>
   </div>
 
-  <button id="save">Save</button>
+  <button id="save">保存</button>
 
   <div id="status" class="status"></div>
 

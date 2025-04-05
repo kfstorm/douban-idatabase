@@ -15,10 +15,10 @@ document.addEventListener('DOMContentLoaded', function() {
     'noRatingColor'
   ], function(data) {
     const statusElement = document.createElement('p');
-    statusElement.textContent = `API URL: ${data.doubanIdatabaseApiBaseUrl || 'http://localhost:8000'}`;
+    statusElement.textContent = `API 网址: ${data.doubanIdatabaseApiBaseUrl || 'http://localhost:8000'}`;
 
     const apiKeyStatus = document.createElement('p');
-    apiKeyStatus.textContent = `douban-idatabase API Key: ${data.doubanIdatabaseApiKey ? 'Configured' : 'Not configured'}`;
+    apiKeyStatus.textContent = `豆瓣数据库 API 密钥: ${data.doubanIdatabaseApiKey ? '已配置' : '未配置'}`;
 
     document.body.insertBefore(statusElement, document.querySelector('.button'));
     document.body.insertBefore(apiKeyStatus, document.querySelector('.button'));
@@ -27,22 +27,22 @@ document.addEventListener('DOMContentLoaded', function() {
     const legendElement = document.createElement('div');
     legendElement.className = 'rating-legend';
     legendElement.innerHTML = `
-      <p><strong>Rating Color Legend:</strong></p>
+      <p><strong>评分颜色说明:</strong></p>
       <div class="legend-item">
         <span class="color-dot" style="background-color: ${data.goodRatingColor}"></span>
-        <span>Good (≥ ${data.goodRatingThreshold})</span>
+        <span>好评 (≥ ${data.goodRatingThreshold})</span>
       </div>
       <div class="legend-item">
         <span class="color-dot" style="background-color: ${data.mediumRatingColor}"></span>
-        <span>Medium (≥ ${data.mediumRatingThreshold})</span>
+        <span>中评 (≥ ${data.mediumRatingThreshold})</span>
       </div>
       <div class="legend-item">
         <span class="color-dot" style="background-color: ${data.lowRatingColor}"></span>
-        <span>Low (< ${data.mediumRatingThreshold})</span>
+        <span>低评 (< ${data.mediumRatingThreshold})</span>
       </div>
       <div class="legend-item">
         <span class="color-dot" style="background-color: ${data.noRatingColor}"></span>
-        <span>No Rating</span>
+        <span>暂无评分</span>
       </div>
     `;
     document.body.insertBefore(legendElement, document.querySelector('.button'));
@@ -71,19 +71,19 @@ function displayRadarrStatus(response) {
 
   if (response) {
     if (response.isRadarrPage) {
-      statusElement.innerHTML = '<p><strong>✅ This is a Radarr page</strong></p>';
+      statusElement.innerHTML = '<p><strong>✅ 这是 Radarr 页面</strong></p>';
       if (response.hasApiAccess) {
-        statusElement.innerHTML += '<p>✅ API access: Available</p>';
+        statusElement.innerHTML += '<p>✅ API 访问: 可用</p>';
       } else {
-        statusElement.innerHTML += '<p>❌ API access: Not available</p>';
+        statusElement.innerHTML += '<p>❌ API 访问: 不可用</p>';
       }
     } else {
-      statusElement.innerHTML = '<p><strong>❌ This is not a Radarr page</strong></p>';
-      statusElement.innerHTML += '<p>Douban ratings will only be displayed on Radarr pages.</p>';
+      statusElement.innerHTML = '<p><strong>❌ 这不是 Radarr 页面</strong></p>';
+      statusElement.innerHTML += '<p>豆瓣评分只会在 Radarr 页面上显示。</p>';
     }
   } else {
-    statusElement.innerHTML = '<p><strong>❓ Unable to determine if this is a Radarr page</strong></p>';
-    statusElement.innerHTML += '<p>Extension may not have access to this page.</p>';
+    statusElement.innerHTML = '<p><strong>❓ 无法确定这是否为 Radarr 页面</strong></p>';
+    statusElement.innerHTML += '<p>扩展程序可能无法访问此页面。</p>';
   }
 
   // Insert the status at the top of the popup

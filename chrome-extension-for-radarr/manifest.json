@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
-  "name": "Douban Ratings for Radarr",
+  "name": "Radarr 豆瓣评分",
   "version": "1.0",
-  "description": "Displays Douban ratings for movies in Radarr",
+  "description": "在 Radarr 中显示电影的豆瓣评分",
   "permissions": ["storage", "activeTab"],
   "host_permissions": ["<all_urls>"],
   "background": {
