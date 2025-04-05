@@ -45,6 +45,19 @@ class Queue(Base):
     __table_args__ = (Index("idx_queue_type", type),)
 
 
+class User(Base):
+    __tablename__ = "user"
+
+    user_id = Column(Integer, primary_key=True, autoincrement=True)
+    api_key = Column(String(64), unique=True, index=True, nullable=False)
+    comment = Column(String(256), nullable=True)
+    admin = Column(Boolean, nullable=False)
+    rate_limit = Column(Integer, nullable=False)
+    window_size = Column(Integer, nullable=False)
+    create_time = Column(Float, nullable=False)
+    disabled = Column(Boolean, nullable=False)
+
+
 class History(Base):
     __tablename__ = "history"
 
@@ -226,3 +239,17 @@ def add_to_queue(
         logger.info(f"Added {queue_type} item to queue: {item_id}")
         return True
     return False
+
+
+def get_user_by_api_key(db: Session, api_key: str):
+    """
+    Get a user by their API key
+
+    Args:
+        db: Database session
+        api_key: The API key to look up
+
+    Returns:
+        User object if found, None otherwise
+    """
+    return db.query(User).filter(User.api_key == api_key).first()

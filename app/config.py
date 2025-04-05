@@ -23,11 +23,14 @@ class Settings(BaseSettings):
     SQLALCHEMY_DATABASE_URL: str = os.getenv(
         "SQLALCHEMY_DATABASE_URL", "sqlite:///db.sqlite3"
     )
+
+    # Redis settings
+    # Format: redis://user:password@host:port/db
+    # Example: redis://localhost:6379/0
+    REDIS_URL: str = os.getenv("REDIS_URL", "")
+
     # ZenRows settings
     ZENROWS_API_KEY: str = os.getenv("ZENROWS_API_KEY", "")
-
-    # API Authentication
-    API_KEY: str = os.getenv("API_KEY", "")
 
     # Queue processing settings
     QUEUE_PROCESS_TIME_LIMIT_SECONDS: int = int(
@@ -82,6 +85,10 @@ class Settings(BaseSettings):
     DISCOVER_LISTS_BY_TAG_MIN_FAVORITES: int = int(
         os.getenv("DISCOVER_LISTS_BY_TAG_MIN_FAVORITES", "10")
     )
+
+    DISABLE_SCHEDULER: bool = _parse_bool_env_var(
+        "DISABLE_SCHEDULER", False
+    )  # Disable scheduler for testing purposes
 
     class Config:
         env_file = ".env"

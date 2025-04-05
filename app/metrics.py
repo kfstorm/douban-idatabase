@@ -50,6 +50,26 @@ api_request_duration = Histogram(
     buckets=DURATION_BUCKETS,
 )
 
+# User-specific API metrics
+user_requests_total = Counter(
+    "douban_idatabase_user_requests_total",
+    "Total number of API requests by user",
+    ["user_id", "endpoint"],  # Track by user_id and endpoint
+)
+
+# Rate limit metrics
+user_rate_limit_hits = Counter(
+    "douban_idatabase_user_rate_limit_hits_total",
+    "Total number of rate limit hits",
+    ["user_id"],  # Track which users are hitting limits
+)
+
+user_rate_limit_current = Gauge(
+    "douban_idatabase_user_rate_limit_current",
+    "Current rate limit usage",
+    ["user_id"],  # Track current usage by user
+)
+
 # Database metrics - refactored to use tags
 db_items = Gauge(
     "douban_idatabase_items", "Number of items in the database", ["type", "state"]
