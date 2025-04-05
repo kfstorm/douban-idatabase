@@ -196,72 +196,68 @@ def update_db_metrics(db: Session, force=False):
     db_path = settings.SQLALCHEMY_DATABASE_URL
 
     try:
-        # Use a single transaction for all metrics queries
-        with db.begin():
-            # Optimize item statistics query with indexed columns
-            # Use compiled query with hints for better performance
-            item_stats = (
-                db.query(
-                    func.coalesce(Item.type, "unknown").label("type"),
-                    func.sum(
-                        case((Item.update_time == None, 1), else_=0)  # noqa: E711
-                    ).label("placeholder_count"),
-                    func.sum(
-                        case((Item.update_time != None, 1), else_=0)  # noqa: E711
-                    ).label("fetched_count"),
-                )
-                .group_by(func.coalesce(Item.type, "unknown"))
-                .all()
-            )
-
-            for item_type, placeholder_count, fetched_count in item_stats:
-                db_items.labels(type=item_type, state="fetched").set(fetched_count)
-                db_items.labels(type=item_type, state="placeholder").set(
-                    placeholder_count
-                )
-
-            # Use optimized queries for list statistics
-            list_stats = db.query(
+        # Optimize item statistics query with indexed columns
+        # Use compiled query with hints for better performance
+        item_stats = (
+            db.query(
+                func.coalesce(Item.type, "unknown").label("type"),
                 func.sum(
-                    case((List.last_check_time == None, 1), else_=0)  # noqa: E711
+                    case((Item.update_time == None, 1), else_=0)  # noqa: E711
                 ).label("placeholder_count"),
                 func.sum(
-                    case((List.last_check_time != None, 1), else_=0)  # noqa: E711
+                    case((Item.update_time != None, 1), else_=0)  # noqa: E711
                 ).label("fetched_count"),
-            ).one()
-
-            db_lists.labels(state="fetched").set(list_stats.fetched_count)
-            db_lists.labels(state="placeholder").set(list_stats.placeholder_count)
-
-            # Use optimized query for tag statistics with indexed columns
-            tag_stats = db.query(
-                func.sum(case((Tag.fetch == True, 1), else_=0)).label(  # noqa: E712
-                    "valid_count"
-                ),
-                func.sum(case((Tag.fetch == False, 1), else_=0)).label(  # noqa: E712
-                    "not_valid_count"
-                ),
-                func.sum(
-                    case((Tag.last_check_time == None, 1), else_=0)  # noqa: E711
-                ).label("placeholder_count"),
-            ).one()
-
-            db_tags.labels(state="valid").set(tag_stats.valid_count)
-            db_tags.labels(state="not_valid").set(tag_stats.not_valid_count)
-            db_tags.labels(state="placeholder").set(tag_stats.placeholder_count)
-
-            # Use indexed query for queue statistics
-            queue_stats = (
-                db.query(Queue.type, func.count(Queue.type).label("count"))
-                .group_by(Queue.type)
-                .all()
             )
+            .group_by(func.coalesce(Item.type, "unknown"))
+            .all()
+        )
 
-            for queue_type, count in queue_stats:
-                db_queue_size.labels(type=queue_type).set(count)
+        for item_type, placeholder_count, fetched_count in item_stats:
+            db_items.labels(type=item_type, state="fetched").set(fetched_count)
+            db_items.labels(type=item_type, state="placeholder").set(placeholder_count)
 
-            # Fast count query for history using primary key index
-            db_history_total.set(db.query(func.count(History.change_id)).scalar() or 0)
+        # Use optimized queries for list statistics
+        list_stats = db.query(
+            func.sum(
+                case((List.last_check_time == None, 1), else_=0)  # noqa: E711
+            ).label("placeholder_count"),
+            func.sum(
+                case((List.last_check_time != None, 1), else_=0)  # noqa: E711
+            ).label("fetched_count"),
+        ).one()
+
+        db_lists.labels(state="fetched").set(list_stats.fetched_count)
+        db_lists.labels(state="placeholder").set(list_stats.placeholder_count)
+
+        # Use optimized query for tag statistics with indexed columns
+        tag_stats = db.query(
+            func.sum(case((Tag.fetch == True, 1), else_=0)).label(  # noqa: E712
+                "valid_count"
+            ),
+            func.sum(case((Tag.fetch == False, 1), else_=0)).label(  # noqa: E712
+                "not_valid_count"
+            ),
+            func.sum(
+                case((Tag.last_check_time == None, 1), else_=0)  # noqa: E711
+            ).label("placeholder_count"),
+        ).one()
+
+        db_tags.labels(state="valid").set(tag_stats.valid_count)
+        db_tags.labels(state="not_valid").set(tag_stats.not_valid_count)
+        db_tags.labels(state="placeholder").set(tag_stats.placeholder_count)
+
+        # Use indexed query for queue statistics
+        queue_stats = (
+            db.query(Queue.type, func.count(Queue.type).label("count"))
+            .group_by(Queue.type)
+            .all()
+        )
+
+        for queue_type, count in queue_stats:
+            db_queue_size.labels(type=queue_type).set(count)
+
+        # Fast count query for history using primary key index
+        db_history_total.set(db.query(func.count(History.change_id)).scalar() or 0)
 
         # Set database file size (SQLite specific)
         # - outside transaction as it doesn't need DB access
