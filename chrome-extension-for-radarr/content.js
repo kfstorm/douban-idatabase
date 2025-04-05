@@ -78,6 +78,19 @@ window.addEventListener('message', function(event) {
   }
 });
 
+// Add message listener to respond with Radarr page status
+chrome.runtime.onMessage.addListener(
+  function(request, sender, sendResponse) {
+    if (request.action === "getRadarrStatus") {
+      sendResponse({
+        isRadarrPage: isRadarrPage,
+        hasApiAccess: !!(radarrApiRoot && radarrApiKey)
+      });
+    }
+    return true; // Keep the message channel open for async response
+  }
+);
+
 // First, get the API settings from storage
 chrome.storage.sync.get([
   'doubanIdatabaseApiBaseUrl',

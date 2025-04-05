@@ -1,5 +1,8 @@
 // Simple popup functionality
 document.addEventListener('DOMContentLoaded', function() {
+  // Check if current page is a Radarr page
+  checkCurrentTab();
+
   // Get current status from storage
   chrome.storage.sync.get([
     'doubanIdatabaseApiBaseUrl',
@@ -45,3 +48,44 @@ document.addEventListener('DOMContentLoaded', function() {
     document.body.insertBefore(legendElement, document.querySelector('.button'));
   });
 });
+
+// Function to check if the current tab is a Radarr page
+function checkCurrentTab() {
+  chrome.tabs.query({active: true, currentWindow: true}, function(tabs) {
+    if (tabs[0]) {
+      chrome.tabs.sendMessage(
+        tabs[0].id,
+        {action: "getRadarrStatus"},
+        function(response) {
+          displayRadarrStatus(response);
+        }
+      );
+    }
+  });
+}
+
+// Function to display Radarr page status in the popup
+function displayRadarrStatus(response) {
+  const statusElement = document.createElement('div');
+  statusElement.className = 'radarr-status';
+
+  if (response) {
+    if (response.isRadarrPage) {
+      statusElement.innerHTML = '<p><strong>✅ This is a Radarr page</strong></p>';
+      if (response.hasApiAccess) {
+        statusElement.innerHTML += '<p>✅ API access: Available</p>';
+      } else {
+        statusElement.innerHTML += '<p>❌ API access: Not available</p>';
+      }
+    } else {
+      statusElement.innerHTML = '<p><strong>❌ This is not a Radarr page</strong></p>';
+      statusElement.innerHTML += '<p>Douban ratings will only be displayed on Radarr pages.</p>';
+    }
+  } else {
+    statusElement.innerHTML = '<p><strong>❓ Unable to determine if this is a Radarr page</strong></p>';
+    statusElement.innerHTML += '<p>Extension may not have access to this page.</p>';
+  }
+
+  // Insert the status at the top of the popup
+  document.body.insertBefore(statusElement, document.body.firstChild);
+}
