@@ -12,6 +12,7 @@ from prometheus_client import (
 )
 from sqlalchemy.orm import Session
 
+from app.config import settings
 from app.models import Item, Queue, History, List, Tag
 from app.utils import record_exception_metrics
 
@@ -164,7 +165,6 @@ exception_counts = Counter(
 # Metrics update caching
 _metrics_cache_lock = threading.Lock()
 _last_metrics_update = 0
-_metrics_min_update_interval = 60  # Update metrics at most every 60 seconds
 
 
 def update_db_metrics(db: Session, force=False):
@@ -181,7 +181,8 @@ def update_db_metrics(db: Session, force=False):
     with _metrics_cache_lock:
         if (
             not force
-            and (current_time - _last_metrics_update) < _metrics_min_update_interval
+            and (current_time - _last_metrics_update)
+            < settings.DB_METRICS_MIN_UPDATE_INTERVAL_SECONDS
         ):
             logger.debug("Skipping metrics update, last update was too recent")
             return
@@ -189,7 +190,6 @@ def update_db_metrics(db: Session, force=False):
         # Update the timestamp before running queries to prevent concurrent updates
         _last_metrics_update = current_time
 
-    from app.config import settings
     from sqlalchemy import func, case
     from sqlalchemy.exc import SQLAlchemyError, TimeoutError
 

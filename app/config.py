@@ -103,6 +103,11 @@ class Settings(BaseSettings):
         os.getenv("ANONYMOUS_WINDOW_SIZE", "3600")
     )  # seconds (1 hour)
 
+    # Metrics settings
+    DB_METRICS_MIN_UPDATE_INTERVAL_SECONDS: int = int(
+        os.getenv("DB_METRICS_MIN_UPDATE_INTERVAL_SECONDS", "600")
+    )
+
     class Config:
         env_file = ".env"
         env_file_encoding = "utf-8"
