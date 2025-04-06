@@ -161,8 +161,7 @@ def get_items(
     return items
 
 
-# temporarily disabled
-# @app.get("/metrics")
+@app.get("/metrics")
 def metrics_endpoint(
     db: Session = Depends(get_db), current_user: dict = Depends(verify_api_key)
 ):
