@@ -47,8 +47,12 @@ class Settings(BaseSettings):
 
     RATE_LIMIT_USE_ZENROWS: bool = _parse_bool_env_var("RATE_LIMIT_USE_ZENROWS", False)
 
-    ITEM_REFRESH_INTERVAL_DAYS_DEFAULT: int = int(
-        os.getenv("ITEM_REFRESH_INTERVAL_MINUTES", "30")
+    ITEM_REFRESH_INTERVAL_DEFAULT_DAYS: int = int(
+        os.getenv("ITEM_REFRESH_INTERVAL_DEFAULT_DAYS", "30")
+    )
+
+    ITEM_REFRESH_INTERVAL_MAX_DAYS: int = int(
+        os.getenv("ITEM_REFRESH_INTERVAL_MAX_DAYS", "365")
     )
 
     LIST_REFRESH_MIN_INTERVAL_DAYS: int = int(

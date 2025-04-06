@@ -544,6 +544,104 @@ def migrate_add_metrics_indices():
             return False
 
 
+def migrate_item_add_next_update_time():
+    """Add next_update_time column to item table and calculate initial values"""
+    logger.info("Checking if item table needs next_update_time column...")
+
+    inspector = inspect(engine)
+
+    # Check if item table exists
+    if "item" not in inspector.get_table_names():
+        logger.info("item table doesn't exist, skipping migration.")
+        return False
+
+    # Check if next_update_time column already exists
+    columns = {col["name"]: col for col in inspector.get_columns("item")}
+    if "next_update_time" in columns:
+        logger.info("next_update_time column already exists in item table.")
+        return False
+
+    # Import the calculation function from common
+    from app.queue_processor.common import fill_next_update_time
+    from app.models import Item
+
+    with SessionLocal() as session:
+        try:
+            # Add the next_update_time column with float type
+            logger.info("Adding next_update_time column to item table...")
+            session.execute(text("ALTER TABLE item ADD COLUMN next_update_time FLOAT"))
+
+            # Create an index for faster queries on next_update_time
+            logger.info("Creating index for next_update_time column...")
+            session.execute(
+                text("CREATE INDEX idx_item_next_update_time ON item(next_update_time)")
+            )
+
+            session.commit()
+            logger.info(
+                "Successfully added next_update_time column with index to item table"
+            )
+
+            # Update existing records by calculating next_update_time
+            logger.info("Calculating next_update_time values for existing records...")
+
+            # Process items in batches to avoid OOM
+            batch_size = 1000
+            offset = 0
+            updated_count = 0
+            total_items = 0
+
+            while True:
+                # Get one batch
+                batch = (
+                    session.query(Item)
+                    .filter(Item.update_time != None)  # noqa: E711
+                    .order_by(Item.douban_id)  # Ensure consistent order for pagination
+                    .limit(batch_size)
+                    .offset(offset)
+                    .all()
+                )
+
+                if not batch:
+                    break
+
+                # Process this batch
+                for item in batch:
+                    total_items += 1
+                    try:
+                        # Use the renamed function directly on the item
+                        fill_next_update_time(item)
+
+                        # The item is already updated in-memory, just persist it
+                        session.add(item)
+                        updated_count += 1
+
+                    except Exception as e:
+                        logger.warning(
+                            f"Error processing item {item.douban_id}: {str(e)}"
+                        )
+
+                # Commit after each batch
+                session.commit()
+                logger.info(f"Processed {total_items} items so far")
+
+                # Move to next batch
+                offset += batch_size
+
+            logger.info(
+                f"Successfully updated next_update_time for {updated_count} items"
+            )
+
+            return True
+        except Exception as e:
+            record_exception_metrics(e)
+            session.rollback()
+            logger.error(
+                f"Error during item table next_update_time column migration: {str(e)}"
+            )
+            raise
+
+
 def init_db():
     """Initialize the database, creating tables and migrating if needed"""
     # Create tables if they don't exist
@@ -561,3 +659,4 @@ def init_db():
     migrate_item_add_type_column()
     migrate_history_add_type_column()
     migrate_add_metrics_indices()
+    migrate_item_add_next_update_time()  # Add this new migration

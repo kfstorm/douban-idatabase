@@ -1,5 +1,6 @@
 import json
 import logging
+from datetime import datetime
 from sqlalchemy.orm import Session
 
 from app.config import settings
@@ -9,15 +10,55 @@ from app.utils import now_timestamp
 logger = logging.getLogger(__name__)
 
 
-def allow_update_item(existing_item: Item) -> bool:
-    if existing_item and existing_item.update_time:
-        current_time = now_timestamp()
-        min_update_interval_seconds = (
-            settings.ITEM_REFRESH_INTERVAL_DAYS_DEFAULT
-            * 86400
-            * (((int)(existing_item.douban_id) % 10000) / 10000 + 0.5)
+def fill_next_update_time(item: Item) -> None:
+    """
+    Calculate and set the next_update_time property on the item based on its properties.
+
+    Args:
+        item: The Item object to be updated
+    """
+    if not item.update_time:
+        item.next_update_time = None
+        return
+
+    # Calculate the next update time based on the year and update time.
+    # The closer the year is to the current year,
+    # the more frequently it will be updated.
+    year = item.year
+    if year:
+        now_year = datetime.now().year
+        diff_year = abs(year - now_year)
+        interval_seconds = (
+            settings.ITEM_REFRESH_INTERVAL_DEFAULT_DAYS * 86400 * (diff_year + 1)
         )
-        if current_time - existing_item.update_time < min_update_interval_seconds:
+    else:
+        # If year is not available, use the average interval of two setting values.
+        interval_seconds = (
+            (
+                settings.ITEM_REFRESH_INTERVAL_DEFAULT_DAYS
+                + settings.ITEM_REFRESH_INTERVAL_MAX_DAYS
+            )
+            / 2
+            * 86400
+        )
+    # The bias is a random value between 1 and 1.2
+    bias = ((int)(item.douban_id) % 10000) / 10000 * 0.2 + 1
+    interval_seconds *= bias
+    interval_seconds = max(
+        interval_seconds, settings.ITEM_REFRESH_INTERVAL_DEFAULT_DAYS * 86400
+    )
+    interval_seconds = min(
+        interval_seconds,
+        settings.ITEM_REFRESH_INTERVAL_MAX_DAYS * 86400,
+    )
+
+    item.next_update_time = item.update_time + interval_seconds
+
+
+def allow_update_item(existing_item: Item) -> bool:
+    if existing_item and existing_item.next_update_time:
+        current_time = now_timestamp()
+        if current_time < existing_item.next_update_time:
             return False
     return True
 
@@ -81,6 +122,9 @@ def save_item_to_db(db: Session, item: Item):
     Now accepts an Item object directly instead of raw data
     """
 
+    # Calculate next_update_time
+    fill_next_update_time(item)
+
     # Also add an entry to history
     history = History(
         douban_id=item.douban_id,
@@ -103,6 +147,7 @@ def save_item_to_db(db: Session, item: Item):
         existing_item.year = item.year
         existing_item.rating = item.rating
         existing_item.update_time = item.update_time
+        existing_item.next_update_time = item.next_update_time
         existing_item.imdb_id = item.imdb_id
         existing_item.type = item.type
         existing_item.raw_data = item.raw_data

@@ -1,7 +1,7 @@
 import logging
 import requests
 from sqlalchemy.orm import Session, selectinload
-from sqlalchemy import and_
+from sqlalchemy import and_, or_
 
 from app.config import settings
 from app.models import Item, List, Queue, Tag, add_to_queue
@@ -47,7 +47,10 @@ class RefreshTask(BaseTask):
         """
         logger.info("Starting refresh from item table...")
 
+        current_time = now_timestamp()
+
         # Base query for items not already in the queue
+        # and whose next_update_time has passed or is NULL
         items_base_query = (
             db.query(Item)
             .options(selectinload("*"))
@@ -55,6 +58,12 @@ class RefreshTask(BaseTask):
                 Queue, and_(Queue.type == "douban_id", Queue.id == Item.douban_id)
             )
             .filter(Queue.id == None)  # noqa: E711
+            .filter(
+                or_(
+                    Item.next_update_time <= current_time,
+                    Item.next_update_time == None,  # noqa: E711
+                )
+            )
         )
 
         # Process item callback

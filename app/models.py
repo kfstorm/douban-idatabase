@@ -28,6 +28,9 @@ class Item(Base):
     type = Column(String(16), nullable=True, index=True)  # 'movie' or 'tv'
     raw_data = Column(Text, nullable=True)
     update_time = Column(Float, nullable=True, index=True)
+    next_update_time = Column(
+        Float, nullable=True, index=True
+    )  # When the item can be updated next
 
     # Add composite index for faster metrics queries
     __table_args__ = (Index("idx_item_type_update_time", type, update_time),)
