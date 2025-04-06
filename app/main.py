@@ -37,16 +37,6 @@ async def verify_api_key(
     api_key_query: Optional[str] = Security(api_key_query),
     db: Session = Depends(get_db),
 ):
-    from app.database import engine
-
-    pool = engine.pool
-    logger.info(
-        f"Pool size: {pool.size()}"
-        f", checked in: {pool.checkedin()}"
-        f", checked out: {pool.checkedout()}"
-        f", overflow: {pool.overflow()}"
-    )
-
     # Get API key from header or query
     api_key = api_key_header or api_key_query
 
