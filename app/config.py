@@ -112,6 +112,8 @@ class Settings(BaseSettings):
         os.getenv("DB_METRICS_MIN_UPDATE_INTERVAL_SECONDS", "600")
     )
 
+    DOUBAN_COOKIE_DBCL2: str = os.getenv("DOUBAN_COOKIE_DBCL2", "")
+
     class Config:
         env_file = ".env"
         env_file_encoding = "utf-8"

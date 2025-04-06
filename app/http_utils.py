@@ -98,7 +98,12 @@ throttler = Throttler()
 
 
 def _get_extra_http_client_args():
-    return {}
+    args = {}
+    if settings.DOUBAN_COOKIE_DBCL2:
+        args["cookies"] = {
+            "dbcl2": settings.DOUBAN_COOKIE_DBCL2,
+        }
+    return args
 
 
 def get_response_via_zenrows(http_session: requests.Session, url: str, **kwargs):
