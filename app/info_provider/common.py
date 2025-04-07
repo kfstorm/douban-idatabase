@@ -125,12 +125,18 @@ def extract_douban_item_detail(item: dict, source: str) -> dict:
         except (ValueError, TypeError):
             pass
 
+    if "in_blacklist" in item:
+        in_blacklist = bool(item["in_blacklist"])
+    else:
+        in_blacklist = False if year or rating else None
+
     return {
         "douban_id": douban_id,
         "douban_title": title,
         "year": year,
         "rating": rating,
         "type": item_type,
+        "in_blacklist": in_blacklist,
         "raw_data": {
             "detail": item,
             "detail_source": source,

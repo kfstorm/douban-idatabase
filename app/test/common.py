@@ -4,14 +4,27 @@ from requests.adapters import HTTPAdapter
 
 def check_detail(detail: dict):
     assert isinstance(detail, dict)
+    assert "in_blacklist" in detail
+    assert isinstance(detail["in_blacklist"], bool)
+    in_blacklist = detail["in_blacklist"]
+
     assert "douban_id" in detail
     assert "douban_title" in detail
+
     assert "year" in detail
-    assert isinstance(detail["year"], int)
-    assert 0 < detail["year"] <= 2099
+    if in_blacklist:
+        assert detail["year"] is None
+    else:
+        assert isinstance(detail["year"], int)
+        assert 0 < detail["year"] <= 2099
     assert "rating" in detail
-    assert isinstance(detail["rating"], float)
-    assert 0 <= detail["rating"] <= 10
+
+    if in_blacklist:
+        assert detail["rating"] is None
+    else:
+        assert isinstance(detail["rating"], float)
+        assert 0 <= detail["rating"] <= 10
+
     assert "type" in detail
     assert detail["type"] in ["movie", "tv"]
     assert "raw_data" in detail

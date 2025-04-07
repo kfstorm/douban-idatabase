@@ -79,9 +79,18 @@ def _fetch_douban_item(http_session: requests.Session, douban_id: str) -> Item:
     detail_info = fetch_douban_item_detail(http_session, douban_id)
     if not detail_info:
         return None
-    imdb_info = fetch_imdb_id(http_session, douban_id)
-    if not imdb_info:
-        return None
+    if detail_info["in_blacklist"]:
+        imdb_info = {
+            "imdb_id": None,
+            "raw_data": {
+                "imdb_id": None,
+                "imdb_source": "in_blacklist",
+            },
+        }
+    else:
+        imdb_info = fetch_imdb_id(http_session, douban_id)
+        if not imdb_info:
+            return None
     logger.info(
         "Successfully fetched data"
         f" for douban_id={douban_id}: {detail_info['douban_title']}"

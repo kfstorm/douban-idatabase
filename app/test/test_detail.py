@@ -47,6 +47,7 @@ def test_extract_from_doulist_movie():
         "year": 2006,
         "rating": 6.7,
         "type": "movie",
+        "in_blacklist": False,
     }
     _test_extract_base(json_text, source, expected_result)
 
@@ -80,6 +81,7 @@ def test_extract_from_doulist_tv():
         "year": 2013,
         "rating": 6.7,
         "type": "tv",
+        "in_blacklist": False,
     }
     _test_extract_base(json_text, source, expected_result)
 
@@ -226,6 +228,7 @@ def test_extract_from_type_rank_movie():
         "year": 1994,
         "rating": 9.7,
         "type": "movie",
+        "in_blacklist": False,
     }
     _test_extract_base(json_text, source, expected_result)
 
@@ -299,6 +302,50 @@ def test_extract_from_subject_collection():
         "year": 2012,
         "rating": 7.4,
         "type": "movie",
+        "in_blacklist": False,
+    }
+    _test_extract_base(json_text, source, expected_result)
+
+
+def test_extract_from_rexxar_movie(http_session):
+    """Test extracting item details from a rexxar API response."""
+    source = "https://m.douban.com/rexxar/api/v2/movie/2158666"
+    json_text = """
+    {
+        "rating": {
+            "count": 0,
+            "max": 10,
+            "star_count": 0.0,
+            "value": 0
+        },
+        "controversy_reason": "",
+        "title": "未知电影",
+        "url": "https://movie.douban.com/subject/2158666/",
+        "pic": {
+            "large": "https://qnmob3.doubanio.com/f/frodo/753fa1e93c945e533e52dddab73b2b55a1083083/pics/subject/movie_large.jpg?imageView2/2/q/80/w/600/h/3000/format/jpg",
+            "normal": "https://qnmob3.doubanio.com/f/frodo/18c01f9a4a16495b333f27b94c1b8ef0bfbd47e0/pics/subject/movie_normal.png?imageView2/2/q/80/w/200/h/300/format/jpg"
+        },
+        "is_released": false,
+        "uri": "douban://douban.com/movie/2158666",
+        "cover_url": "https://img2.doubanio.com/f/frodo/753fa1e93c945e533e52dddab73b2b55a1083083/pics/subject/movie_large.jpg",
+        "subtype": "",
+        "is_show": false,
+        "in_blacklist": true,
+        "card_subtitle": "",
+        "color_scheme": null,
+        "type": "movie",
+        "id": "2158666",
+        "null_rating_reason": "",
+        "sharing_url": ""
+        }
+    """  # noqa: B950
+    expected_result = {
+        "douban_id": "2158666",
+        "douban_title": "未知电影",
+        "year": None,
+        "rating": None,
+        "type": "movie",
+        "in_blacklist": True,
     }
     _test_extract_base(json_text, source, expected_result)
 
@@ -315,6 +362,28 @@ def test_fetch_douban_item_detail(http_session):
         "year": 1994,
         "rating": 9.7,
         "type": "movie",
+        "in_blacklist": False,
+    }
+    expected_result["raw_data"] = {
+        "detail": detail_info["raw_data"]["detail"],
+        "detail_source": DOUBAN_REXXAR_API_URL.format(douban_id),
+    }
+    assert expected_result == detail_info
+
+
+def test_fetch_douban_item_detail_in_blacklist(http_session):
+    """Test fetching item details from Douban API."""
+    # Test with a movie in blacklist
+    douban_id = "2158666"
+    detail_info = fetch_douban_item_detail(http_session, douban_id)
+    check_detail(detail_info)
+    expected_result = {
+        "douban_id": "2158666",
+        "douban_title": "未知电影",
+        "year": None,
+        "rating": None,
+        "type": "movie",
+        "in_blacklist": True,
     }
     expected_result["raw_data"] = {
         "detail": detail_info["raw_data"]["detail"],
