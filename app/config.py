@@ -1,3 +1,4 @@
+import json
 import os
 from pydantic_settings import BaseSettings
 from dotenv import load_dotenv
@@ -117,6 +118,15 @@ class Settings(BaseSettings):
     DISABLE_IMDB_DESKTOP_HTML_FETCH: bool = _parse_bool_env_var(
         "DISABLE_IMDB_DESKTOP_HTML_FETCH", True
     )
+
+    # Configuration for rate limit fallbacks
+    # Comma-separated list of fallback strategies: "ZENROWS,PROXY" or "PROXY,ZENROWS"
+    RATE_LIMIT_FALLBACK_STRATEGIES: str = os.getenv(
+        "RATE_LIMIT_FALLBACK_STRATEGIES", "ZENROWS,PROXY"
+    )
+
+    # Proxy settings (for PROXY fallback strategy)
+    REQUESTS_PROXIES: dict = json.loads(os.getenv("REQUESTS_PROXIES", "null"))
 
     class Config:
         env_file = ".env"
