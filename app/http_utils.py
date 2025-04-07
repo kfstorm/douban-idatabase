@@ -206,6 +206,8 @@ def can_use_fallback(strategy: FallbackStrategy, host: str):
 
 
 def get_response(url: str, fallback_strategy=None, **kwargs):
+    host = urlparse(url).netloc
+
     if not fallback_strategy:
         headers = {
             "User-Agent": (
@@ -220,12 +222,10 @@ def get_response(url: str, fallback_strategy=None, **kwargs):
             headers.update(kwargs.pop("headers"))
         kwargs["headers"] = headers
 
-    if settings.DOUBAN_COOKIE_DBCL2:
+    if settings.DOUBAN_COOKIE_DBCL2 and host.endswith(".douban.com"):
         kwargs["cookies"] = kwargs.get("cookies", {})
         kwargs["cookies"]["dbcl2"] = settings.DOUBAN_COOKIE_DBCL2
 
-    # Get the host for metrics
-    host = urlparse(url).netloc
     start_time = time.time()
 
     # Check if this host is already known to be rate limited
