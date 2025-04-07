@@ -239,7 +239,10 @@ def _extract_search_results_from_html(soup: BeautifulSoup) -> List[dict]:
     results = []
 
     # Check for CAPTCHA
-    if "Our systems have detected unusual traffic" in soup.text:
+    if (
+        "Our systems have detected unusual traffic" in soup.text
+        or "If you're having trouble accessing Google Search" in soup.text
+    ):
         logger.warning("Google CAPTCHA detected, cannot extract results")
         return results
 
