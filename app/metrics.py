@@ -2,7 +2,14 @@ import logging
 import os
 import time
 import threading
-from prometheus_client import Counter, Gauge, Histogram, generate_latest, REGISTRY
+from prometheus_client import (
+    Counter,
+    Gauge,
+    Histogram,
+    CollectorRegistry,
+    generate_latest,
+    multiprocess,
+)
 from sqlalchemy.orm import Session
 
 from app.config import settings
@@ -10,6 +17,20 @@ from app.models import Item, Queue, History, List, Tag
 from app.utils import record_exception_metrics
 
 logger = logging.getLogger(__name__)
+
+# Get multiprocess metrics directory from environment
+prometheus_multiproc_dir = os.environ.get("PROMETHEUS_MULTIPROC_DIR")
+
+if not prometheus_multiproc_dir:
+    logger.warning(
+        "PROMETHEUS_MULTIPROC_DIR environment variable not set. "
+        "Metrics may not be shared correctly between processes."
+    )
+
+# Use the multiprocess registry provided by Prometheus
+registry = CollectorRegistry()
+if prometheus_multiproc_dir:
+    multiprocess.MultiProcessCollector(registry)
 
 # Define exponential buckets for duration histograms
 # Start at 0.001s (1ms), multiply by 2 each time, generate 20 buckets
@@ -258,4 +279,4 @@ def update_db_metrics(db: Session, force=False):
 
 def get_metrics():
     """Generate latest metrics in Prometheus format"""
-    return generate_latest(REGISTRY)
+    return generate_latest(registry)
