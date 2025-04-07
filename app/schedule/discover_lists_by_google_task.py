@@ -1,4 +1,5 @@
 import logging
+from typing import Iterable, Optional
 from urllib.parse import urlparse
 import requests
 from sqlalchemy.orm import Session
@@ -16,6 +17,29 @@ logger = logging.getLogger(__name__)
 SEARCH_QUERY = "site:douban.com/doulist"
 
 
+def extract_doulist_id_from_search_result(result: dict) -> Optional[str]:
+    """Extract Doulist ID from a Google search result item.
+
+    Args:
+        result: A dictionary representing a single search result item
+
+    Returns:
+        The extracted Doulist ID or None if not found
+    """
+    url = result.get("link")
+    if not url:
+        return None
+    parsed_url = urlparse(url)
+    if not parsed_url.path.startswith("/doulist/"):
+        return None
+
+    id_part = parsed_url.path.split("/")[2]
+    if not id_part:
+        return None
+
+    return id_part
+
+
 @register_task
 class DiscoverListsByGoogleTask(BaseTask):
     """Task to discover lists by searching Google"""
@@ -28,32 +52,23 @@ class DiscoverListsByGoogleTask(BaseTask):
     def default_interval(self) -> int:
         return 86400  # 1 day
 
+    def search(self, http_session: requests.Session) -> Iterable[str]:
+        """
+        Search for doulists on Douban using Google.
+        """
+        yield from (
+            google_search(
+                http_session,
+                SEARCH_QUERY,
+                max_results=settings.DISCOVER_LISTS_BY_GOOGLE_MAX_RESULTS,
+                extractor=extract_doulist_id_from_search_result,
+            )
+        )
+
     def execute(self, db: Session, http_session: requests.Session) -> None:
         """Add lists by searching Google."""
-        list_ids = set()  # Use a set to avoid duplicates
-
-        for result in google_search(
-            http_session,
-            SEARCH_QUERY,
-            max_results=settings.DISCOVER_LISTS_BY_GOOGLE_MAX_RESULTS,
-        ):
-            # Extract links and find doulist IDs
-            url = result.get("link")
-            if not url:
-                continue
-            parsed_url = urlparse(url)
-            if not parsed_url.path.startswith("/doulist/"):
-                continue
-            list_id = parsed_url.path.split("/")[2]
-            if not list_id:
-                continue
-            list_ids.add(list_id)
-
-        logger.info(f"Found {len(list_ids)} doulist list IDs")
-
         added_count = 0
-
-        for list_id in list_ids:
+        for list_id in self.search(http_session):
             try:
                 if add_placeholder_list(db, "doulist", list_id):
                     added_count += 1

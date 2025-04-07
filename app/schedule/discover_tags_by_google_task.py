@@ -1,4 +1,5 @@
 import logging
+from typing import Iterable, Optional
 from urllib.parse import unquote, urlparse
 import requests
 from sqlalchemy.orm import Session
@@ -16,6 +17,29 @@ logger = logging.getLogger(__name__)
 SEARCH_QUERY = "site:douban.com/tag inurl:doulist"
 
 
+def extract_douban_tag_name_from_search_result(result: dict) -> Optional[str]:
+    """Extract Douban tag from a Google search result item.
+
+    Args:
+        result: A dictionary representing a single search result item
+
+    Returns:
+        The extracted Douban tag or None if not found
+    """
+    url = result.get("link")
+    if not url:
+        return None
+    parsed_url = urlparse(url)
+    if not parsed_url.path.startswith("/tag/"):
+        return None
+
+    tag_name = unquote(parsed_url.path.split("/")[2])
+    if not tag_name:
+        return None
+
+    return tag_name
+
+
 @register_task
 class DiscoverTagsByGoogleTask(BaseTask):
     """Task to discover tags by searching Google"""
@@ -28,32 +52,23 @@ class DiscoverTagsByGoogleTask(BaseTask):
     def default_interval(self) -> int:
         return 86400  # 1 day
 
+    def search(self, http_session: requests.Session) -> Iterable[str]:
+        """
+        Search for tags on Douban using Google.
+        """
+        yield from (
+            google_search(
+                http_session,
+                SEARCH_QUERY,
+                extractor=extract_douban_tag_name_from_search_result,
+                max_results=settings.DISCOVER_LISTS_BY_GOOGLE_MAX_RESULTS,
+            )
+        )
+
     def execute(self, db: Session, http_session: requests.Session) -> None:
         """Add tags by searching Google."""
-        tag_names = set()  # Use a set to avoid duplicates
-
-        for result in google_search(
-            http_session,
-            SEARCH_QUERY,
-            max_results=settings.DISCOVER_LISTS_BY_GOOGLE_MAX_RESULTS,
-        ):
-            # Extract links and find tags
-            url = result.get("link")
-            if not url:
-                continue
-            parsed_url = urlparse(url)
-            if not parsed_url.path.startswith("/tag/"):
-                continue
-            tag_name = unquote(parsed_url.path.split("/")[2])
-            if not tag_name:
-                continue
-            tag_names.add(tag_name)
-
-        logger.info(f"Found {len(tag_names)} tags")
-
         added_count = 0
-
-        for tag_name in tag_names:
+        for tag_name in self.search(http_session):
             try:
                 if add_placeholder_tag(db, tag_name):
                     added_count += 1

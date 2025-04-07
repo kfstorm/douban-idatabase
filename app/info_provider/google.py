@@ -1,8 +1,9 @@
 import logging
+from typing import Any, Callable, Iterable
 import requests
+from urllib.parse import urlencode
 
 from app.utils import record_exception_metrics
-from urllib.parse import urlencode
 from app.config import settings
 from app.http_utils import get_json
 
@@ -16,8 +17,12 @@ ZENROWS_API_URL = "https://serp.api.zenrows.com/v1/targets/google/search"
 
 
 def google_search(
-    http_session: requests.Session, query: str, max_results: int = 100, **kwargs
-):
+    http_session: requests.Session,
+    query: str,
+    extractor: Callable[[dict], Any] = None,
+    max_results: int = 100,
+    **kwargs,
+) -> Iterable[Any]:
     """
     Search Google.
     Continues to next page as long as there are more results.
@@ -74,7 +79,10 @@ def google_search(
                 break
 
             for result in organic_results:
-                yield result
+                if extractor:
+                    yield extractor(result)
+                else:
+                    yield result
                 count += 1
                 if count >= max_results:
                     has_more_results = False

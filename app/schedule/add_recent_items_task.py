@@ -1,4 +1,5 @@
 import logging
+from typing import Iterable, Optional
 from urllib.parse import urlparse
 import requests
 from sqlalchemy.orm import Session
@@ -28,6 +29,29 @@ SEARCH_QUERY = (
 )
 
 
+def extract_douban_id_from_search_result(result: dict) -> Optional[str]:
+    """Extract Douban ID from a Google search result item.
+
+    Args:
+        result: A dictionary representing a single search result item
+
+    Returns:
+        The extracted Douban ID or None if not found
+    """
+    url = result.get("link")
+    if not url:
+        return None
+    parsed_url = urlparse(url)
+    if not parsed_url.path.startswith("/subject/"):
+        return None
+
+    id_part = parsed_url.path.split("/")[2]
+    if not id_part:
+        return None
+
+    return id_part
+
+
 @register_task
 class AddRecentItemsTask(BaseTask):
     """Task to add recent items by Google search"""
@@ -40,35 +64,26 @@ class AddRecentItemsTask(BaseTask):
     def default_interval(self) -> int:
         return 3600  # 1 hour
 
+    def search(self, http_session: requests.Session) -> Iterable[str]:
+        """
+        Search for recent items on Douban using Google.
+        """
+        yield from (
+            google_search(
+                http_session,
+                SEARCH_QUERY,
+                tbs="qdr:d",  # Native Google time filter: past day,
+                extractor=extract_douban_id_from_search_result,
+            )
+        )
+
     def execute(self, db: Session, http_session: requests.Session) -> None:
         """
         Add recent items to the queue from Douban.
         This function searches for recent Douban movie pages
         """
-        douban_ids = set()  # Use a set to avoid duplicates
-
-        for result in google_search(
-            http_session,
-            SEARCH_QUERY,
-            tbs="qdr:d",  # Native Google time filter: past day
-        ):
-            # Extract links and find Douban IDs
-            url = result.get("link")
-            if not url:
-                continue
-            parsed_url = urlparse(url)
-            if not parsed_url.path.startswith("/subject/"):
-                continue
-            douban_id = parsed_url.path.split("/")[2]
-            if not douban_id or not douban_id.isdecimal():
-                continue
-            douban_ids.add(douban_id)
-
-        logger.info(f"Found {len(douban_ids)} Douban IDs")
-
         added_count = 0
-
-        for douban_id in douban_ids:
+        for douban_id in self.search(http_session):
             try:
                 if add_placeholder_item(db, douban_id):
                     added_count += 1
