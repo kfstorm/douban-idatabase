@@ -114,6 +114,10 @@ class Settings(BaseSettings):
 
     DOUBAN_COOKIE_DBCL2: str = os.getenv("DOUBAN_COOKIE_DBCL2", "")
 
+    DISABLE_IMDB_DESKTOP_HTML_FETCH: bool = _parse_bool_env_var(
+        "DISABLE_IMDB_DESKTOP_HTML_FETCH", True
+    )
+
     class Config:
         env_file = ".env"
         env_file_encoding = "utf-8"

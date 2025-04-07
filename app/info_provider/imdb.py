@@ -148,18 +148,20 @@ def fetch_imdb_id(http_session: requests.Session, douban_id: str) -> dict:
         )
         first_exception = first_exception or e
 
-    # Try main desktop page scraping
-    try:
-        result = _fetch_imdb_id_from_desktop_html(http_session, douban_id)
-        if result:
-            return result
-    except Exception as e:
-        record_exception_metrics(e)
-        logger.warning(
-            "Error fetching IMDb ID from desktop page"
-            f" for douban_id={douban_id}: {str(e)}"
-        )
-        first_exception = first_exception or e
+    # Try main desktop page scraping only if not disabled
+    # (because desktop page is slower and costs more traffic)
+    if not settings.DISABLE_IMDB_DESKTOP_HTML_FETCH:
+        try:
+            result = _fetch_imdb_id_from_desktop_html(http_session, douban_id)
+            if result:
+                return result
+        except Exception as e:
+            record_exception_metrics(e)
+            logger.warning(
+                "Error fetching IMDb ID from desktop page"
+                f" for douban_id={douban_id}: {str(e)}"
+            )
+            first_exception = first_exception or e
 
     # If we got here, all methods failed. Re-throw the first exception if we have one
     if first_exception:
