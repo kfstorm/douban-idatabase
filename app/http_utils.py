@@ -1,9 +1,11 @@
 from collections import defaultdict
+import logging
 import random
 import time
 import requests
+from requests.adapters import HTTPAdapter
 from urllib.parse import urlencode, urlparse
-import logging
+
 from app.config import settings
 from app.utils import (
     now_timestamp,
@@ -211,13 +213,17 @@ def get_json(http_session, url, **kwargs):
         return response.json()
 
 
-def new_http_session():
+def new_http_session(adapter: HTTPAdapter = None) -> requests.Session:
     http_session = requests.Session()
 
     http_session.headers["User-Agent"] = (
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"
         + " AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.3"
     )
+
+    if adapter:
+        http_session.mount("http://", adapter)
+        http_session.mount("https://", adapter)
 
     extra_args = _get_extra_http_client_args()
     if "proxies" in extra_args:

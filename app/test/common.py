@@ -1,3 +1,7 @@
+from urllib.parse import urlparse
+from requests.adapters import HTTPAdapter
+
+
 def check_detail(detail: dict):
     assert isinstance(detail, dict)
     assert "douban_id" in detail
@@ -15,3 +19,24 @@ def check_detail(detail: dict):
     assert isinstance(detail["raw_data"]["detail"], dict)
     assert "detail_source" in detail["raw_data"]
     assert detail["raw_data"]["detail_source"]
+
+
+class CompressionCheckAdapter(HTTPAdapter):
+    """HTTP adapter that checks for compression in the response."""
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+    def build_response(self, req, resp):
+        response = super().build_response(req, resp)
+
+        if urlparse(req.url).path.endswith(".gz"):
+            return response
+        content_encoding = response.headers.get("content-encoding")
+        assert content_encoding in [
+            "br",
+            "zstd",
+            "gzip",
+            "deflate",
+        ], f"Unexpected content encoding: {content_encoding}"
+        return response
