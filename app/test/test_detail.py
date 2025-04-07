@@ -1,6 +1,7 @@
 import json
 
 from app.info_provider.common import extract_douban_item_detail
+from app.info_provider.detail import DOUBAN_REXXAR_API_URL, fetch_douban_item_detail
 from app.test.common import check_detail
 
 
@@ -300,3 +301,23 @@ def test_extract_from_subject_collection():
         "type": "movie",
     }
     _test_extract_base(json_text, source, expected_result)
+
+
+def test_fetch_douban_item_detail(http_session):
+    """Test fetching item details from Douban API."""
+    # Test with a movie
+    douban_id = "1292052"
+    detail_info = fetch_douban_item_detail(http_session, douban_id)
+    check_detail(detail_info)
+    expected_result = {
+        "douban_id": "1292052",
+        "douban_title": "肖申克的救赎",
+        "year": 1994,
+        "rating": 9.7,
+        "type": "movie",
+    }
+    expected_result["raw_data"] = {
+        "detail": detail_info["raw_data"]["detail"],
+        "detail_source": DOUBAN_REXXAR_API_URL.format(douban_id),
+    }
+    assert expected_result == detail_info

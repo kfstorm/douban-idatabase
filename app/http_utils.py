@@ -210,16 +210,19 @@ def can_use_fallback(strategy: FallbackStrategy, host: str):
 def get_response(
     http_session: requests.Session, url: str, fallback_strategy=None, **kwargs
 ):
-    headers = {
-        "User-Agent": (
-            "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"
-            + " AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.3"
-        )
-    }
+    if not fallback_strategy:
+        headers = {
+            "User-Agent": (
+                "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"
+                + " AppleWebKit/537.36 (KHTML, like Gecko)"
+                + " Chrome/121.0.0.0 Safari/537.3"
+            )
+        }
 
-    # Merge headers if provided in kwargs
-    if "headers" in kwargs:
-        headers.update(kwargs.pop("headers"))
+        # Merge headers if provided in kwargs
+        if "headers" in kwargs:
+            headers.update(kwargs.pop("headers"))
+        kwargs["headers"] = headers
 
     # Get the host for metrics
     host = urlparse(url).netloc
@@ -251,7 +254,7 @@ def get_response(
 
     try:
         logger.info("Accessing %s", url)
-        response = http_session.get(url, headers=headers, timeout=60, **kwargs)
+        response = http_session.get(url, timeout=60, **kwargs)
 
         # Record response duration
         duration = time.time() - start_time
