@@ -20,7 +20,7 @@ def check_imdb_info(imdb_info: dict):
 def test_fetch_imdb_id(http_session):
     """Test fetching IMDb ID from Douban movie page."""
     douban_id = "36445098"
-    imdb_info = fetch_imdb_id(http_session, douban_id)
+    imdb_info = fetch_imdb_id(http_session, douban_id, False)
     check_imdb_info(imdb_info)
     assert imdb_info["imdb_id"] == "tt21800162"
 

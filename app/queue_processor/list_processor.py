@@ -87,7 +87,9 @@ def process_list(
 
             existing_item = db.query(Item).filter(Item.douban_id == douban_id).first()
             if allow_update_item(existing_item):
-                imdb_info = fetch_imdb_id(http_session, douban_id)
+                imdb_info = fetch_imdb_id(
+                    http_session, douban_id, detail_info.get("in_blacklist")
+                )
                 if not imdb_info:
                     logger.warning(f"Failed to fetch IMDb ID for douban_id={douban_id}")
                     continue

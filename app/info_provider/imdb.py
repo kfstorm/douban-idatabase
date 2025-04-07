@@ -2,6 +2,7 @@ import csv
 import logging
 import os
 import re
+from typing import Optional
 
 import requests
 
@@ -117,7 +118,9 @@ def _fetch_imdb_id_with_html_regex(
     }
 
 
-def fetch_imdb_id(http_session: requests.Session, douban_id: str) -> dict:
+def fetch_imdb_id(
+    http_session: requests.Session, douban_id: str, in_blacklist: Optional[bool]
+) -> dict:
     """
     Fetch IMDb ID for a Douban movie using multiple methods
     """
@@ -134,6 +137,18 @@ def fetch_imdb_id(http_session: requests.Session, douban_id: str) -> dict:
             f"Error fetching IMDb ID from CSV for douban_id={douban_id}: {str(e)}"
         )
         first_exception = first_exception or e
+
+    if in_blacklist:
+        logging.warning(
+            f"Douban ID {douban_id} is in blacklist. Skipping fetching IMDB ID."
+        )
+        return {
+            "imdb_id": None,
+            "raw_data": {
+                "imdb_id": None,
+                "imdb_source": "in_blacklist",
+            },
+        }
 
     # Try mobile description page scraping
     try:
