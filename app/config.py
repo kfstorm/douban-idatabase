@@ -1,5 +1,6 @@
 import json
 import os
+from typing import Optional
 from pydantic_settings import BaseSettings
 from dotenv import load_dotenv
 
@@ -126,7 +127,7 @@ class Settings(BaseSettings):
     )
 
     # Proxy settings (for PROXY fallback strategy)
-    REQUESTS_PROXIES: dict = json.loads(os.getenv("REQUESTS_PROXIES", "null"))
+    REQUESTS_PROXIES: Optional[dict] = json.loads(os.getenv("REQUESTS_PROXIES", "null"))
 
     class Config:
         env_file = ".env"
