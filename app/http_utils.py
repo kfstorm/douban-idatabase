@@ -299,9 +299,10 @@ def get_response(
         return response
     except requests.exceptions.RequestException as e:
         record_exception_metrics(e)
-        # Record network-level failures
-        http_requests_total.labels(host=host, status_code="error").inc()
-        logger.error(f"Request exception for {url}: {str(e)}")
+        if not isinstance(e, requests.HTTPError):
+            # Record network-level failures
+            http_requests_total.labels(host=host, status_code="error").inc()
+            logger.error(f"Request exception for {url}: {str(e)}")
         raise e
 
 
