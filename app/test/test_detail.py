@@ -350,6 +350,94 @@ def test_extract_from_rexxar_movie():
     _test_extract_base(json_text, source, expected_result)
 
 
+def test_extract_from_explore():
+    """Test extracting item details from an explore API response."""
+    source = "dummy"
+    json_text = """
+    {
+        "comment": {
+            "comment": "最重要的不過愛與美，哪怕它拒絕著生。",
+            "id": "3758839233",
+            "user": {
+                "kind": "user",
+                "name": "白石春子",
+                "url": "https://www.douban.com/people/54358731/",
+                "uri": "douban://douban.com/user/54358731",
+                "avatar": "https://img3.doubanio.com/icon/up54358731-32.jpg",
+                "is_club": false,
+                "type": "user",
+                "id": "54358731",
+                "uid": "harukorose"
+            }
+        },
+        "rating": {
+            "count": 21499,
+            "max": 10,
+            "star_count": 4.0,
+            "value": 7.8
+        },
+        "vendor_count": 0,
+        "playable_date": null,
+        "pic": {
+            "large": "https://img1.doubanio.com/view/photo/m_ratio_poster/public/p2892253589.jpg",
+            "normal": "https://img1.doubanio.com/view/photo/s_ratio_poster/public/p2892253589.jpg"
+        },
+        "honor_infos": [
+            {
+                "kind": "movie",
+                "uri": "douban://douban.com/subject_collection/ECCMOLZQA?type=rank&category=movie&rank_type=film_genre",
+                "rank": 13,
+                "title": "冷门佳作奇幻片榜"
+            }
+        ],
+        "vendor_icons": [],
+        "year": "2023",
+        "card_subtitle": "2023 / 意大利 法国 瑞士 / 喜剧 爱情 奇幻 冒险 / 阿莉切·罗尔瓦赫尔 / 乔什·奥康纳 卡罗尔·杜阿尔特",
+        "id": "35448539",
+        "title": "奇美拉",
+        "tags": [
+            {
+                "name": "冷门佳作奇幻片榜",
+                "uri": "douban://douban.com/subject_collection/ECCMOLZQA?category=movie&rank_type=film_genre&type=rank"
+            },
+            {
+                "name": "喜欢《无依之地》的也喜欢",
+                "uri": "douban://douban.com/movie/recommend_tag?type=like_like&id=30458949"
+            },
+            {
+                "name": "戛纳电影节 金棕榈奖 获奖作品",
+                "uri": "douban://douban.com/subject_collection/ECEA6CK3I?category=movie&rank_type=award_movie&type=rank"
+            }
+        ],
+        "interest": null,
+        "type": "movie",
+        "alg_json": "...",
+        "has_linewatch": false,
+        "photos": [
+            "https://img9.doubanio.com/view/photo/m/public/p2893531406.jpg",
+            "https://img9.doubanio.com/view/photo/m/public/p2890652815.jpg",
+            "https://img1.doubanio.com/view/photo/m/public/p2873350338.jpg",
+            "https://img9.doubanio.com/view/photo/m/public/p2890616034.jpg"
+        ],
+        "card": "subject",
+        "playable_date_info": "",
+        "following_rating": null,
+        "uri": "douban://douban.com/movie/35448539",
+        "episodes_info": "",
+        "item_type": "movie"
+    }
+    """  # noqa: B950
+    expected_result = {
+        "douban_id": "35448539",
+        "douban_title": "奇美拉",
+        "year": 2023,
+        "rating": 7.8,
+        "type": "movie",
+        "in_blacklist": False,
+    }
+    _test_extract_base(json_text, source, expected_result)
+
+
 def test_fetch_douban_item_detail():
     """Test fetching item details from Douban API."""
     # Test with a movie
