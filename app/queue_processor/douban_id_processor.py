@@ -80,6 +80,9 @@ def _fetch_douban_item(http_session: requests.Session, douban_id: str) -> Item:
     if not detail_info:
         return None
     if detail_info["in_blacklist"]:
+        logging.warning(
+            f"Douban ID {douban_id} is in blacklist. Skipping fetching IMDB ID."
+        )
         imdb_info = {
             "imdb_id": None,
             "raw_data": {
