@@ -1,5 +1,4 @@
 import logging
-import requests
 from sqlalchemy.orm import Session
 
 from app.http_utils import NoPermissionException
@@ -15,16 +14,14 @@ from app.utils import now_timestamp, timestamp_to_local_time_str
 logger = logging.getLogger(__name__)
 
 
-def process_list(
-    db: Session, http_session: requests.Session, queue_item: Queue
-) -> None:
+def process_list(db: Session, queue_item: Queue) -> None:
     """
     Process a queue item of type 'subject_collection' or 'doulist'
     """
     list_type = queue_item.type
     list_id = queue_item.id
     logger.info(f"Processing list {list_type} {list_id} ...")
-    list_api = get_list_api_by_list_type(http_session, list_type)
+    list_api = get_list_api_by_list_type(list_type)
 
     # Check if we've processed this list before
     list_record = db.query(List).filter_by(list_type=list_type, list_id=list_id).first()
@@ -87,9 +84,7 @@ def process_list(
 
             existing_item = db.query(Item).filter(Item.douban_id == douban_id).first()
             if allow_update_item(existing_item):
-                imdb_info = fetch_imdb_id(
-                    http_session, douban_id, detail_info.get("in_blacklist")
-                )
+                imdb_info = fetch_imdb_id(douban_id, detail_info.get("in_blacklist"))
                 if not imdb_info:
                     logger.warning(f"Failed to fetch IMDb ID for douban_id={douban_id}")
                     continue

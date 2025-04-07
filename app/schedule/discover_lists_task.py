@@ -1,5 +1,4 @@
 import logging
-import requests
 from sqlalchemy.orm import Session
 
 from app.info_provider.lists import ListsApi
@@ -23,13 +22,13 @@ class DiscoverListsTask(BaseTask):
     def default_interval(self) -> int:
         return 86400  # 1 day
 
-    def execute(self, db: Session, http_session: requests.Session) -> None:
+    def execute(self, db: Session) -> None:
         logger.info("Discovering lists...")
 
         count = 0
         added_count = 0
         last_print = now_timestamp()
-        lists_api = ListsApi(http_session)
+        lists_api = ListsApi()
         for list_type, list_id in lists_api.iter_lists():
             count += 1
             if list_type == "subject_collection" or list_type == "doulist":

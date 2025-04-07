@@ -307,7 +307,7 @@ def test_extract_from_subject_collection():
     _test_extract_base(json_text, source, expected_result)
 
 
-def test_extract_from_rexxar_movie(http_session):
+def test_extract_from_rexxar_movie():
     """Test extracting item details from a rexxar API response."""
     source = "https://m.douban.com/rexxar/api/v2/movie/2158666"
     json_text = """
@@ -350,11 +350,11 @@ def test_extract_from_rexxar_movie(http_session):
     _test_extract_base(json_text, source, expected_result)
 
 
-def test_fetch_douban_item_detail(http_session):
+def test_fetch_douban_item_detail():
     """Test fetching item details from Douban API."""
     # Test with a movie
     douban_id = "1292052"
-    detail_info = fetch_douban_item_detail(http_session, douban_id)
+    detail_info = fetch_douban_item_detail(douban_id)
     check_detail(detail_info)
     expected_result = {
         "douban_id": "1292052",
@@ -371,11 +371,11 @@ def test_fetch_douban_item_detail(http_session):
     assert expected_result == detail_info
 
 
-def test_fetch_douban_item_detail_in_blacklist(http_session):
+def test_fetch_douban_item_detail_in_blacklist():
     """Test fetching item details from Douban API."""
     # Test with a movie in blacklist
     douban_id = "2158666"
-    detail_info = fetch_douban_item_detail(http_session, douban_id)
+    detail_info = fetch_douban_item_detail(douban_id)
     check_detail(detail_info)
     expected_result = {
         "douban_id": "2158666",

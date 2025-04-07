@@ -1,8 +1,7 @@
 import pytest
 
-from app.http_utils import new_http_session
+import app.http_utils
 from app.logging_config import setup_logging
-from app.test.common import CompressionCheckAdapter
 
 
 @pytest.fixture(scope="session", autouse=True)
@@ -13,9 +12,8 @@ def configure_logging():
     return logger
 
 
-@pytest.fixture(scope="session")
-def http_session():
-    """Fixture to create a new HTTP session for testing."""
-    http_adapter = CompressionCheckAdapter()
-    with new_http_session(http_adapter) as session:
-        yield session
+@pytest.fixture(scope="session", autouse=True)
+def compression_check():
+    app.http_utils._test_check_response_compression = True
+    yield
+    app.http_utils._test_check_response_compression = False

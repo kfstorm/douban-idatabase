@@ -4,8 +4,6 @@ import os
 import re
 from typing import Optional
 
-import requests
-
 from app.config import settings
 from app.http_utils import get_response
 from app.info_provider.common import COMMON_HEADERS
@@ -55,14 +53,11 @@ def _fetch_imdb_id_from_csv(douban_id: str) -> dict:
     return None
 
 
-def _fetch_imdb_id_from_mobile_desc(
-    http_session: requests.Session, douban_id: str
-) -> dict:
+def _fetch_imdb_id_from_mobile_desc(douban_id: str) -> dict:
     """
     Fetch IMDb ID from Douban movie mobile description page
     """
     return _fetch_imdb_id_with_html_regex(
-        http_session,
         douban_id,
         "mobile",
         DOUBAN_MOBILE_DESC_URL,
@@ -70,14 +65,11 @@ def _fetch_imdb_id_from_mobile_desc(
     )
 
 
-def _fetch_imdb_id_from_desktop_html(
-    http_session: requests.Session, douban_id: str
-) -> dict:
+def _fetch_imdb_id_from_desktop_html(douban_id: str) -> dict:
     """
     Fetch IMDb ID from Douban movie desktop HTML page
     """
     return _fetch_imdb_id_with_html_regex(
-        http_session,
         douban_id,
         "desktop",
         DOUBAN_DESKTOP_HTML_URL,
@@ -86,7 +78,6 @@ def _fetch_imdb_id_from_desktop_html(
 
 
 def _fetch_imdb_id_with_html_regex(
-    http_session: requests.Session,
     douban_id: str,
     html_type: str,
     url_pattern: str,
@@ -98,9 +89,7 @@ def _fetch_imdb_id_with_html_regex(
     url = url_pattern.format(douban_id)
     logger.info(f"Fetching IMDb ID from {html_type} page for douban_id={douban_id}...")
 
-    with get_response(
-        http_session, url, headers=COMMON_HEADERS, allow_redirects=True
-    ) as response:
+    with get_response(url, headers=COMMON_HEADERS, allow_redirects=True) as response:
         match = imdb_id_pattern.search(response.text)
     if match:
         imdb_id = match.group(1)
@@ -118,9 +107,7 @@ def _fetch_imdb_id_with_html_regex(
     }
 
 
-def fetch_imdb_id(
-    http_session: requests.Session, douban_id: str, in_blacklist: Optional[bool]
-) -> dict:
+def fetch_imdb_id(douban_id: str, in_blacklist: Optional[bool]) -> dict:
     """
     Fetch IMDb ID for a Douban movie using multiple methods
     """
@@ -152,7 +139,7 @@ def fetch_imdb_id(
 
     # Try mobile description page scraping
     try:
-        result = _fetch_imdb_id_from_mobile_desc(http_session, douban_id)
+        result = _fetch_imdb_id_from_mobile_desc(douban_id)
         if result:
             return result
     except Exception as e:
@@ -167,7 +154,7 @@ def fetch_imdb_id(
     # (because desktop page is slower and costs more traffic)
     if not settings.DISABLE_IMDB_DESKTOP_HTML_FETCH:
         try:
-            result = _fetch_imdb_id_from_desktop_html(http_session, douban_id)
+            result = _fetch_imdb_id_from_desktop_html(douban_id)
             if result:
                 return result
         except Exception as e:

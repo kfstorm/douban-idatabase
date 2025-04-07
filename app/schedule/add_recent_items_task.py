@@ -1,7 +1,6 @@
 import logging
 from typing import Iterable, Optional
 from urllib.parse import urlparse
-import requests
 from sqlalchemy.orm import Session
 
 from app.info_provider.google import google_search
@@ -64,26 +63,25 @@ class AddRecentItemsTask(BaseTask):
     def default_interval(self) -> int:
         return 3600 * 4  # 4 hours
 
-    def search(self, http_session: requests.Session) -> Iterable[str]:
+    def search(self) -> Iterable[str]:
         """
         Search for recent items on Douban using Google.
         """
         yield from (
             google_search(
-                http_session,
                 SEARCH_QUERY,
                 tbs="qdr:d",  # Native Google time filter: past day,
                 extractor=extract_douban_id_from_search_result,
             )
         )
 
-    def execute(self, db: Session, http_session: requests.Session) -> None:
+    def execute(self, db: Session) -> None:
         """
         Add recent items to the queue from Douban.
         This function searches for recent Douban movie pages
         """
         added_count = 0
-        for douban_id in self.search(http_session):
+        for douban_id in self.search():
             try:
                 if add_placeholder_item(db, douban_id):
                     added_count += 1

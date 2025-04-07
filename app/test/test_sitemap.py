@@ -7,16 +7,14 @@ from app.info_provider.sitemap import (
 )
 
 
-def test_extract_douban_ids_from_sitemap(http_session):
+def test_extract_douban_ids_from_sitemap():
     """Test extracting Douban IDs from a real Douban sitemap."""
     # Use a real sitemap index URL
     sitemap_index_url = "https://www.douban.com/sitemap_index.xml"
 
     # Get sitemap URLs from the sitemap index
     # Fetch up to 5 sitemap URLs to ensure we get enough IDs
-    sitemap_urls = list(
-        fetch_sitemap_urls_from_sitemap_index(http_session, sitemap_index_url)
-    )
+    sitemap_urls = list(fetch_sitemap_urls_from_sitemap_index(sitemap_index_url))
     assert len(sitemap_urls) > 0, "No sitemap URLs found in the index"
 
     # Collect IDs from multiple sitemaps if needed
@@ -27,7 +25,7 @@ def test_extract_douban_ids_from_sitemap(http_session):
         # Get IDs from the current sitemap
         new_ids = list(
             islice(
-                fetch_douban_ids_from_sitemap(http_session, sitemap_url),
+                fetch_douban_ids_from_sitemap(sitemap_url),
                 target_count - len(all_ids),
             )
         )

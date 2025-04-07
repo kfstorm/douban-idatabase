@@ -1,7 +1,6 @@
 import logging
 from typing import Iterable, Optional
 from urllib.parse import unquote, urlparse
-import requests
 from sqlalchemy.orm import Session
 
 from app.config import settings
@@ -52,23 +51,22 @@ class DiscoverTagsByGoogleTask(BaseTask):
     def default_interval(self) -> int:
         return 86400  # 1 day
 
-    def search(self, http_session: requests.Session) -> Iterable[str]:
+    def search(self) -> Iterable[str]:
         """
         Search for tags on Douban using Google.
         """
         yield from (
             google_search(
-                http_session,
                 SEARCH_QUERY,
                 extractor=extract_douban_tag_name_from_search_result,
                 max_results=settings.DISCOVER_LISTS_BY_GOOGLE_MAX_RESULTS,
             )
         )
 
-    def execute(self, db: Session, http_session: requests.Session) -> None:
+    def execute(self, db: Session) -> None:
         """Add tags by searching Google."""
         added_count = 0
-        for tag_name in self.search(http_session):
+        for tag_name in self.search():
             try:
                 if add_placeholder_tag(db, tag_name):
                     added_count += 1

@@ -1,6 +1,5 @@
 import logging
 from urllib.parse import parse_qs, urlparse
-import requests
 from typing import Any, Iterator
 
 from app.http_utils import get_json
@@ -29,20 +28,16 @@ def extract_update_time(list_info: dict) -> int:
 
 
 class BaseApi:
-    def __init__(self, http_session: requests.Session, sub_path: str, items_key: str):
-        self.http_session = http_session
+    def __init__(self, sub_path: str, items_key: str):
         self.base_url = f"https://m.douban.com/rexxar/api/v2/{sub_path}"
         self.headers = {"Referer": f"https://m.douban.com/{sub_path}"}
         self.items_key = items_key
 
     def get_info(self, id: str) -> Any:
-        return get_json(
-            self.http_session, f"{self.base_url}/{id}", headers=self.headers
-        )
+        return get_json(f"{self.base_url}/{id}", headers=self.headers)
 
     def _read_one_page(self, id: str, start: int, count: int) -> Any:
         return get_json(
-            self.http_session,
             f"{self.base_url}/{id}/items?start={start}&count={count}",
             headers=self.headers,
         )
@@ -63,20 +58,19 @@ class BaseApi:
 
 
 class CollectionApi(BaseApi):
-    def __init__(self, http_session: requests.Session):
-        super().__init__(http_session, "subject_collection", "subject_collection_items")
+    def __init__(self):
+        super().__init__("subject_collection", "subject_collection_items")
 
 
 class DoulistApi(BaseApi):
-    def __init__(self, http_session: requests.Session):
-        super().__init__(http_session, "doulist", "items")
+    def __init__(self):
+        super().__init__("doulist", "items")
 
 
 # Reference:
 # https://github.com/DIYgod/RSSHub/blob/master/lib/v2/douban/other/recommended.js
 class ListsApi:
-    def __init__(self, http_session: requests.Session):
-        self.http_session = http_session
+    def __init__(self):
         self.base_url = "https://frodo.douban.com/api/v2"
         self.headers = {
             "User-Agent": "MicroMessenger/",
@@ -86,7 +80,6 @@ class ListsApi:
 
     def _read_one_page(self, start: int, count: int) -> Any:
         return get_json(
-            self.http_session,
             f"{self.base_url}/skynet/new_playlists?apikey={self.api_key}&start={start}&count={count}",
             headers=self.headers,
         )
@@ -112,12 +105,10 @@ class ListsApi:
             yield (list_type, list_id)
 
 
-def get_list_api_by_list_type(
-    http_session: requests.Session, list_type: str
-) -> BaseApi:
+def get_list_api_by_list_type(list_type: str) -> BaseApi:
     if list_type == "subject_collection":
-        return CollectionApi(http_session)
+        return CollectionApi()
     elif list_type == "doulist":
-        return DoulistApi(http_session)
+        return DoulistApi()
     else:
         raise ValueError(f"Unknown list type {list_type}")

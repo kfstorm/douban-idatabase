@@ -1,5 +1,4 @@
 import logging
-import requests
 from itertools import islice
 from sqlalchemy.orm import Session
 
@@ -22,7 +21,7 @@ from app.utils import (
 logger = logging.getLogger(__name__)
 
 
-def process_tag(db: Session, http_session: requests.Session, queue_item: Queue) -> None:
+def process_tag(db: Session, queue_item: Queue) -> None:
     """
     Process a queue item of type 'tag'
     """
@@ -43,9 +42,9 @@ def process_tag(db: Session, http_session: requests.Session, queue_item: Queue) 
     else:
         fetch_check_list_count = 10
         is_tv_or_movie_tag = any(
-            _check_is_tv_or_movie_list(http_session, list_type, list_id)
+            _check_is_tv_or_movie_list(list_type, list_id)
             for list_type, list_id in islice(
-                fetch_lists_from_tag(http_session, tag_name), fetch_check_list_count
+                fetch_lists_from_tag(tag_name), fetch_check_list_count
             )
         )
 
@@ -70,7 +69,6 @@ def process_tag(db: Session, http_session: requests.Session, queue_item: Queue) 
     count = 0
     # If it's decided to fetch, we fetch lists again with min favorites requirement
     for list_type, list_id in fetch_lists_from_tag(
-        http_session,
         tag_name,
         min_favorites=settings.DISCOVER_LISTS_BY_TAG_MIN_FAVORITES,
     ):
@@ -88,10 +86,8 @@ def process_tag(db: Session, http_session: requests.Session, queue_item: Queue) 
     db.commit()
 
 
-def _check_is_tv_or_movie_list(
-    http_session: requests.Session, list_type: str, list_id: str
-) -> bool:
-    list_api = get_list_api_by_list_type(http_session, list_type)
+def _check_is_tv_or_movie_list(list_type: str, list_id: str) -> bool:
+    list_api = get_list_api_by_list_type(list_type)
 
     # check if top 10 items have at least 1 TV or movie items.
     check_count = 10

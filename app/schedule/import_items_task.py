@@ -1,7 +1,6 @@
 import csv
 import logging
 import os
-import requests
 from sqlalchemy.orm import Session
 
 from app.config import settings
@@ -25,16 +24,11 @@ class ImportItemsTask(BaseTask):
     def default_interval(self) -> int:
         return 86400  # 1 day
 
-    @property
-    def requires_http_session(self) -> bool:
-        return False
-
-    def execute(self, db: Session, http_session: requests.Session) -> None:
+    def execute(self, db: Session) -> None:
         """
         Import Douban IDs from CSV files into the item table as placeholders.
         Uses the same CSV files as configured for IMDb ID mapping.
         """
-        # This task doesn't use http_session
         if not settings.IMDB_CSV_PATH:
             return
 

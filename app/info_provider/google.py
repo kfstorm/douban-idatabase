@@ -1,6 +1,5 @@
 import logging
 from typing import Any, Callable, Iterable, List
-import requests
 from urllib.parse import urlencode, parse_qs, urlparse
 import time
 import random
@@ -29,7 +28,6 @@ USER_AGENTS = [
 
 
 def google_search(
-    http_session: requests.Session,
     query: str,
     extractor: Callable[[dict], Any] = None,
     max_results: int = 100,
@@ -41,7 +39,6 @@ def google_search(
     Uses ZenRows API if API key is configured, otherwise falls back to direct search.
 
     Args:
-        http_session: HTTP session
         query: Search query
         extractor: Function to extract data from each result
         max_results: Maximum number of results to return
@@ -49,18 +46,13 @@ def google_search(
     """
     # Check if ZenRows API key is configured
     if settings.ZENROWS_API_KEY:
-        yield from _zenrows_google_search(
-            http_session, query, extractor, max_results, **kwargs
-        )
+        yield from _zenrows_google_search(query, extractor, max_results, **kwargs)
     else:
         # Fall back to direct search without ZenRows
-        yield from _direct_google_search(
-            http_session, query, extractor, max_results, **kwargs
-        )
+        yield from _direct_google_search(query, extractor, max_results, **kwargs)
 
 
 def _zenrows_google_search(
-    http_session: requests.Session,
     query: str,
     extractor: Callable[[dict], Any] = None,
     max_results: int = 100,
@@ -70,7 +62,6 @@ def _zenrows_google_search(
     Search Google using ZenRows API.
 
     Args:
-        http_session: HTTP session
         query: Search query
         extractor: Function to extract data from each result
         max_results: Maximum number of results to return
@@ -100,9 +91,7 @@ def _zenrows_google_search(
             logger.info(f"Searching Google (page {page}) via ZenRows API...")
 
             # Make request to ZenRows API
-            search_results = get_json(
-                http_session, ZENROWS_API_URL, params=zenrows_params
-            )
+            search_results = get_json(ZENROWS_API_URL, params=zenrows_params)
 
             # Check if we have organic results
             organic_results = search_results.get("organic_results", [])
@@ -137,7 +126,6 @@ def _zenrows_google_search(
 
 
 def _direct_google_search(
-    http_session: requests.Session,
     query: str,
     extractor: Callable[[dict], Any] = None,
     max_results: int = 100,
@@ -147,7 +135,6 @@ def _direct_google_search(
     Search Google directly without using ZenRows.
 
     Args:
-        http_session: HTTP session
         query: Search query
         extractor: Function to extract data from each result
         max_results: Maximum number of results to return
@@ -190,7 +177,7 @@ def _direct_google_search(
             time.sleep(random.uniform(1.0, 3.0))
 
             # Make the request
-            response = get_response(http_session, url, headers=headers)
+            response = get_response(url, headers=headers)
 
             # Parse the HTML response
             soup = BeautifulSoup(response.text, "html.parser")

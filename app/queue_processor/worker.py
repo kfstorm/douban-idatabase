@@ -1,5 +1,4 @@
 import logging
-import requests
 import time
 from sqlalchemy.orm import Session
 
@@ -20,7 +19,7 @@ from app.metrics import worker_processed_items, worker_processing_duration
 logger = logging.getLogger(__name__)
 
 
-def process_queue_items(db: Session, http_session: requests.Session) -> None:
+def process_queue_items(db: Session) -> None:
     """
     Process items from the queue until reaching time limit (1 minute).
     Supports different types of queue items.
@@ -69,15 +68,15 @@ def process_queue_items(db: Session, http_session: requests.Session) -> None:
 
             # Dispatch to appropriate handler based on queue item type
             if item_type == "douban_id":
-                process_douban_id(db, http_session, queue_item)
+                process_douban_id(db, queue_item)
             elif item_type == "subject_collection" or item_type == "doulist":
-                process_list(db, http_session, queue_item)
+                process_list(db, queue_item)
             elif item_type == "tag":
-                process_tag(db, http_session, queue_item)
+                process_tag(db, queue_item)
             elif item_type == "type_rank":
-                process_type_rank(db, http_session, queue_item)
+                process_type_rank(db, queue_item)
             elif item_type == "sitemap":
-                process_sitemap(db, http_session, queue_item)
+                process_sitemap(db, queue_item)
             else:
                 logger.warning(f"Unsupported queue item type: {item_type}")
 

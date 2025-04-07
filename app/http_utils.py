@@ -3,7 +3,6 @@ import logging
 import random
 import time
 import requests
-from requests.adapters import HTTPAdapter
 from urllib.parse import urlencode, urlparse
 from enum import Enum, auto
 
@@ -16,6 +15,16 @@ from app.utils import (
 from app.metrics import rate_limit_hits, http_requests_total, http_request_duration
 
 logger = logging.getLogger(__name__)
+
+
+DEFAULT_HEADERS = {
+    "User-Agent": (
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"
+        + " AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.3"
+    )
+}
+
+_test_check_response_compression = False
 
 
 class FallbackStrategy(Enum):
@@ -152,16 +161,7 @@ class Throttler:
 throttler = Throttler()
 
 
-def _get_extra_http_client_args():
-    args = {}
-    if settings.DOUBAN_COOKIE_DBCL2:
-        args["cookies"] = {
-            "dbcl2": settings.DOUBAN_COOKIE_DBCL2,
-        }
-    return args
-
-
-def get_response_via_zenrows(http_session: requests.Session, url: str, **kwargs):
+def get_response_via_zenrows(url: str, **kwargs):
     final_url = url
     original_params = kwargs.pop("params", {})
     if original_params:
@@ -176,17 +176,15 @@ def get_response_via_zenrows(http_session: requests.Session, url: str, **kwargs)
     }
     kwargs["params"] = new_params
     return get_response(
-        http_session,
         "https://api.zenrows.com/v1/",
         fallback_strategy=FallbackStrategy.ZENROWS,
         **kwargs,
     )
 
 
-def get_response_via_proxy(http_session: requests.Session, url: str, **kwargs):
+def get_response_via_proxy(url: str, **kwargs):
     """Make a request using configured proxies."""
     return get_response(
-        http_session,
         url,
         fallback_strategy=FallbackStrategy.PROXY,
         proxies=settings.REQUESTS_PROXIES,
@@ -207,9 +205,7 @@ def can_use_fallback(strategy: FallbackStrategy, host: str):
     return False
 
 
-def get_response(
-    http_session: requests.Session, url: str, fallback_strategy=None, **kwargs
-):
+def get_response(url: str, fallback_strategy=None, **kwargs):
     if not fallback_strategy:
         headers = {
             "User-Agent": (
@@ -223,6 +219,10 @@ def get_response(
         if "headers" in kwargs:
             headers.update(kwargs.pop("headers"))
         kwargs["headers"] = headers
+
+    if settings.DOUBAN_COOKIE_DBCL2:
+        kwargs["cookies"] = kwargs.get("cookies", {})
+        kwargs["cookies"]["dbcl2"] = settings.DOUBAN_COOKIE_DBCL2
 
     # Get the host for metrics
     host = urlparse(url).netloc
@@ -245,16 +245,16 @@ def get_response(
                 )
 
                 if next_strategy == FallbackStrategy.ZENROWS:
-                    return get_response_via_zenrows(http_session, url, **kwargs)
+                    return get_response_via_zenrows(url, **kwargs)
                 elif next_strategy == FallbackStrategy.PROXY:
-                    return get_response_via_proxy(http_session, url, **kwargs)
+                    return get_response_via_proxy(url, **kwargs)
 
         record_exception_metrics(e)
         raise e
 
     try:
         logger.info("Accessing %s", url)
-        response = http_session.get(url, timeout=60, **kwargs)
+        response = requests.get(url, timeout=60, **kwargs)
 
         # Record response duration
         duration = time.time() - start_time
@@ -282,9 +282,9 @@ def get_response(
                     )
 
                     if next_strategy == FallbackStrategy.ZENROWS:
-                        return get_response_via_zenrows(http_session, url, **kwargs)
+                        return get_response_via_zenrows(url, **kwargs)
                     elif next_strategy == FallbackStrategy.PROXY:
-                        return get_response_via_proxy(http_session, url, **kwargs)
+                        return get_response_via_proxy(url, **kwargs)
 
             record_exception_metrics(e)
             raise e
@@ -296,6 +296,18 @@ def get_response(
             logger.error(f"Failed to fetch {url}: {str(e)}")
             raise e
 
+        if _test_check_response_compression:
+            if urlparse(url).path.endswith(".gz"):
+                return response
+            content_encoding = response.headers.get("content-encoding")
+            assert content_encoding in [
+                "br",
+                "zstd",
+                "gzip",
+                "deflate",
+            ], f"Unexpected content encoding: {content_encoding}"
+            return response
+
         return response
     except requests.exceptions.RequestException as e:
         record_exception_metrics(e)
@@ -306,28 +318,6 @@ def get_response(
         raise e
 
 
-def get_json(http_session, url, **kwargs):
-    with get_response(http_session, url, **kwargs) as response:
+def get_json(url, **kwargs):
+    with get_response(url, **kwargs) as response:
         return response.json()
-
-
-def new_http_session(adapter: HTTPAdapter = None) -> requests.Session:
-    http_session = requests.Session()
-
-    http_session.headers["User-Agent"] = (
-        "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"
-        + " AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.3"
-    )
-
-    if adapter:
-        http_session.mount("http://", adapter)
-        http_session.mount("https://", adapter)
-
-    extra_args = _get_extra_http_client_args()
-    if "proxies" in extra_args:
-        http_session.proxies = extra_args["proxies"]
-    if "cookies" in extra_args:
-        for key, value in extra_args["cookies"].items():
-            http_session.cookies.set(key, value, domain=".douban.com")
-
-    return http_session

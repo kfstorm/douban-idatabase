@@ -1,6 +1,5 @@
 import logging
 from urllib.parse import quote, urlparse
-import requests
 from typing import Iterator, Tuple
 
 from app.http_utils import get_response
@@ -12,7 +11,7 @@ TAG_LISTS_PAGE_SIZE = 15
 
 
 def fetch_lists_from_tag(
-    http_session: requests.Session, tag_name: str, min_favorites: int = None
+    tag_name: str, min_favorites: int = None
 ) -> Iterator[Tuple[str, str]]:
     """
     Get lists from a tag.
@@ -22,9 +21,7 @@ def fetch_lists_from_tag(
 
     page = 0
     while True:
-        response = get_response(
-            http_session, url, params={"start": page * TAG_LISTS_PAGE_SIZE}
-        )
+        response = get_response(url, params={"start": page * TAG_LISTS_PAGE_SIZE})
 
         # Parse HTML content
         from bs4 import BeautifulSoup

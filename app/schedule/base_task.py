@@ -1,6 +1,5 @@
 import logging
 from abc import ABC, abstractmethod
-import requests
 from sqlalchemy.orm import Session
 
 logger = logging.getLogger(__name__)
@@ -22,12 +21,12 @@ class BaseTask(ABC):
         pass
 
     @abstractmethod
-    def execute(self, db: Session, http_session: requests.Session) -> None:
+    def execute(self, db: Session) -> None:
         """
         Implementation of the task execution. Must be implemented by subclasses.
 
         Args:
             db: Database session
-            http_session: HTTP session (always provided by scheduler)
+
         """
         pass

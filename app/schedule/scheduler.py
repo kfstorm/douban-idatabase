@@ -2,12 +2,11 @@ import logging
 import threading
 import time
 from typing import Optional
-import requests
 from sqlalchemy.orm import Session
 
 from app.database import SessionLocal
 from app.models import Schedule
-from app.http_utils import new_http_session, RateLimitException
+from app.http_utils import RateLimitException
 from app.utils import (
     now_timestamp,
     timestamp_to_local_time_str,
@@ -90,9 +89,7 @@ def get_next_schedule_run(db: Session):
     )
 
 
-def execute_scheduled_task(
-    db: Session, http_session: requests.Session, schedule_type: str
-) -> Optional[float]:
+def execute_scheduled_task(db: Session, schedule_type: str) -> Optional[float]:
     """
     Execute a specific scheduled task based on its type.
 
@@ -104,7 +101,7 @@ def execute_scheduled_task(
         task = create_task_instance(schedule_type)
 
         # Execute the task
-        task.execute(db, http_session)
+        task.execute(db)
 
         # Return None to use default scheduling
         return None
@@ -130,7 +127,6 @@ def unified_scheduler():
 
     logger.info("Unified scheduler started")
 
-    http_session = new_http_session()
     while running:
         with SessionLocal() as db:
             try:
@@ -159,7 +155,7 @@ def unified_scheduler():
                     continue
 
                 # Execute the task
-                next_run_time = execute_scheduled_task(db, http_session, schedule.type)
+                next_run_time = execute_scheduled_task(db, schedule.type)
 
                 # Update the next run time
                 update_schedule_next_run(db, schedule.type, next_run_time)

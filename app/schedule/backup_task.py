@@ -6,7 +6,6 @@ import shutil
 import time
 from datetime import datetime
 from pathlib import Path
-import requests
 from sqlalchemy.orm import Session
 
 from app.config import settings
@@ -34,11 +33,10 @@ class BackupTask(BaseTask):
     def default_interval(self) -> int:
         return settings.BACKUP_INTERVAL_SECONDS
 
-    def execute(self, db: Session, http_session: requests.Session) -> None:
+    def execute(self, db: Session) -> None:
         """
         Perform SQLite online backup with compression
         """
-        # This task doesn't use http_session
         if not settings.BACKUP_ENABLED:
             logger.info("Database backup is disabled. Skipping...")
             return

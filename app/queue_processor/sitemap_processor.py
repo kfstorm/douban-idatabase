@@ -1,5 +1,4 @@
 import logging
-import requests
 from sqlalchemy.orm import Session
 
 from app.models import Queue, add_placeholder_item
@@ -8,9 +7,7 @@ from app.info_provider.sitemap import fetch_douban_ids_from_sitemap
 logger = logging.getLogger(__name__)
 
 
-def process_sitemap(
-    db: Session, http_session: requests.Session, queue_item: Queue
-) -> None:
+def process_sitemap(db: Session, queue_item: Queue) -> None:
     """
     Process a queue item of type 'sitemap'
 
@@ -23,7 +20,7 @@ def process_sitemap(
     # Fetch Douban IDs from the sitemap
     added_count = 0
     found_count = 0
-    for douban_id in fetch_douban_ids_from_sitemap(http_session, sitemap_url):
+    for douban_id in fetch_douban_ids_from_sitemap(sitemap_url):
         found_count += 1
         # Add as placeholder item if it doesn't exist
         if add_placeholder_item(db, douban_id):

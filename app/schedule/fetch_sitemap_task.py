@@ -1,5 +1,4 @@
 import logging
-import requests
 from sqlalchemy.orm import Session
 
 from app.info_provider.sitemap import fetch_sitemap_urls_from_sitemap_index
@@ -23,7 +22,7 @@ class FetchSitemapTask(BaseTask):
         # Run weekly (7 days)
         return 7 * 24 * 60 * 60
 
-    def execute(self, db: Session, http_session: requests.Session) -> None:
+    def execute(self, db: Session) -> None:
         """
         Fetch sitemap index from Douban and add individual sitemaps to the queue
         """
@@ -36,9 +35,7 @@ class FetchSitemapTask(BaseTask):
             # Fetch sitemap URLs from the index
             sitemap_count = 0
 
-            for sitemap_url in fetch_sitemap_urls_from_sitemap_index(
-                http_session, sitemap_index_url
-            ):
+            for sitemap_url in fetch_sitemap_urls_from_sitemap_index(sitemap_index_url):
                 # Add to queue
                 add_to_queue(db, "sitemap", sitemap_url)
                 sitemap_count += 1

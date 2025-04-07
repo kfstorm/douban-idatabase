@@ -1,5 +1,4 @@
 import logging
-import requests
 from sqlalchemy.orm import Session
 
 from app.info_provider.type_rank import get_rank_details
@@ -10,9 +9,7 @@ from app.queue_processor.common import allow_update_item, merge_item, save_item_
 logger = logging.getLogger(__name__)
 
 
-def process_type_rank(
-    db: Session, http_session: requests.Session, queue_item: Queue
-) -> None:
+def process_type_rank(db: Session, queue_item: Queue) -> None:
     """
     Process a queue item of type 'type_rank'.
     Retrieves ranked items for a specific type and interval combination
@@ -36,7 +33,7 @@ def process_type_rank(
     added_count = 0
     total_count = 0
     # Get rank details for this type and interval
-    for item_detail in get_rank_details(http_session, type_id, interval_id):
+    for item_detail in get_rank_details(type_id, interval_id):
         douban_id = item_detail.get("douban_id")
         if not douban_id:
             continue
@@ -47,9 +44,7 @@ def process_type_rank(
 
         if allow_update_item(existing_item):
             # Fetch IMDb data
-            imdb_info = fetch_imdb_id(
-                http_session, douban_id, item_detail.get("in_blacklist")
-            )
+            imdb_info = fetch_imdb_id(douban_id, item_detail.get("in_blacklist"))
             if not imdb_info:
                 logger.warning(f"Failed to fetch IMDb ID for douban_id={douban_id}")
                 continue

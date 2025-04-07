@@ -1,5 +1,4 @@
 import logging
-import requests
 from sqlalchemy.orm import Session
 
 from app.info_provider.type_rank import get_types, TYPE_RANK_INTERVALS
@@ -23,7 +22,7 @@ class DiscoverItemsByTypeRankTask(BaseTask):
         # Run weekly (7 days)
         return 7 * 24 * 60 * 60
 
-    def execute(self, db: Session, http_session: requests.Session) -> None:
+    def execute(self, db: Session) -> None:
         """
         Discover items by type rank.
         Gets all available types and adds them to the queue with
@@ -34,7 +33,7 @@ class DiscoverItemsByTypeRankTask(BaseTask):
         added_count = 0
 
         # Get all available types
-        types = get_types(http_session)
+        types = get_types()
         logger.info(f"Found {len(types)} types")
 
         # For each type and interval combination, add to queue

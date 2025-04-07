@@ -1,7 +1,6 @@
 import logging
 import re
 from typing import Any, Dict, Iterator, List, Tuple
-import requests
 from bs4 import BeautifulSoup
 from urllib.parse import parse_qs, urlparse
 
@@ -20,7 +19,7 @@ CHART_TOP_LIST_API_URL = "https://movie.douban.com/j/chart/top_list"
 TYPE_RANK_INTERVALS = [f"{i}:{i-10}" for i in range(100, 0, -10)]
 
 
-def get_types(http_session: requests.Session) -> List[Tuple[str, str]]:
+def get_types() -> List[Tuple[str, str]]:
     """
     Get available movie/TV types by crawling Douban chart page.
 
@@ -30,7 +29,7 @@ def get_types(http_session: requests.Session) -> List[Tuple[str, str]]:
     logger.info("Fetching movie/TV types from Douban chart page...")
 
     try:
-        response = get_response(http_session, CHART_PAGE_URL, headers=COMMON_HEADERS)
+        response = get_response(CHART_PAGE_URL, headers=COMMON_HEADERS)
 
         # Parse HTML content
         soup = BeautifulSoup(response.text, "html.parser")
@@ -72,7 +71,6 @@ def get_types(http_session: requests.Session) -> List[Tuple[str, str]]:
 
 
 def get_rank_details(
-    http_session: requests.Session,
     type_id: str,
     interval_id: str,
     page_size: int = 100,
@@ -81,7 +79,7 @@ def get_rank_details(
     Get ranked movies/TV shows for a specific type and percentile interval.
 
     Args:
-        http_session: HTTP session
+
         type_id: The ID of the movie/TV type
         interval_id: Percentile range (e.g., "100:90" for top 10%, "90:80" for 10%-20%)
 
@@ -105,7 +103,6 @@ def get_rank_details(
 
         try:
             data = get_json(
-                http_session,
                 CHART_TOP_LIST_API_URL,
                 params=params,
                 headers=COMMON_HEADERS,

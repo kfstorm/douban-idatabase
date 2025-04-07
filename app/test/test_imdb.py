@@ -17,25 +17,25 @@ def check_imdb_info(imdb_info: dict):
     assert len(imdb_info["raw_data"]["imdb_source"]) > 0
 
 
-def test_fetch_imdb_id(http_session):
+def test_fetch_imdb_id():
     """Test fetching IMDb ID from Douban movie page."""
     douban_id = "36445098"
-    imdb_info = fetch_imdb_id(http_session, douban_id, False)
+    imdb_info = fetch_imdb_id(douban_id, False)
     check_imdb_info(imdb_info)
     assert imdb_info["imdb_id"] == "tt21800162"
 
 
-def test_fetch_imdb_id_from_mobile_desc(http_session):
+def test_fetch_imdb_id_from_mobile_desc():
     """Test fetching IMDb ID from mobile description page."""
     douban_id = "36445098"
-    imdb_info = _fetch_imdb_id_from_mobile_desc(http_session, douban_id)
+    imdb_info = _fetch_imdb_id_from_mobile_desc(douban_id)
     check_imdb_info(imdb_info)
     assert imdb_info["imdb_id"] == "tt21800162"
 
 
-def test_fetch_imdb_id_from_desktop_html(http_session):
+def test_fetch_imdb_id_from_desktop_html():
     """Test fetching IMDb ID from desktop HTML page."""
     douban_id = "36445098"
-    imdb_info = _fetch_imdb_id_from_mobile_desc(http_session, douban_id)
+    imdb_info = _fetch_imdb_id_from_mobile_desc(douban_id)
     check_imdb_info(imdb_info)
     assert imdb_info["imdb_id"] == "tt21800162"

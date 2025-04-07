@@ -1,5 +1,4 @@
 import logging
-import requests
 from sqlalchemy.orm import Session
 
 from app.config import settings
@@ -11,9 +10,7 @@ from app.queue_processor.common import allow_update_item, merge_item, save_item_
 logger = logging.getLogger(__name__)
 
 
-def process_douban_id(
-    db: Session, http_session: requests.Session, queue_item: Queue
-) -> None:
+def process_douban_id(db: Session, queue_item: Queue) -> None:
     """
     Process a queue item of type 'douban_id'
     """
@@ -28,7 +25,7 @@ def process_douban_id(
         return
 
     # Fetch data from Douban and create Item object
-    item = _fetch_douban_item(http_session, douban_id)
+    item = _fetch_douban_item(douban_id)
 
     if not item:
         logger.warning(f"Failed to fetch data for douban_id={douban_id}")
@@ -42,14 +39,14 @@ def process_douban_id(
     )
 
 
-def _fetch_douban_item(http_session: requests.Session, douban_id: str) -> Item:
+def _fetch_douban_item(douban_id: str) -> Item:
     """
     Fetch movie data from Douban API and return an Item object
     """
-    detail_info = fetch_douban_item_detail(http_session, douban_id)
+    detail_info = fetch_douban_item_detail(douban_id)
     if not detail_info:
         return None
-    imdb_info = fetch_imdb_id(http_session, douban_id, detail_info.get("in_blacklist"))
+    imdb_info = fetch_imdb_id(douban_id, detail_info.get("in_blacklist"))
     if not imdb_info:
         return None
     logger.info(

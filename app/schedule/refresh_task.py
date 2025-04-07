@@ -1,5 +1,4 @@
 import logging
-import requests
 from sqlalchemy.orm import Session, selectinload
 from sqlalchemy import and_, or_
 
@@ -31,7 +30,7 @@ class RefreshTask(BaseTask):
     def default_interval(self) -> int:
         return 4 * 60 * 60  # 4 hours
 
-    def execute(self, db: Session, http_session: requests.Session) -> None:
+    def execute(self, db: Session) -> None:
         """
         Periodically refresh data from item/list/tag table
             by adding them back to the queue

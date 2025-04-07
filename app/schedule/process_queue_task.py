@@ -1,6 +1,5 @@
 import logging
 from sqlalchemy.orm import Session
-import requests
 
 from app.queue_processor.worker import process_queue_items
 from app.schedule.base_task import BaseTask
@@ -21,8 +20,8 @@ class ProcessQueueTask(BaseTask):
     def default_interval(self) -> int:
         return 1  # 1 second
 
-    def execute(self, db: Session, http_session: requests.Session) -> None:
+    def execute(self, db: Session) -> None:
         """
         Process items in the queue
         """
-        process_queue_items(db, http_session)
+        process_queue_items(db)

@@ -1,7 +1,6 @@
 import logging
 from typing import Iterable, Optional
 from urllib.parse import urlparse
-import requests
 from sqlalchemy.orm import Session
 
 from app.config import settings
@@ -52,23 +51,22 @@ class DiscoverListsByGoogleTask(BaseTask):
     def default_interval(self) -> int:
         return 86400  # 1 day
 
-    def search(self, http_session: requests.Session) -> Iterable[str]:
+    def search(self) -> Iterable[str]:
         """
         Search for doulists on Douban using Google.
         """
         yield from (
             google_search(
-                http_session,
                 SEARCH_QUERY,
                 max_results=settings.DISCOVER_LISTS_BY_GOOGLE_MAX_RESULTS,
                 extractor=extract_doulist_id_from_search_result,
             )
         )
 
-    def execute(self, db: Session, http_session: requests.Session) -> None:
+    def execute(self, db: Session) -> None:
         """Add lists by searching Google."""
         added_count = 0
-        for list_id in self.search(http_session):
+        for list_id in self.search():
             try:
                 if add_placeholder_list(db, "doulist", list_id):
                     added_count += 1
