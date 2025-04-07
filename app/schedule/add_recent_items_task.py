@@ -62,7 +62,7 @@ class AddRecentItemsTask(BaseTask):
 
     @property
     def default_interval(self) -> int:
-        return 3600  # 1 hour
+        return 3600 * 4  # 4 hours
 
     def search(self, http_session: requests.Session) -> Iterable[str]:
         """
