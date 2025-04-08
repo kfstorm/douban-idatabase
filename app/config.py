@@ -39,6 +39,11 @@ class Settings(BaseSettings):
         os.getenv("QUEUE_PROCESS_TIME_LIMIT_SECONDS", "60")
     )
 
+    # Number of threads to use for queue processing
+    QUEUE_PROCESSOR_THREAD_COUNT: int = int(
+        os.getenv("QUEUE_PROCESSOR_THREAD_COUNT", "4")
+    )
+
     RATE_LIMIT_DELAY_SECONDS: float = float(
         os.getenv("RATE_LIMIT_DELAY_SECONDS", "600")
     )
