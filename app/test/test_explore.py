@@ -49,3 +49,32 @@ def test_explore_with_region_filter():
         and "喜剧" in item["raw_data"]["detail"]["card_subtitle"]
         and "意大利" in item["raw_data"]["detail"]["card_subtitle"],
     )
+
+
+def test_explore_type_filter_not_on_website():
+    """Test the explore function with a type filter
+    that is not present on the website."""
+    result = explore("0,10", tags=["脱口秀"], count=COUNT)
+    check_explore_result(
+        result,
+        lambda item: "脱口秀" in item["raw_data"]["detail"]["card_subtitle"],
+    )
+
+
+def test_explore_region_filter_not_on_website():
+    """Test the explore function with a region filter
+    that is not present on the website."""
+    result = explore("1,10", tags=["挪威"], count=COUNT)
+    check_explore_result(
+        result,
+        lambda item: "挪威" in item["raw_data"]["detail"]["card_subtitle"],
+    )
+
+
+def test_explore_year_filter_not_on_website():
+    """Test the explore function with a year filter
+    that is not present on the website."""
+    result = explore("9,10", tags=["2015"], count=COUNT)
+    check_explore_result(
+        result, lambda item: item["rating"] >= 9.0 and item["year"] == 2015
+    )
