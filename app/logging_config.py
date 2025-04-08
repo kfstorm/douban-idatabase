@@ -22,7 +22,7 @@ def setup_logging():
     console_handler = logging.StreamHandler(sys.stdout)
     console_handler.setLevel(logging.INFO)
     console_format = logging.Formatter(
-        "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+        "%(asctime)s - %(threadName)s - %(name)s - %(levelname)s - %(message)s"
     )
     console_handler.setFormatter(console_format)
 
@@ -37,7 +37,7 @@ def setup_logging():
     )
     file_handler.setLevel(logging.INFO)
     file_format = logging.Formatter(
-        "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+        "%(asctime)s - %(threadName)s - %(name)s - %(levelname)s - %(message)s"
     )
     file_handler.setFormatter(file_format)
     file_handler.suffix = "%Y-%m-%d"  # Append date to rotated files

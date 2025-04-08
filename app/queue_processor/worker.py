@@ -1,6 +1,5 @@
 import logging
 import time
-import threading
 from concurrent.futures import ThreadPoolExecutor
 from sqlalchemy.orm import Session
 from typing import List
@@ -45,10 +44,7 @@ def process_single_queue_item(item_type: str, item_id: str) -> bool:
             return False
 
         try:
-            logger.info(
-                f"Thread {threading.get_ident()}: "
-                f"Processing queue item: type={item_type}, id={item_id}"
-            )
+            logger.info(f"Processing queue item: type={item_type}, id={item_id}")
 
             # Start timing for this specific item
             item_start_time = time.time()
@@ -151,8 +147,10 @@ def process_queue_items(db: Session) -> None:
         f" in queue using {thread_count} threads"
     )
 
-    # Create thread pool
-    with ThreadPoolExecutor(max_workers=thread_count) as executor:
+    # Create thread pool with named threads for better logging
+    with ThreadPoolExecutor(
+        max_workers=thread_count, thread_name_prefix="QueueWorker"
+    ) as executor:
         # Keep track of active futures using composite key (type, id)
         futures = {}
 
