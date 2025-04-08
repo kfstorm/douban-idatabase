@@ -6,12 +6,6 @@ from app.info_provider.common import COMMON_HEADERS, extract_douban_item_detail
 
 EXPLORE_URL = "https://m.douban.com/rexxar/api/v2/movie/recommend"
 
-SCORE_RANGES = [f"{i},{i+1}" for i in range(0, 10)]
-
-
-def get_explore_id(score_range: str, tags_str: str):
-    return f"score_range:{score_range}/tags:{tags_str}"
-
 
 def explore(
     score_range: str,
@@ -42,7 +36,7 @@ def explore(
     return {
         "items": [
             extract_douban_item_detail(
-                item, "explore:" + get_explore_id(score_range, tags_str)
+                item, f"explore:score_range:{score_range}/tags:{tags_str}"
             )
             for item in response["items"]
         ],

@@ -7,6 +7,7 @@ from app.queue_processor.list_processor import process_list
 from app.queue_processor.tag_processor import process_tag
 from app.queue_processor.type_rank_processor import process_type_rank
 from app.queue_processor.sitemap_processor import process_sitemap
+from app.queue_processor.explore_processor import process_explore
 from app.utils import (
     now_timestamp,
     record_exception_metrics,
@@ -77,6 +78,8 @@ def process_queue_items(db: Session) -> None:
                 process_type_rank(db, queue_item)
             elif item_type == "sitemap":
                 process_sitemap(db, queue_item)
+            elif item_type == "explore":
+                process_explore(db, queue_item)
             else:
                 logger.warning(f"Unsupported queue item type: {item_type}")
 
