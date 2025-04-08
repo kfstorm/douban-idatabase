@@ -3,7 +3,7 @@ import logging
 from sqlalchemy.orm import Session
 from typing import Dict
 
-from app.models import Item, Queue, add_to_queue
+from app.models import Item, Queue, add_placeholder_item, add_to_queue
 from app.info_provider.explore import explore
 from app.info_provider.imdb import fetch_imdb_id
 from app.queue_processor.common import allow_update_item, merge_item, save_item_to_db
@@ -304,6 +304,25 @@ def process_explore(db: Session, queue_item: Queue) -> None:
         )
         return
 
+    # If reported total is large, create narrower queue items
+    if reported_total > 400:
+        if not _add_narrower_conditions(db, conditions):
+            logger.warning(
+                f"All conditions already present in queue item: {queue_id}."
+                " No narrower conditions added."
+                f" Reported total: {reported_total}"
+            )
+
+    placeholder_count = 0
+    for item_detail in items:
+        douban_id = item_detail["douban_id"]
+        if add_placeholder_item(db, douban_id):
+            placeholder_count += 1
+    logger.info(f"Added {placeholder_count} placeholder items for {queue_id}")
+
+    # NOTE: process items at last in case any error occurs during processing.
+    # We don't want to lose narrower conditions or placeholder items.
+
     # Process retrieved items
     processed_count = 0
     for item_detail in items:
@@ -323,18 +342,10 @@ def process_explore(db: Session, queue_item: Queue) -> None:
         save_item_to_db(db, item)
         processed_count += 1
 
-    logger.info(f"Processed {processed_count} items for {queue_id}")
-
-    # If reported total is large, create narrower queue items
-    if reported_total > 400:
-        if not _add_narrower_conditions(db, conditions):
-            logger.warning(
-                f"All conditions already present in queue item: {queue_id}."
-                " No narrower conditions added."
-                f" Reported total: {reported_total}"
-            )
-
-    logger.info(f"Completed processing explore queue item: {queue_id}")
+    logger.info(
+        f"Completed processing explore queue item: {queue_id}."
+        f" Processed {processed_count} items."
+    )
 
 
 def _add_narrower_conditions(db: Session, conditions: dict) -> bool:
