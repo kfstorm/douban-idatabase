@@ -12,12 +12,13 @@ logger = logging.getLogger(__name__)
 
 COUNT = 500
 
-SCORE_RANGES = [f"{i},{i+1}" for i in range(0, 10)]
+# Score ranges for exploration. Higher scores come first.
+SCORE_RANGES = [f"{i},{i+1}" for i in range(9, -1, -1)]
 
 # Predefined conditions for narrowing down exploration
 
-# Years from 1980 to current year + 5
-YEARS = [str(year) for year in range(1980, datetime.now().year + 6)]
+# Years from 1980 to current year + 5. Later years come first.
+YEARS = [str(year) for year in range(datetime.now().year + 5, 1979, -1)]
 # Years before 1980. We expect fewer items in these ranges.
 YEARS += ["70年代", "60年代", "更早"]
 
