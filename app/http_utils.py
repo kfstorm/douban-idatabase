@@ -184,10 +184,23 @@ def get_response_via_zenrows(url: str, **kwargs):
 
 def get_response_via_proxy(url: str, **kwargs):
     """Make a request using configured proxies."""
+    proxies = settings.REQUESTS_PROXIES
+
+    # Handle legacy single proxy configuration
+    if isinstance(proxies, dict):
+        selected_proxy = proxies
+        proxy_info = "single proxy configuration"
+    else:
+        # Select a random proxy from the list
+        proxy_index = random.randrange(len(proxies))
+        selected_proxy = proxies[proxy_index]
+        proxy_info = f"proxy #{proxy_index+1}/{len(proxies)}"
+
+    logger.info(f"Using {proxy_info} for request to {url}")
     return get_response(
         url,
         fallback_strategy=FallbackStrategy.PROXY,
-        proxies=settings.REQUESTS_PROXIES,
+        proxies=selected_proxy,
         **kwargs,
     )
 
