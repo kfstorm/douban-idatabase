@@ -286,6 +286,18 @@ def generate_dashboard():
         [{"expr": "douban_idatabase_items", "legendFormat": "{{type}} - {{state}}"}],
     )
 
+    # Add panel for change rate of items
+    generator.add_graph_panel(
+        "Change Rate of Items by Type and State (per hour)",
+        [
+            {
+                "expr": "douban_idatabase_items - douban_idatabase_items offset 1h",  # Direct calculation of hourly change
+                "legendFormat": "{{type}} - {{state}}",
+            }
+        ],
+        y_axis_label="changes/hour",
+    )
+
     # Replace list stat panels with graph panel
     generator.add_graph_panel(
         "Lists by State",
