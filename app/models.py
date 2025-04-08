@@ -10,6 +10,7 @@ from sqlalchemy import (
 )
 from sqlalchemy import and_
 from sqlalchemy.orm import Session
+from sqlalchemy.exc import IntegrityError
 
 from app.database import Base
 from app.utils import now_timestamp
@@ -144,15 +145,21 @@ def add_placeholder_item(db: Session, douban_id: str) -> bool:
     existing_item = db.query(Item).filter_by(douban_id=douban_id).first()
 
     if not existing_item:
-        # Add to item table with minimal data
-        minimal_item = Item(
-            douban_id=douban_id,
-            update_time=None,  # This indicates it's a placeholder
-        )
-        db.add(minimal_item)
-        db.commit()
-        logger.info(f"Added placeholder item {douban_id}")
-        return True
+        try:
+            # Add to item table with minimal data
+            minimal_item = Item(
+                douban_id=douban_id,
+                update_time=None,  # This indicates it's a placeholder
+            )
+            db.add(minimal_item)
+            db.commit()
+            logger.info(f"Added placeholder item {douban_id}")
+            return True
+        except IntegrityError:
+            # Another thread might have added the same item
+            db.rollback()
+            logger.info(f"Placeholder item {douban_id} already added by another thread")
+            return False
     else:
         return False
 
@@ -174,17 +181,26 @@ def add_placeholder_list(db: Session, list_type: str, list_id: str) -> bool:
     )
 
     if not existing_list:
-        # Add to list table with minimal data
-        minimal_list = List(
-            list_type=list_type,
-            list_id=list_id,
-            last_check_time=None,  # This indicates it's a placeholder
-            douban_update_time=None,
-        )
-        db.add(minimal_list)
-        db.commit()
-        logger.info(f"Added placeholder list {list_type}/{list_id}")
-        return True
+        try:
+            # Add to list table with minimal data
+            minimal_list = List(
+                list_type=list_type,
+                list_id=list_id,
+                last_check_time=None,  # This indicates it's a placeholder
+                douban_update_time=None,
+            )
+            db.add(minimal_list)
+            db.commit()
+            logger.info(f"Added placeholder list {list_type}/{list_id}")
+            return True
+        except IntegrityError:
+            # Another thread might have added the same list
+            db.rollback()
+            logger.info(
+                f"Placeholder list {list_type}/{list_id}"
+                " already added by another thread"
+            )
+            return False
     else:
         return False
 
@@ -203,23 +219,29 @@ def add_placeholder_tag(db: Session, tag_name: str) -> bool:
     existing_tag = db.query(Tag).filter_by(tag_name=tag_name).first()
 
     if not existing_tag:
-        # Add to tag table with minimal data
-        minimal_tag = Tag(
-            tag_name=tag_name,
-            fetch=None,
-            last_check_time=None,  # This indicates it's a placeholder
-        )
-        db.add(minimal_tag)
-        db.commit()
-        logger.info(f"Added placeholder tag {tag_name}")
-        return True
+        try:
+            # Add to tag table with minimal data
+            minimal_tag = Tag(
+                tag_name=tag_name,
+                fetch=None,
+                last_check_time=None,  # This indicates it's a placeholder
+            )
+            db.add(minimal_tag)
+            db.commit()
+            logger.info(f"Added placeholder tag {tag_name}")
+            return True
+        except IntegrityError:
+            # Another thread might have added the same tag
+            db.rollback()
+            logger.info(f"Placeholder tag {tag_name} already added by another thread")
+            return False
     else:
         return False
 
 
 def add_to_queue(
     db: Session, queue_type: str, item_id: str, params: str = None
-) -> None:
+) -> bool:
     """
     Add an item to the queue if it doesn't exist
 
@@ -228,19 +250,30 @@ def add_to_queue(
         queue_type: Type of queue item (e.g., 'douban_id', 'sitemap')
         item_id: ID of the item
         params: Optional parameters for the queue item
+
+    Returns:
+        bool: True if a new queue item was added, False if it already existed
     """
     existing_item = (
         db.query(Queue).filter(Queue.type == queue_type, Queue.id == item_id).first()
     )
 
     if not existing_item:
-        queue_item = Queue(
-            type=queue_type, id=item_id, params=params, upsert_time=now_timestamp()
-        )
-        db.add(queue_item)
-        db.commit()
-        logger.info(f"Added {queue_type} item to queue: {item_id}")
-        return True
+        try:
+            queue_item = Queue(
+                type=queue_type, id=item_id, params=params, upsert_time=now_timestamp()
+            )
+            db.add(queue_item)
+            db.commit()
+            logger.info(f"Added {queue_type} item to queue: {item_id}")
+            return True
+        except IntegrityError:
+            # Another thread might have added the same queue item
+            db.rollback()
+            logger.info(
+                f"Queue item {queue_type}/{item_id} already added by another thread"
+            )
+            return False
     return False
 
 

@@ -2,6 +2,7 @@ import json
 import logging
 from datetime import datetime
 from sqlalchemy.orm import Session
+from sqlalchemy.exc import IntegrityError
 
 from app.config import settings
 from app.models import History, Item, List, Tag
@@ -116,6 +117,33 @@ def merge_item(detail_info: dict, imdb_info: dict) -> Item:
     )
 
 
+def _update_existing_item_columns(
+    existing_item: Item, new_item: Item, context: str = ""
+):
+    """
+    Update an existing item with data from a new item
+
+    Args:
+        existing_item: The existing Item object in the database
+        new_item: The new Item object with updated data
+        context: Optional context for logging (e.g., "after integrity error")
+    """
+    existing_item.douban_title = new_item.douban_title
+    existing_item.year = new_item.year
+    existing_item.rating = new_item.rating
+    existing_item.update_time = new_item.update_time
+    existing_item.next_update_time = new_item.next_update_time
+    existing_item.imdb_id = new_item.imdb_id
+    existing_item.type = new_item.type
+    existing_item.raw_data = new_item.raw_data
+
+    log_context = f" {context}" if context else ""
+    logger.info(
+        f"Updated item{log_context}: "
+        f"douban_id={new_item.douban_id}, title={new_item.douban_title}"
+    )
+
+
 def save_item_to_db(db: Session, item: Item):
     """
     Save or update item in database and log history
@@ -143,24 +171,32 @@ def save_item_to_db(db: Session, item: Item):
 
     if existing_item:
         # Update the existing item with new values
-        existing_item.douban_title = item.douban_title
-        existing_item.year = item.year
-        existing_item.rating = item.rating
-        existing_item.update_time = item.update_time
-        existing_item.next_update_time = item.next_update_time
-        existing_item.imdb_id = item.imdb_id
-        existing_item.type = item.type
-        existing_item.raw_data = item.raw_data
-
-        logger.info(
-            f"Updated item: douban_id={item.douban_id}, title={item.douban_title}"
-        )
+        _update_existing_item_columns(existing_item, item)
     else:
-        # Add the new item directly
-        db.add(item)
+        try:
+            # Add the new item directly
+            db.add(item)
+            logger.info(
+                f"Added new item: douban_id={item.douban_id}, title={item.douban_title}"
+            )
+        except IntegrityError:
+            # Another thread might have added the same item
+            db.rollback()
+            logger.info(
+                f"Item {item.douban_id} already added"
+                f" by another thread, updating instead"
+            )
 
-        logger.info(
-            f"Added new item: douban_id={item.douban_id}, title={item.douban_title}"
-        )
+            # Re-add the history entry that was rolled back
+            db.add(history)
+
+            # Fetch the item that was added by another thread and update it
+            existing_item = (
+                db.query(Item).filter(Item.douban_id == item.douban_id).first()
+            )
+            if existing_item:
+                _update_existing_item_columns(
+                    existing_item, item, "after integrity error"
+                )
 
     db.commit()
