@@ -2,10 +2,12 @@ from collections import defaultdict
 import logging
 import random
 import time
+from typing import Optional
 import requests
 from urllib.parse import urlencode, urlparse
 from enum import Enum, auto
 from requests.exceptions import ProxyError
+from http.cookiejar import DefaultCookiePolicy
 
 from app.config import settings
 from app.utils import (
@@ -167,6 +169,73 @@ class Throttler:
 throttler = Throttler()
 
 
+class SessionManager:
+    """Manages requests.Session objects for connection pooling."""
+
+    def __init__(self):
+        # Default session for regular requests
+        self.default_session = self._create_new_session()
+        # Sessions for each proxy configuration as an array
+        self.proxy_sessions = []
+
+        # Initialize all proxy sessions at startup
+        self._initialize_proxy_sessions()
+
+    def _initialize_proxy_sessions(self):
+        """Create sessions for all configured proxies at startup."""
+        # Check if proxies are configured
+        if not settings.REQUESTS_PROXIES:
+            logger.info("No proxies configured, skipping proxy session initialization")
+            return
+
+        proxies = settings.REQUESTS_PROXIES
+
+        # Handle legacy single proxy configuration
+        if isinstance(proxies, dict):
+            proxies = [proxies]
+
+        # Create a session for each proxy and add to the array
+        for i, proxy_config in enumerate(proxies):
+            session = self._create_new_session()
+            session.proxies.update(proxy_config)
+            self.proxy_sessions.append(session)
+            logger.info(f"Initialized session for proxy #{i + 1}")
+
+    def _create_new_session(self):
+        """Create a new session with default settings."""
+        session = requests.Session()
+        # Set default headers
+        session.headers.update(DEFAULT_HEADERS)
+        # Prevent cookies from being stored by setting an empty allowed domains list
+        session.cookies.set_policy(DefaultCookiePolicy(allowed_domains=[]))
+        return session
+
+    def get_session(self, proxy_index: Optional[int] = None):
+        """
+        Get a session for the given proxy index.
+
+        Args:
+            proxy_index: Optional identifier for the proxy (numeric index)
+
+        Returns:
+            A requests.Session object
+        """
+        if proxy_index is None:
+            return self.default_session
+
+        # Check if proxy_index is a valid index
+        if isinstance(proxy_index, int) and 0 <= proxy_index < len(self.proxy_sessions):
+            return self.proxy_sessions[proxy_index]
+
+        # Fallback to default session if proxy index not valid
+        logger.warning(f"Proxy session {proxy_index} not found, using default session")
+        return self.default_session
+
+
+# Initialize the session manager
+session_manager = SessionManager()
+
+
 def get_response_via_zenrows(url: str, **kwargs):
     final_url = url
     original_params = kwargs.pop("params", {})
@@ -198,7 +267,6 @@ def get_response_via_proxy(url: str, **kwargs):
 
     # Select a random proxy from the list
     proxy_index = random.randrange(len(proxies)) if len(proxies) > 1 else 0
-    selected_proxy = proxies[proxy_index]
     proxy_id = f"#{proxy_index + 1}"
 
     logger.info(f"Using proxy {proxy_id}/{len(proxies)} for request to {url}")
@@ -207,7 +275,7 @@ def get_response_via_proxy(url: str, **kwargs):
         return get_response(
             url,
             fallback_strategy=FallbackStrategy.PROXY,
-            proxies=selected_proxy,
+            proxy_index=proxy_index,
             **kwargs,
         )
     except ProxyError as e:
@@ -234,23 +302,21 @@ def can_use_fallback(strategy: FallbackStrategy, host: str):
 def get_response(url: str, fallback_strategy=None, **kwargs):
     host = urlparse(url).netloc
 
-    if not fallback_strategy:
-        headers = {
-            "User-Agent": (
-                "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"
-                + " AppleWebKit/537.36 (KHTML, like Gecko)"
-                + " Chrome/121.0.0.0 Safari/537.3"
-            )
-        }
+    # Get the appropriate session based on proxy configuration
+    proxy_index = kwargs.pop("proxy_index", None)
+    session = session_manager.get_session(proxy_index)
 
-        # Merge headers if provided in kwargs
-        if "headers" in kwargs:
-            headers.update(kwargs.pop("headers"))
-        kwargs["headers"] = headers
-
+    # Handle Douban cookies for this specific request
+    cookies = {}
     if settings.DOUBAN_COOKIE_DBCL2 and host.endswith(".douban.com"):
-        kwargs["cookies"] = kwargs.get("cookies", {})
-        kwargs["cookies"]["dbcl2"] = settings.DOUBAN_COOKIE_DBCL2
+        cookies["dbcl2"] = settings.DOUBAN_COOKIE_DBCL2
+
+    # Merge with any provided cookies
+    if "cookies" in kwargs:
+        cookies.update(kwargs.pop("cookies"))
+
+    if cookies:
+        kwargs["cookies"] = cookies
 
     start_time = time.time()
 
@@ -280,7 +346,7 @@ def get_response(url: str, fallback_strategy=None, **kwargs):
 
     try:
         logger.info("Accessing %s", url)
-        response = requests.get(url, timeout=60, **kwargs)
+        response = session.get(url, timeout=60, **kwargs)
 
         # Record response duration
         duration = time.time() - start_time
