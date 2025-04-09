@@ -545,6 +545,20 @@ def generate_dashboard():
         aggregation=None,  # No additional aggregation needed - already using sum
     )
 
+    # Proxy Metrics
+    generator.add_row("Proxy Metrics")
+    generator.add_graph_panel(
+        "Proxy Failures by Proxy ID",
+        [
+            {
+                "expr": "rate(douban_idatabase_proxy_failures_total[5m])",
+                "legendFormat": "{{proxy_id}}",
+            }
+        ],
+        y_axis_format="ops",
+        y_axis_label="failures/sec",
+    )
+
     return generator.generate_dashboard()
 
 

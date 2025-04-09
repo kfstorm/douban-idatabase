@@ -155,6 +155,13 @@ http_request_duration = Histogram(
     buckets=DURATION_BUCKETS,
 )
 
+# Proxy failure metrics
+proxy_failures_total = Counter(
+    "douban_idatabase_proxy_failures_total",
+    "Total number of proxy failures",
+    ["proxy_id"],
+)
+
 # Exception counter
 exception_counts = Counter(
     "douban_idatabase_exceptions_total",

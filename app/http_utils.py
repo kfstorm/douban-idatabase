@@ -5,6 +5,7 @@ import time
 import requests
 from urllib.parse import urlencode, urlparse
 from enum import Enum, auto
+from requests.exceptions import ProxyError
 
 from app.config import settings
 from app.utils import (
@@ -12,7 +13,12 @@ from app.utils import (
     record_exception_metrics,
     timestamp_to_local_time_str,
 )
-from app.metrics import rate_limit_hits, http_requests_total, http_request_duration
+from app.metrics import (
+    rate_limit_hits,
+    http_requests_total,
+    http_request_duration,
+    proxy_failures_total,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -188,21 +194,28 @@ def get_response_via_proxy(url: str, **kwargs):
 
     # Handle legacy single proxy configuration
     if isinstance(proxies, dict):
-        selected_proxy = proxies
-        proxy_info = "single proxy configuration"
-    else:
-        # Select a random proxy from the list
-        proxy_index = random.randrange(len(proxies))
-        selected_proxy = proxies[proxy_index]
-        proxy_info = f"proxy #{proxy_index+1}/{len(proxies)}"
+        proxies = [proxies]
 
-    logger.info(f"Using {proxy_info} for request to {url}")
-    return get_response(
-        url,
-        fallback_strategy=FallbackStrategy.PROXY,
-        proxies=selected_proxy,
-        **kwargs,
-    )
+    # Select a random proxy from the list
+    proxy_index = random.randrange(len(proxies)) if len(proxies) > 1 else 0
+    selected_proxy = proxies[proxy_index]
+    proxy_id = f"#{proxy_index + 1}"
+
+    logger.info(f"Using proxy {proxy_id}/{len(proxies)} for request to {url}")
+
+    try:
+        return get_response(
+            url,
+            fallback_strategy=FallbackStrategy.PROXY,
+            proxies=selected_proxy,
+            **kwargs,
+        )
+    except ProxyError as e:
+        # Record which proxy failed
+        proxy_failures_total.labels(proxy_id=proxy_id).inc()
+        logger.error(f"Proxy error with {proxy_id}: {str(e)}")
+        record_exception_metrics(e)
+        raise
 
 
 def can_use_fallback(strategy: FallbackStrategy, host: str):
