@@ -1,31 +1,41 @@
 from collections import defaultdict
 import gzip
 import json
+import logging
 
 import pytest
 from app.info_provider.explore import explore
 from app.test.common import check_detail
 
-COUNT = 20
+logger = logging.getLogger(__name__)
+
+DEFAULT_TEST_COUNT = 20
 
 
-def check_explore_result(result: dict, item_check_func):
-    assert len(result["items"]) > 0
-    assert result["total"] > 0
+def check_explore_result(
+    result: dict, item_check_func, allow_no_results: bool = False, **kwargs
+):
+    logger.info(f"Items count: {len(result['items'])}, Total: {result['total']}")
+    if not allow_no_results:
+        assert len(result["items"]) > 0
+        assert result["total"] > 0
+    douban_ids = set()
     for item in result["items"]:
-        check_detail(item)
+        check_detail(item, **kwargs)
         item_check_func(item)
+        assert item["douban_id"] not in douban_ids
+        douban_ids.add(item["douban_id"])
 
 
 def test_explore_with_score_range():
     """Test the explore function with just a score range and no other filters."""
-    result = explore("9,10", count=COUNT)
+    result = explore("9,10", count=DEFAULT_TEST_COUNT)
     check_explore_result(result, lambda item: item["rating"] >= 9.0)
 
 
 def test_explore_with_year_filter():
     """Test the explore function with a score range and a specific year filter."""
-    result = explore("9,10", tags=["2023"], count=COUNT)
+    result = explore("9,10", tags=["2023"], count=DEFAULT_TEST_COUNT)
     check_explore_result(
         result, lambda item: item["rating"] >= 9.0 and item["year"] == 2023
     )
@@ -34,7 +44,7 @@ def test_explore_with_year_filter():
 def test_explore_with_type_filter():
     """Test the explore function with a score range, year,
     and a specific type filter."""
-    result = explore("9,10", tags=["2023", "喜剧"], count=COUNT)
+    result = explore("9,10", tags=["2023", "喜剧"], count=DEFAULT_TEST_COUNT)
     check_explore_result(
         result,
         lambda item: item["rating"] >= 9.0
@@ -46,7 +56,7 @@ def test_explore_with_type_filter():
 def test_explore_with_region_filter():
     """Test the explore function with a score range, year, type,
     and a specific region filter."""
-    result = explore("9,10", tags=["2023", "喜剧", "意大利"], count=COUNT)
+    result = explore("9,10", tags=["2023", "喜剧", "意大利"], count=DEFAULT_TEST_COUNT)
     check_explore_result(
         result,
         lambda item: item["rating"] >= 9.0
@@ -59,7 +69,7 @@ def test_explore_with_region_filter():
 def test_explore_type_filter_not_on_website():
     """Test the explore function with a type filter
     that is not present on the website."""
-    result = explore("0,10", tags=["脱口秀"], count=COUNT)
+    result = explore("0,10", tags=["脱口秀"], count=DEFAULT_TEST_COUNT)
     check_explore_result(
         result,
         lambda item: "脱口秀" in item["raw_data"]["detail"]["card_subtitle"],
@@ -69,7 +79,7 @@ def test_explore_type_filter_not_on_website():
 def test_explore_region_filter_not_on_website():
     """Test the explore function with a region filter
     that is not present on the website."""
-    result = explore("1,10", tags=["挪威"], count=COUNT)
+    result = explore("1,10", tags=["挪威"], count=DEFAULT_TEST_COUNT)
     check_explore_result(
         result,
         lambda item: "挪威" in item["raw_data"]["detail"]["card_subtitle"],
@@ -79,10 +89,49 @@ def test_explore_region_filter_not_on_website():
 def test_explore_year_filter_not_on_website():
     """Test the explore function with a year filter
     that is not present on the website."""
-    result = explore("9,10", tags=["2015"], count=COUNT)
+    result = explore("9,10", tags=["2015"], count=DEFAULT_TEST_COUNT)
     check_explore_result(
         result, lambda item: item["rating"] >= 9.0 and item["year"] == 2015
     )
+
+
+def test_explore_year_range():
+    start_year = 1980  # somehow if we use 2010 here, the test will fail
+    years = [start_year + i for i in range(10)]
+    if start_year >= 2000:
+        year_range = f"{start_year}年代"
+    else:
+        year_range = f"{start_year % 100}年代"
+    common_tags = ["喜剧", "中国大陆"]
+
+    def check(result):
+        check_explore_result(
+            result,
+            lambda item: (
+                (item["rating"] is None or item["rating"] <= 1.0)
+                and (not item["year"] or min(years) <= item["year"] <= max(years))
+                and "喜剧" in item["raw_data"]["detail"]["card_subtitle"]
+                and "中国大陆" in item["raw_data"]["detail"]["card_subtitle"]
+            ),
+            allow_no_results=True,
+            allow_no_rating=True,
+            allow_no_year=True,
+        )
+
+    result_by_year_range = explore("0,1", tags=common_tags + [year_range])
+    check(result_by_year_range)
+
+    results_by_year = [explore("0,1", tags=common_tags + [str(year)]) for year in years]
+    for result in results_by_year:
+        check(result)
+
+    douban_ids_by_year_range = set(
+        item["douban_id"] for item in result_by_year_range["items"]
+    )
+    douban_ids_by_year = set(
+        item["douban_id"] for result in results_by_year for item in result["items"]
+    )
+    assert douban_ids_by_year_range == douban_ids_by_year
 
 
 @pytest.mark.skip(reason="This test is skipped because it is a only a tool.")

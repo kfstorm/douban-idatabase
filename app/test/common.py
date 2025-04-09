@@ -1,7 +1,9 @@
-def check_detail(detail: dict):
+def check_detail(
+    detail: dict, allow_no_rating: bool = False, allow_no_year: bool = False
+) -> None:
     assert isinstance(detail, dict)
     assert "in_blacklist" in detail
-    assert isinstance(detail["in_blacklist"], bool)
+    assert detail["in_blacklist"] is None or isinstance(detail["in_blacklist"], bool)
     in_blacklist = detail["in_blacklist"]
 
     assert "douban_id" in detail
@@ -11,15 +13,21 @@ def check_detail(detail: dict):
     if in_blacklist:
         assert detail["year"] is None
     else:
-        assert isinstance(detail["year"], int)
-        assert 0 < detail["year"] <= 2099
+        if allow_no_year and detail["year"] is None:
+            pass
+        else:
+            assert isinstance(detail["year"], int)
+            assert 0 < detail["year"] <= 2099
     assert "rating" in detail
 
     if in_blacklist:
         assert detail["rating"] is None
     else:
-        assert isinstance(detail["rating"], float)
-        assert 0 <= detail["rating"] <= 10
+        if allow_no_rating and detail["rating"] is None:
+            pass
+        else:
+            assert isinstance(detail["rating"], float)
+            assert 0 <= detail["rating"] <= 10
 
     assert "type" in detail
     assert detail["type"] in ["movie", "tv"]

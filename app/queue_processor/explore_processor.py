@@ -305,8 +305,9 @@ def process_explore(db: Session, queue_item: Queue) -> None:
         )
         return
 
-    # If reported total is large, create narrower queue items
-    if reported_total > 400:
+    # If reported total is large or items are less than 95% of reported total,
+    # add narrower conditions to the queue.
+    if reported_total > 400 or len(items) / reported_total < 0.95:
         if not _add_narrower_conditions(db, conditions):
             logger.warning(
                 f"All conditions already present in queue item: {queue_id}."
