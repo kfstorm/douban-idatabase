@@ -25,7 +25,7 @@ else:
     logger.info("Redis URL not configured, using in-memory store for rate limiting")
 
 
-async def rate_limit_middleware(request: Request, user_info: dict):
+def rate_limit_middleware(request: Request, user_info: dict):
     """
     Implement API rate limiting middleware
     Using sliding window algorithm to limit user request frequency

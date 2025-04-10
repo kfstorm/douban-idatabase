@@ -32,7 +32,7 @@ api_key_query = APIKeyQuery(name="api_key", auto_error=False)
 
 
 # API Key verification dependency
-async def verify_api_key(
+def verify_api_key(
     request: Request,
     api_key_header: Optional[str] = Security(api_key_header),
     api_key_query: Optional[str] = Security(api_key_query),
@@ -73,7 +73,7 @@ async def verify_api_key(
 
 
 # API rate limiting - applied globally after authentication
-async def apply_rate_limiting(request: Request):
+def apply_rate_limiting(request: Request):
     # Only apply rate limiting for /api paths
     if request.url.path.startswith("/api"):
         # Get user info from state (set by verify_api_key)
@@ -86,7 +86,7 @@ async def apply_rate_limiting(request: Request):
             ).inc()
 
             # Apply rate limiting
-            await rate_limit_middleware(request, user_info)
+            rate_limit_middleware(request, user_info)
 
 
 # Initialize FastAPI with global dependencies

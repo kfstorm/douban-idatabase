@@ -12,8 +12,15 @@ from app.info_provider.common import extract_douban_item_detail
 
 logger = logging.getLogger(__name__)
 
+# Increase pool size and max overflow if multiple threads are used
+pool_size = max(10, settings.QUEUE_PROCESSOR_THREAD_COUNT * 2)
+max_overflow = max(5, settings.QUEUE_PROCESSOR_THREAD_COUNT)
+
 engine = create_engine(
-    settings.SQLALCHEMY_DATABASE_URL, connect_args={"check_same_thread": False}
+    settings.SQLALCHEMY_DATABASE_URL,
+    connect_args={"check_same_thread": False},
+    pool_size=pool_size,
+    max_overflow=max_overflow,
 )
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
