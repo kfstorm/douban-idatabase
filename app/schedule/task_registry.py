@@ -1,5 +1,6 @@
 from typing import Dict, Type, List
 
+from app.config import settings
 from app.schedule.base_task import BaseTask
 
 # Registry for all registered tasks
@@ -8,6 +9,8 @@ _TASK_REGISTRY: Dict[str, Type[BaseTask]] = {}
 
 def register_task(task_class: Type[BaseTask]) -> Type[BaseTask]:
     """Register a task class in the registry"""
+    if settings.DISABLE_SCHEDULER:
+        return task_class
     try:
         task_instance = task_class()  # Instantiate to verify properties
         task_type = task_instance.task_type
