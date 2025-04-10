@@ -7,7 +7,7 @@ from typing import Optional
 from app.config import settings
 from app.http_utils import get_response
 from app.info_provider.common import COMMON_HEADERS
-from app.utils import record_exception_metrics
+from app.utils import ApplicationShutdownException, record_exception_metrics
 
 
 logger = logging.getLogger(__name__)
@@ -142,6 +142,8 @@ def fetch_imdb_id(douban_id: str, in_blacklist: Optional[bool]) -> dict:
         result = _fetch_imdb_id_from_mobile_desc(douban_id)
         if result:
             return result
+    except ApplicationShutdownException:
+        raise
     except Exception as e:
         record_exception_metrics(e)
         logger.warning(
@@ -157,6 +159,8 @@ def fetch_imdb_id(douban_id: str, in_blacklist: Optional[bool]) -> dict:
             result = _fetch_imdb_id_from_desktop_html(douban_id)
             if result:
                 return result
+        except ApplicationShutdownException:
+            raise
         except Exception as e:
             record_exception_metrics(e)
             logger.warning(

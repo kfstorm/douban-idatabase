@@ -4,20 +4,22 @@ from concurrent.futures import ThreadPoolExecutor
 from sqlalchemy.orm import Session
 from typing import List
 
+from app.http_utils import RateLimitException
 from app.queue_processor.douban_id_processor import process_douban_id
 from app.queue_processor.list_processor import process_list
 from app.queue_processor.tag_processor import process_tag
 from app.queue_processor.type_rank_processor import process_type_rank
 from app.queue_processor.sitemap_processor import process_sitemap
 from app.queue_processor.explore_processor import process_explore
+import app.utils
 from app.utils import (
     now_timestamp,
     record_exception_metrics,
+    ApplicationShutdownException,
 )
 from app.models import Queue
 from app.config import settings
 from app.database import SessionLocal
-from app.http_utils import RateLimitException
 from app.metrics import worker_processed_items, worker_processing_duration
 
 logger = logging.getLogger(__name__)
@@ -26,11 +28,10 @@ logger = logging.getLogger(__name__)
 processing_items = set()  # Set of (type, id) tuples
 
 
-def process_single_queue_item(item_type: str, item_id: str) -> bool:
+def process_single_queue_item(item_type: str, item_id: str) -> None:
     """
     Process a single queue item in a separate thread.
     Retrieves the queue item from the database using its type and ID.
-    Returns True if processed successfully, False otherwise.
     """
     # Use context manager for automatic session cleanup
     with SessionLocal() as db:
@@ -41,7 +42,6 @@ def process_single_queue_item(item_type: str, item_id: str) -> bool:
 
         if not queue_item:
             logger.warning(f"Queue item not found: type={item_type}, id={item_id}")
-            return False
 
         try:
             logger.info(f"Processing queue item: type={item_type}, id={item_id}")
@@ -76,7 +76,13 @@ def process_single_queue_item(item_type: str, item_id: str) -> bool:
             db.delete(queue_item)
             db.commit()
 
-            return True
+        except ApplicationShutdownException:
+            logger.warning(
+                f"Queue item {item_type}/{item_id} processing aborted"
+                " due to application shutdown."
+            )
+            db.rollback()
+            worker_processed_items.labels(type=item_type, status="aborted").inc()
 
         except RateLimitException as e:
             record_exception_metrics(e)
@@ -86,7 +92,6 @@ def process_single_queue_item(item_type: str, item_id: str) -> bool:
             logger.error(
                 f"Rate limit hit while processing queue item {item_id}: {str(e)}"
             )
-            return False
 
         except Exception as e:
             record_exception_metrics(e)
@@ -101,7 +106,6 @@ def process_single_queue_item(item_type: str, item_id: str) -> bool:
             # Remove the item from queue even if there's an error
             db.delete(queue_item)
             db.commit()
-            return True
 
 
 def fetch_batch_of_queue_items(db: Session, batch_size: int) -> List[Queue]:
@@ -123,6 +127,26 @@ def fetch_batch_of_queue_items(db: Session, batch_size: int) -> List[Queue]:
     ][:batch_size]
 
     return available_items
+
+
+def _process_future_result(future_key, future, db):
+    """
+    Helper function to process the result of a completed future.
+    Returns True if the item was processed successfully (should be counted),
+    False otherwise.
+    """
+    try:
+        future.result()
+    except Exception as e:
+        item_type, item_id = future_key
+        logger.exception(
+            "Unhandled exception in worker thread"
+            f" for item type={item_type}, id={item_id}: {e}"
+        )
+    finally:
+        # Remove from processing items set
+        if future_key in processing_items:
+            processing_items.remove(future_key)
 
 
 def process_queue_items(db: Session) -> None:
@@ -155,6 +179,10 @@ def process_queue_items(db: Session) -> None:
         futures = {}
 
         while True:
+            if app.utils.shutdown_flag:
+                logger.info("Application is shutting down. Stopping queue processing.")
+                break
+
             # Check if we've exceeded the time limit
             elapsed_seconds = now_timestamp() - start_time
             if elapsed_seconds >= time_limit_seconds:
@@ -169,20 +197,8 @@ def process_queue_items(db: Session) -> None:
             for future_key, future in futures.items():
                 if future.done():
                     done_future_keys.append(future_key)
-                    try:
-                        result = future.result()
-                        if result:
-                            processed_count += 1
-                    except Exception as e:
-                        item_type, item_id = future_key
-                        logger.exception(
-                            "Unhandled exception in worker thread"
-                            f" for item type={item_type}, id={item_id}: {e}"
-                        )
-                    finally:
-                        # Remove from processing items set
-                        if future_key in processing_items:
-                            processing_items.remove(future_key)
+                    _process_future_result(future_key, future, db)
+                    processed_count += 1
 
             # Remove completed futures
             for future_key in done_future_keys:
@@ -233,16 +249,8 @@ def process_queue_items(db: Session) -> None:
         if futures:
             logger.info(f"Waiting for {len(futures)} remaining tasks to complete...")
             for future_key, future in futures.items():
-                try:
-                    result = future.result()
-                    if result:
-                        processed_count += 1
-                except Exception as e:
-                    item_type, item_id = future_key
-                    logger.exception(
-                        "Unhandled exception in worker thread"
-                        f" for item type={item_type}, id={item_id}: {e}"
-                    )
+                _process_future_result(future_key, future, db)
+                processed_count += 1
             # Make sure to clear processing_items when done
             processing_items.clear()
 

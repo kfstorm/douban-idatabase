@@ -7,7 +7,7 @@ from urllib.parse import parse_qs, urlparse
 from app.http_utils import get_json, get_response
 from app.info_provider.common import COMMON_HEADERS
 from app.info_provider.common import extract_douban_item_detail
-from app.utils import record_exception_metrics
+from app.utils import ApplicationShutdownException, record_exception_metrics
 
 logger = logging.getLogger(__name__)
 
@@ -64,6 +64,8 @@ def get_types() -> List[Tuple[str, str]]:
         )
         return unique_result
 
+    except ApplicationShutdownException:
+        raise
     except Exception as e:
         record_exception_metrics(e)
         logger.error(f"Error fetching movie/TV types from chart page: {str(e)}")
@@ -134,6 +136,8 @@ def get_rank_details(
             # Move to the next page
             current_start += page_size
 
+        except ApplicationShutdownException:
+            raise
         except Exception as e:
             record_exception_metrics(e)
             logger.error(f"Error fetching rank data: {str(e)}")

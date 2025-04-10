@@ -21,6 +21,7 @@ from app.metrics import (
     user_requests_total,
 )
 from app.rate_limit import rate_limit_middleware
+import app.utils
 
 # Initialize logging
 logger = setup_logging()
@@ -89,7 +90,7 @@ async def apply_rate_limiting(request: Request):
 
 
 # Initialize FastAPI with global dependencies
-app = FastAPI(
+my_app = FastAPI(
     dependencies=[
         Depends(verify_api_key),  # First verify API key
         Depends(apply_rate_limiting),  # Then apply rate limiting
@@ -97,7 +98,7 @@ app = FastAPI(
 )
 
 # Add CORS middleware to allow cross-origin requests
-app.add_middleware(
+my_app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],  # Allows all origins
     allow_credentials=True,
@@ -106,7 +107,7 @@ app.add_middleware(
 )
 
 
-@app.middleware("http")
+@my_app.middleware("http")
 async def global_middleware(request: Request, call_next):
     # Record start time for metrics
     start_time = time.time()
@@ -136,7 +137,7 @@ async def global_middleware(request: Request, call_next):
     return response
 
 
-@app.get("/api/item", response_model=List[schemas.Item])
+@my_app.get("/api/item", response_model=List[schemas.Item])
 def get_items(
     response: Response,
     douban_id: str = Query(None),
@@ -161,7 +162,7 @@ def get_items(
     return items
 
 
-@app.get("/metrics")
+@my_app.get("/metrics")
 def metrics_endpoint(
     db: Session = Depends(get_db), current_user: dict = Depends(verify_api_key)
 ):
@@ -180,7 +181,7 @@ def metrics_endpoint(
 
 def run_app():
     """Run the FastAPI app"""
-    uvicorn.run("app.main:app", host="0.0.0.0")
+    uvicorn.run("app.main:my_app", host="0.0.0.0")
 
 
 def main():
@@ -214,6 +215,8 @@ def main():
         app_process.join()
     except KeyboardInterrupt:
         logger.info("Shutting down...")
+        app.utils.shutdown_flag = True
+
         if not settings.DISABLE_SCHEDULER:
             stop_scheduler()
         app_process.terminate()

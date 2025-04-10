@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 
 from app.database import SessionLocal
 from app.models import Schedule
-from app.http_utils import RateLimitException
+from app.http_utils import ApplicationShutdownException, RateLimitException
 from app.utils import (
     now_timestamp,
     timestamp_to_local_time_str,
@@ -111,6 +111,10 @@ def execute_scheduled_task(db: Session, schedule_type: str) -> Optional[float]:
             f"Rate limited while executing scheduled task {schedule_type}: {str(e)}"
         )
         return e.next_call_time
+    except ApplicationShutdownException:
+        logger.info("Application is shutting down. Scheduler task execution aborted.")
+        db.rollback()
+        return None
     except KeyError:
         logger.warning(f"Unknown schedule type: {schedule_type}")
         return None

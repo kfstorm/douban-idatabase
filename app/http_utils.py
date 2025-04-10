@@ -16,7 +16,9 @@ from app.utils import (
     now_timestamp,
     record_exception_metrics,
     timestamp_to_local_time_str,
+    ApplicationShutdownException,
 )
+import app.utils
 from app.metrics import (
     rate_limit_hits,
     http_requests_total,
@@ -319,6 +321,11 @@ def can_use_fallback(strategy: FallbackStrategy, host: str):
 
 
 def get_response(url: str, fallback_strategy=None, **kwargs):
+    if app.utils.shutdown_flag:
+        raise ApplicationShutdownException(
+            "Application is shutting down. HTTP requests are forbidden."
+        )
+
     host = urlparse(url).netloc
 
     # Get the appropriate session based on proxy configuration

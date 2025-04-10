@@ -5,6 +5,15 @@ import pytz
 
 logger = logging.getLogger(__name__)
 
+# Define a global shutdown flag
+shutdown_flag = False
+
+
+class ApplicationShutdownException(Exception):
+    """Exception raised when the application is shutting down."""
+
+    pass
+
 
 def parse_douban_time(time_str: str) -> float:
     """Convert Beijing time string to UTC timestamp."""

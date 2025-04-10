@@ -5,7 +5,7 @@ import time
 import random
 from bs4 import BeautifulSoup
 
-from app.utils import record_exception_metrics
+from app.utils import ApplicationShutdownException, record_exception_metrics
 from app.config import settings
 from app.http_utils import get_json, get_response
 
@@ -119,6 +119,8 @@ def _zenrows_google_search(
                     break
                 google_url = next_page
 
+        except ApplicationShutdownException:
+            raise
         except Exception as e:
             record_exception_metrics(e)
             logger.error(f"Error during Google search via ZenRows API: {e}")
@@ -207,6 +209,8 @@ def _direct_google_search(
                 logger.info("End of search results reached")
                 break
 
+        except ApplicationShutdownException:
+            raise
         except Exception as e:
             record_exception_metrics(e)
             logger.error(f"Error during direct Google search: {e}")
