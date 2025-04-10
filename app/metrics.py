@@ -169,7 +169,10 @@ exception_counts = Counter(
     ["type", "module"],
 )
 
-# Metrics update caching
+# Track known labels for group-by metrics
+# to reset metrics when groups don't exist anymore
+_known_item_types = set()
+_known_queue_types = set()
 _metrics_cache_lock = threading.Lock()
 _last_metrics_update = 0
 
@@ -181,7 +184,7 @@ def update_db_metrics(db: Session, force=False):
         db: Database session
         force: Force update regardless of cache status
     """
-    global _last_metrics_update
+    global _last_metrics_update, _known_item_types, _known_queue_types
 
     # Skip update if it's been refreshed recently
     current_time = time.time()
@@ -219,9 +222,20 @@ def update_db_metrics(db: Session, force=False):
             .all()
         )
 
+        # Get current item types
+        current_item_types = set()
         for item_type, placeholder_count, fetched_count in item_stats:
+            current_item_types.add(item_type)
             db_items.labels(type=item_type, state="fetched").set(fetched_count)
             db_items.labels(type=item_type, state="placeholder").set(placeholder_count)
+
+        # Reset metrics for item types that no longer exist
+        for item_type in _known_item_types - current_item_types:
+            db_items.labels(type=item_type, state="fetched").set(0)
+            db_items.labels(type=item_type, state="placeholder").set(0)
+
+        # Update known item types
+        _known_item_types = current_item_types
 
         # Use optimized queries for list statistics
         list_stats = db.query(
@@ -233,8 +247,8 @@ def update_db_metrics(db: Session, force=False):
             ).label("fetched_count"),
         ).one()
 
-        db_lists.labels(state="fetched").set(list_stats.fetched_count)
-        db_lists.labels(state="placeholder").set(list_stats.placeholder_count)
+        db_lists.labels(state="fetched").set(list_stats.fetched_count or 0)
+        db_lists.labels(state="placeholder").set(list_stats.placeholder_count or 0)
 
         # Use optimized query for tag statistics with indexed columns
         tag_stats = db.query(
@@ -249,9 +263,9 @@ def update_db_metrics(db: Session, force=False):
             ).label("placeholder_count"),
         ).one()
 
-        db_tags.labels(state="valid").set(tag_stats.valid_count)
-        db_tags.labels(state="not_valid").set(tag_stats.not_valid_count)
-        db_tags.labels(state="placeholder").set(tag_stats.placeholder_count)
+        db_tags.labels(state="valid").set(tag_stats.valid_count or 0)
+        db_tags.labels(state="not_valid").set(tag_stats.not_valid_count or 0)
+        db_tags.labels(state="placeholder").set(tag_stats.placeholder_count or 0)
 
         # Use indexed query for queue statistics
         queue_stats = (
@@ -260,8 +274,18 @@ def update_db_metrics(db: Session, force=False):
             .all()
         )
 
+        # Get current queue types
+        current_queue_types = set()
         for queue_type, count in queue_stats:
+            current_queue_types.add(queue_type)
             db_queue_size.labels(type=queue_type).set(count)
+
+        # Reset metrics for queue types that no longer exist
+        for queue_type in _known_queue_types - current_queue_types:
+            db_queue_size.labels(type=queue_type).set(0)
+
+        # Update known queue types
+        _known_queue_types = current_queue_types
 
         # Fast count query for history using primary key index
         db_history_total.set(db.query(func.count(History.change_id)).scalar() or 0)
