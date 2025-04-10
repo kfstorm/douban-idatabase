@@ -5,7 +5,9 @@ import time
 from typing import Optional
 import requests
 from urllib.parse import urlencode, urlparse
+from urllib3.util import Retry
 from enum import Enum, auto
+from requests.adapters import HTTPAdapter
 from requests.exceptions import ProxyError
 from http.cookiejar import DefaultCookiePolicy
 
@@ -181,6 +183,16 @@ class SessionManager:
         # Initialize all proxy sessions at startup
         self._initialize_proxy_sessions()
 
+    def _get_retry_config(self):
+        """Get retry configuration with fixed values."""
+        return Retry(
+            total=3,
+            backoff_factor=0.5,
+            status_forcelist=[429, 500, 502, 503, 504],
+            raise_on_status=False,  # Let requests handle HTTP errors
+            respect_retry_after_header=False,
+        )
+
     def _initialize_proxy_sessions(self):
         """Create sessions for all configured proxies at startup."""
         # Check if proxies are configured
@@ -208,6 +220,13 @@ class SessionManager:
         session.headers.update(DEFAULT_HEADERS)
         # Prevent cookies from being stored by setting an empty allowed domains list
         session.cookies.set_policy(DefaultCookiePolicy(allowed_domains=[]))
+
+        # Configure retries
+        retry_config = self._get_retry_config()
+        # Apply retry configuration to both http and https
+        session.mount("http://", HTTPAdapter(max_retries=retry_config))
+        session.mount("https://", HTTPAdapter(max_retries=retry_config))
+
         return session
 
     def get_session(self, proxy_index: Optional[int] = None):
