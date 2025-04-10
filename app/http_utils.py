@@ -356,12 +356,6 @@ def get_response(url: str, fallback_strategy=None, **kwargs):
             next_strategy = throttler.get_next_fallback_strategy(host)
 
             if next_strategy and can_use_fallback(next_strategy, host):
-                logger.warning(
-                    f"The host {host} is rate limited until"
-                    f" {timestamp_to_local_time_str(e.next_call_time)}."
-                    f" Retry via {next_strategy.name}..."
-                )
-
                 if next_strategy == FallbackStrategy.ZENROWS:
                     return get_response_via_zenrows(url, **kwargs)
                 elif next_strategy == FallbackStrategy.PROXY:
@@ -371,7 +365,7 @@ def get_response(url: str, fallback_strategy=None, **kwargs):
         raise e
 
     try:
-        logger.info("Accessing %s", url)
+        logger.info(f"Accessing {url} with strategy {fallback_strategy}")
         response = session.get(url, timeout=60, **kwargs)
 
         # Record response duration
