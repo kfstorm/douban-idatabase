@@ -49,7 +49,7 @@ def extract_douban_item_detail(item: dict, source: str) -> dict:
         # For movie chart APIs, assume it's a movie
         if "chart/top_list" in source:
             item_type = "movie"  # Default to movie for movie chart APIs
-    elif item.get("type") not in ["movie", "tv"]:
+    elif item.get("type") not in ITEM_TYPES:
         return None
     else:
         item_type = item.get("type")
@@ -142,3 +142,6 @@ def extract_douban_item_detail(item: dict, source: str) -> dict:
             "detail_source": source,
         },
     }
+
+
+ITEM_TYPES = ["movie", "tv"]

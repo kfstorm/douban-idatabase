@@ -266,6 +266,9 @@ def process_explore(db: Session, queue_item: Queue) -> None:
     # Parse conditions from queue_id
     conditions = decode_explore_queue_id(queue_id)
 
+    # Extract item_type
+    item_type = conditions.get("item_type", "movie")
+
     # Extract conditions
     score_range = conditions.get("score_range")
     if not score_range:
@@ -276,21 +279,24 @@ def process_explore(db: Session, queue_item: Queue) -> None:
 
     # Extract optional conditions if present
     year_range = conditions.get("year")
-    item_type = conditions.get("type")
+    type_ = conditions.get("type")
     region = conditions.get("region")
 
     # Prepare tags for explore API
     tags = []
     if year_range:
         tags.append(year_range)
-    if item_type:
-        tags.append(item_type)
+    if type_:
+        tags.append(type_)
     if region:
         tags.append(region)
 
     # Call explore API
-    logger.info(f"Calling explore API with score_range={score_range}, tags={tags}")
-    result = explore(score_range, tags, count=COUNT)
+    logger.info(
+        f"Calling explore API with item_type={item_type},"
+        f" score_range={score_range}, tags={tags}"
+    )
+    result = explore(item_type, score_range, tags, count=COUNT)
 
     reported_total = result["total"]
     items = result["items"]
@@ -356,7 +362,7 @@ def _add_narrower_conditions(db: Session, conditions: dict) -> bool:
     score_range -> year -> type -> region
     """
     year = conditions.get("year")
-    item_type = conditions.get("type")
+    type_ = conditions.get("type")
     region = conditions.get("region")
 
     # Determine which level of condition to add
@@ -370,7 +376,7 @@ def _add_narrower_conditions(db: Session, conditions: dict) -> bool:
             logger.info(f"Added narrower explore queue item: {new_id}")
         return True
 
-    if not item_type:
+    if not type_:
         # Add type condition
         for type_val in TYPES:
             new_conditions = conditions.copy()

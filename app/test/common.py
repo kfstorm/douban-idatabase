@@ -1,3 +1,6 @@
+from app.info_provider.common import ITEM_TYPES
+
+
 def check_detail(
     detail: dict, allow_no_rating: bool = False, allow_no_year: bool = False
 ) -> None:
@@ -30,7 +33,7 @@ def check_detail(
             assert 0 <= detail["rating"] <= 10
 
     assert "type" in detail
-    assert detail["type"] in ["movie", "tv"]
+    assert detail["type"] in ITEM_TYPES
     assert "raw_data" in detail
     assert "detail" in detail["raw_data"]
     assert isinstance(detail["raw_data"]["detail"], dict)

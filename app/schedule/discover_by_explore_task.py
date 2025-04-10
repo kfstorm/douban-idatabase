@@ -1,6 +1,7 @@
 import logging
 from sqlalchemy.orm import Session
 
+from app.info_provider.common import ITEM_TYPES
 from app.models import add_to_queue
 from app.queue_processor.explore_processor import SCORE_RANGES
 from app.schedule.base_task import BaseTask
@@ -31,12 +32,18 @@ class DiscoverItemsByExploreTask(BaseTask):
 
         added_count = 0
         for score_range in SCORE_RANGES:
-            # Create queue ID using the helper function
-            queue_id = encode_explore_queue_id({"score_range": score_range})
+            for item_type in ITEM_TYPES:
+                # Create queue ID using the helper function
+                queue_id = encode_explore_queue_id(
+                    {
+                        "item_type": item_type,
+                        "score_range": score_range,
+                    }
+                )
 
-            # Add to queue
-            if add_to_queue(db, "explore", queue_id):
-                added_count += 1
-                logger.info(f"Added explore queue item: {queue_id}")
+                # Add to queue
+                if add_to_queue(db, "explore", queue_id):
+                    added_count += 1
+                    logger.info(f"Added explore queue item: {queue_id}")
 
         logger.info(f"Added {added_count} explore queue items")
