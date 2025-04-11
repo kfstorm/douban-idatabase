@@ -171,13 +171,8 @@ def process_queue_items(db: Session) -> None:
         f" in queue using {thread_count} threads"
     )
 
-    # Create thread pool with named threads for better logging
-    with ThreadPoolExecutor(
-        max_workers=thread_count, thread_name_prefix="QueueWorker"
-    ) as executor:
-        # Keep track of active futures using composite key (type, id)
-        futures = {}
-
+    # Optimized path for single-threaded mode
+    if thread_count == 1:
         while True:
             if app.utils.shutdown_flag:
                 logger.info("Application is shutting down. Stopping queue processing.")
@@ -192,67 +187,108 @@ def process_queue_items(db: Session) -> None:
                 )
                 break
 
-            # Check for completed futures and process results
-            done_future_keys = []
-            for future_key, future in futures.items():
-                if future.done():
-                    done_future_keys.append(future_key)
+            # Fetch a single item to process
+            # (no need to check processing_items in single-thread mode)
+            queue_item = db.query(Queue).order_by(Queue.upsert_time).first()
+            if not queue_item:
+                logger.info("Queue is empty, stopping processing")
+                break
+
+            # Process the item directly
+            try:
+                process_single_queue_item(queue_item.type, queue_item.id)
+                processed_count += 1
+            except Exception as e:
+                logger.exception(f"Unhandled exception processing queue item: {e}")
+
+    else:
+        # Multi-threaded path with ThreadPoolExecutor
+        with ThreadPoolExecutor(
+            max_workers=thread_count, thread_name_prefix="QueueWorker"
+        ) as executor:
+            # Keep track of active futures using composite key (type, id)
+            futures = {}
+
+            while True:
+                if app.utils.shutdown_flag:
+                    logger.info(
+                        "Application is shutting down. Stopping queue processing."
+                    )
+                    break
+
+                # Check if we've exceeded the time limit
+                elapsed_seconds = now_timestamp() - start_time
+                if elapsed_seconds >= time_limit_seconds:
+                    logger.info(
+                        f"Time limit reached ({time_limit_seconds} seconds)"
+                        ", stopping processing"
+                    )
+                    break
+
+                # Check for completed futures and process results
+                done_future_keys = []
+                for future_key, future in futures.items():
+                    if future.done():
+                        done_future_keys.append(future_key)
+                        _process_future_result(future_key, future, db)
+                        processed_count += 1
+
+                # Remove completed futures
+                for future_key in done_future_keys:
+                    futures.pop(future_key)
+
+                # Calculate how many new tasks we can submit
+                available_slots = thread_count - len(futures)
+
+                if available_slots > 0:
+                    # Fetch new items to process
+                    queue_items = fetch_batch_of_queue_items(db, available_slots)
+
+                    if not queue_items:
+                        # Queue is empty - if we also have no active futures, we're done
+                        if not futures:
+                            logger.info("Queue is empty, stopping processing")
+                            break
+                        else:
+                            # We still have active futures
+                            # wait a bit for them to complete
+                            time.sleep(0.1)
+                            continue
+
+                    # Submit new items to the thread pool
+                    for item in queue_items:
+                        # Use composite key (type, id) to track futures
+                        future_key = (item.type, item.id)
+
+                        # Mark this item as being processed
+                        processing_items.add(future_key)
+
+                        # Pass only the type and ID to the worker thread
+                        futures[future_key] = executor.submit(
+                            process_single_queue_item, item.type, item.id
+                        )
+                elif not futures:
+                    # No available slots and no active futures.
+                    # This shouldn't happen but let's handle it.
+                    logger.warning(
+                        "No active futures and no available slots. This is unexpected"
+                    )
+                    break
+                else:
+                    # No available slots but we have active futures.
+                    # wait a bit for some to complete
+                    time.sleep(0.1)
+
+            # Wait for any remaining futures to complete
+            if futures:
+                logger.info(
+                    f"Waiting for {len(futures)} remaining tasks to complete..."
+                )
+                for future_key, future in futures.items():
                     _process_future_result(future_key, future, db)
                     processed_count += 1
-
-            # Remove completed futures
-            for future_key in done_future_keys:
-                futures.pop(future_key)
-
-            # Calculate how many new tasks we can submit
-            available_slots = thread_count - len(futures)
-
-            if available_slots > 0:
-                # Fetch new items to process
-                queue_items = fetch_batch_of_queue_items(db, available_slots)
-
-                if not queue_items:
-                    # Queue is empty - if we also have no active futures, we're done
-                    if not futures:
-                        logger.info("Queue is empty, stopping processing")
-                        break
-                    else:
-                        # We still have active futures, wait a bit for them to complete
-                        time.sleep(0.1)
-                        continue
-
-                # Submit new items to the thread pool
-                for item in queue_items:
-                    # Use composite key (type, id) to track futures
-                    future_key = (item.type, item.id)
-
-                    # Mark this item as being processed
-                    processing_items.add(future_key)
-
-                    # Pass only the type and ID to the worker thread
-                    futures[future_key] = executor.submit(
-                        process_single_queue_item, item.type, item.id
-                    )
-            elif not futures:
-                # No available slots and no active futures.
-                # This shouldn't happen but let's handle it.
-                logger.warning(
-                    "No active futures and no available slots. This is unexpected"
-                )
-                break
-            else:
-                # No available slots but we have active futures.
-                # wait a bit for some to complete
-                time.sleep(0.1)
-
-        # Wait for any remaining futures to complete
-        if futures:
-            logger.info(f"Waiting for {len(futures)} remaining tasks to complete...")
-            for future_key, future in futures.items():
-                _process_future_result(future_key, future, db)
-                processed_count += 1
-            # Make sure to clear processing_items when done
-            processing_items.clear()
+                # Make sure to clear processing_items when done
+                processing_items.clear()
 
     # Calculate total elapsed time
     total_elapsed_seconds = now_timestamp() - start_time
