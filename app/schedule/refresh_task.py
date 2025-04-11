@@ -1,6 +1,6 @@
 import logging
-from sqlalchemy.orm import Session, selectinload
-from sqlalchemy import and_, or_
+from sqlalchemy.orm import Session
+from sqlalchemy import or_
 
 from app.config import settings
 from app.models import Item, List, Queue, Tag, add_to_queue
@@ -52,17 +52,13 @@ class RefreshTask(BaseTask):
         # and whose next_update_time has passed or is NULL
         items_base_query = (
             db.query(Item)
-            .options(selectinload("*"))
-            .outerjoin(
-                Queue, and_(Queue.type == "douban_id", Queue.id == Item.douban_id)
-            )
-            .filter(Queue.id == None)  # noqa: E711
             .filter(
                 or_(
                     Item.next_update_time <= current_time,
                     Item.next_update_time == None,  # noqa: E711
                 )
             )
+            .order_by(Item.douban_id)
         )
 
         # Process item callback
@@ -91,13 +87,7 @@ class RefreshTask(BaseTask):
 
         # Base query for lists not already in the queue
         lists_base_query = (
-            db.query(List)
-            .options(selectinload("*"))
-            .outerjoin(
-                Queue,
-                and_(Queue.type == List.list_type, Queue.id == List.list_id),
-            )
-            .filter(Queue.id == None)  # noqa: E711
+            db.query(List).filter(Queue.id == None).order_by(List.list_id)  # noqa: E711
         )
 
         # Process list callback
@@ -126,13 +116,7 @@ class RefreshTask(BaseTask):
 
         # Base query for tags not already in the queue
         tags_base_query = (
-            db.query(Tag)
-            .options(selectinload("*"))
-            .outerjoin(
-                Queue,
-                and_(Queue.type == "tag", Queue.id == Tag.tag_name),
-            )
-            .filter(Queue.id == None)  # noqa: E711
+            db.query(Tag).filter(Queue.id == None).order_by(Tag.tag_name)  # noqa: E711
         )
 
         # Process tag callback
