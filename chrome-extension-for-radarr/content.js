@@ -1,10 +1,11 @@
-// Content script that runs on Radarr pages
+// Content script that runs on Radarr and Sonarr pages
 
 // Default API URL - this can be overridden in options
 let doubanIdatabaseApiBaseUrl = 'http://localhost:8000';
 let doubanIdatabaseApiKey = '';
-let radarrApiRoot = '';
-let radarrApiKey = '';
+let arrApiRoot = '';
+let arrApiKey = '';
+let arrType = ''; // 'radarr' or 'sonarr'
 // Rating threshold settings
 let goodRatingThreshold = 8.0;
 let mediumRatingThreshold = 7.0;
@@ -12,26 +13,32 @@ let goodRatingColor = '#2e963d'; // green
 let mediumRatingColor = '#e09b24'; // yellow
 let lowRatingColor = '#e05924';  // red
 let noRatingColor = '#888888';   // gray
-// Add a variable to track the last time checkForMovieItems was called
+// Add a variable to track the last time checkForMediaItems was called
 let lastCheckTime = 0;
 let isScrolling = false;
 let scrollTimeout = null;
 // Add a rating cache to avoid redundant API requests
-let ratingCache = {}; // Maps TMDB IDs to {rating, url} objects
-// Add movie cache to avoid redundant Radarr API requests
-let movieCache = null;
-let lastMovieCacheTime = 0;
-const MOVIE_CACHE_TTL = 5 * 60 * 1000; // 5 minutes cache validity
+let ratingCache = {}; // Maps IDs to {rating, url} objects
+// Add media cache to avoid redundant API requests
+let mediaCache = null;
+let lastMediaCacheTime = 0;
+const MEDIA_CACHE_TTL = 5 * 60 * 1000; // 5 minutes cache validity
 
-// Add flag to track if we're on a Radarr page
+// Add flag to track if we're on a Radarr or Sonarr page
 let isRadarrPage = false;
+let isSonarrPage = false;
 
-// Function to check if we're on a Radarr page
-function checkIfRadarrPage() {
-  // Check for Radarr meta tag in head
+// Function to check if we're on a Radarr or Sonarr page
+function checkIfArrPage() {
+  // Check for meta tag in head
   const metaTags = document.querySelectorAll('meta[name="description"]');
   for (const tag of metaTags) {
     if (tag.content === "Radarr") {
+      isRadarrPage = true;
+      return true;
+    }
+    if (tag.content === "Sonarr") {
+      isSonarrPage = true;
       return true;
     }
   }
@@ -39,16 +46,16 @@ function checkIfRadarrPage() {
   return false;
 }
 
-// Function to inject a script into the page context to access window.Radarr
-function injectRadarrApiScript() {
-  // Only proceed if we think this is a Radarr page
-  if (!isRadarrPage) {
+// Function to inject a script into the page context to access window.Radarr or window.Sonarr
+function injectApiScript() {
+  // Only proceed if we think this is a Radarr or Sonarr page
+  if (!isRadarrPage && !isSonarrPage) {
     return;
   }
 
   // Use the extension's own script file instead of inline script
   const script = document.createElement('script');
-  script.src = chrome.runtime.getURL('radarr-api-access.js');
+  script.src = chrome.runtime.getURL('api-access.js');
   (document.head || document.documentElement).appendChild(script);
 
   // Clean up after the script has loaded
@@ -62,29 +69,32 @@ window.addEventListener('message', function(event) {
   // Make sure the message is from our page
   if (event.source !== window) return;
 
-  if (event.data.type === 'RADARR_API_DATA') {
+  if (event.data.type === 'ARR_API_DATA') {
     const apiInfo = event.data.payload;
     if (apiInfo.apiRoot && apiInfo.apiKey) {
-      radarrApiRoot = apiInfo.apiRoot;
-      radarrApiKey = apiInfo.apiKey;
-      console.log('Successfully retrieved Radarr API details');
+      arrApiRoot = apiInfo.apiRoot;
+      arrApiKey = apiInfo.apiKey;
+      arrType = apiInfo.type;
+      console.log(`Successfully retrieved ${arrType} API details`);
 
-      // Immediately check for movie items once we have the API details
-      checkForMovieItems(true);
-    } else if (isRadarrPage) {
-      // Only log the warning if we believe this is a Radarr page
-      console.warn('Radarr API details not found in page context');
+      // Immediately check for items once we have the API details
+      checkForMediaItems(true);
+    } else if (isRadarrPage || isSonarrPage) {
+      // Only log the warning if we believe this is a relevant page
+      console.warn('API details not found in page context');
     }
   }
 });
 
-// Add message listener to respond with Radarr page status
+// Add message listener to respond with page status
 chrome.runtime.onMessage.addListener(
   function(request, sender, sendResponse) {
-    if (request.action === "getRadarrStatus") {
+    if (request.action === "getArrStatus") {
       sendResponse({
         isRadarrPage: isRadarrPage,
-        hasApiAccess: !!(radarrApiRoot && radarrApiKey)
+        isSonarrPage: isSonarrPage,
+        hasApiAccess: !!(arrApiRoot && arrApiKey),
+        type: arrType || (isRadarrPage ? 'radarr' : (isSonarrPage ? 'sonarr' : ''))
       });
     }
     return true; // Keep the message channel open for async response
@@ -137,30 +147,30 @@ chrome.storage.sync.get([
 
   // Start processing once the DOM is fully loaded
   if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', processRadarrPage);
+    document.addEventListener('DOMContentLoaded', processArrPage);
   } else {
-    processRadarrPage();
+    processArrPage();
   }
 });
 
-// Main function to process the Radarr page
-function processRadarrPage() {
-  // Only check if we're on a Radarr page once
-  isRadarrPage = checkIfRadarrPage();
+// Main function to process the page
+function processArrPage() {
+  // Only check if we're on a Radarr/Sonarr page once
+  const isArrPage = checkIfArrPage();
 
-  // Only continue if we think this is a Radarr page
-  if (!isRadarrPage) {
+  // Only continue if we think this is a relevant page
+  if (!isArrPage) {
     return;
   }
 
-  // Try to get Radarr API details from page context
-  injectRadarrApiScript();
+  // Try to get API details from page context
+  injectApiScript();
 
-  // Use MutationObserver to detect when new movie items are added to the page
+  // Use MutationObserver to detect when new items are added to the page
   const observer = new MutationObserver(function(mutations) {
     mutations.forEach(function(mutation) {
       if (mutation.addedNodes && mutation.addedNodes.length > 0) {
-        checkForMovieItems();
+        checkForMediaItems();
       }
     });
   });
@@ -168,14 +178,14 @@ function processRadarrPage() {
   // Start observing the document
   observer.observe(document.body, { childList: true, subtree: true });
 
-  // Initial check for movie items
-  checkForMovieItems();
+  // Initial check for items
+  checkForMediaItems();
 
-  // Set up intersection observer to detect when movie elements come into view
+  // Set up intersection observer to detect when elements come into view
   setupIntersectionObserver();
 
   // Set up periodic checks for missed elements
-  setInterval(checkForMovieItems, 3000);
+  setInterval(checkForMediaItems, 3000);
 
   // Add scroll event listener
   window.addEventListener('scroll', handleScroll);
@@ -197,6 +207,16 @@ function handleScroll() {
   }, 300);
 }
 
+// Function to get all media elements based on the current page type
+function getMediaElements() {
+  if (isRadarrPage) {
+    return [...document.querySelectorAll('div[class^="MovieIndexPoster-content"]')];
+  } else if (isSonarrPage) {
+    return [...document.querySelectorAll('div[class^="SeriesIndexPoster-content"]')];
+  }
+  return [];
+}
+
 // Function to set up intersection observer
 function setupIntersectionObserver() {
   const options = {
@@ -210,40 +230,41 @@ function setupIntersectionObserver() {
       if (entry.isIntersecting) {
         const element = entry.target;
         // Process this element when it comes into view
-        processMovieElement(element);
+        processMediaElement(element);
         // Unobserve after processing
         observer.unobserve(element);
       }
     });
   }, options);
 
-  // Observe all movie elements
-  function observeMovieElements() {
-    const movieElements = document.querySelectorAll('div[class^="MovieIndexPoster-content"]');
-    movieElements.forEach(element => {
+  // Observe all media elements
+  function observeMediaElements() {
+    const mediaElements = getMediaElements();
+    mediaElements.forEach(element => {
       observer.observe(element);
     });
   }
 
   // Initial observation
-  observeMovieElements();
+  observeMediaElements();
 
   // Set up periodic checks for new elements to observe
-  setInterval(observeMovieElements, 2000);
+  setInterval(observeMediaElements, 2000);
 }
 
 // Function to process elements that weren't processed during scrolling
 function processUnprocessedElements() {
-  const movieElements = document.querySelectorAll('div[class^="MovieIndexPoster-content"]');
-  if (movieElements.length > 0) {
-    checkForMovieItems(true); // Force processing
+  const mediaElements = getMediaElements();
+
+  if (mediaElements.length > 0) {
+    checkForMediaItems(true); // Force processing
   }
 }
 
-// Function to check for movie items and extract IMDb IDs
-function checkForMovieItems(force = false) {
-  // Skip if not on a Radarr page
-  if (!isRadarrPage) {
+// Function to check for media items (movies or TV shows)
+function checkForMediaItems(force = false) {
+  // Skip if not on a relevant page
+  if (!isRadarrPage && !isSonarrPage) {
     return;
   }
 
@@ -258,106 +279,130 @@ function checkForMovieItems(force = false) {
   lastCheckTime = currentTime;
 
   // If we don't have API settings yet, try to get them
-  if (!radarrApiRoot || !radarrApiKey) {
-    injectRadarrApiScript();
+  if (!arrApiRoot || !arrApiKey) {
+    injectApiScript();
     return;
   }
 
-  // Otherwise fetch movies from Radarr API
-  fetchMoviesFromRadarrAPI();
+  // Otherwise fetch items from API
+  fetchMediaFromAPI();
 }
 
-// Function to fetch movies from Radarr API
-function fetchMoviesFromRadarrAPI() {
+// Function to fetch media from Radarr/Sonarr API
+function fetchMediaFromAPI() {
   const currentTime = Date.now();
 
   // Check if we have a valid cache
-  if (movieCache && (currentTime - lastMovieCacheTime < MOVIE_CACHE_TTL)) {
-    processMoviesFromAPI(movieCache);
+  if (mediaCache && (currentTime - lastMediaCacheTime < MEDIA_CACHE_TTL)) {
+    processMediaFromAPI(mediaCache);
     return;
   }
 
-  fetch(`${radarrApiRoot}/movie?apikey=${radarrApiKey}`)
+  const endpoint = isRadarrPage ? 'movie' : 'series';
+
+  fetch(`${arrApiRoot}/${endpoint}?apikey=${arrApiKey}`)
     .then(response => {
       if (!response.ok) {
-        throw new Error('Radarr API request failed');
+        throw new Error(`API request failed for ${isRadarrPage ? 'Radarr' : 'Sonarr'}`);
       }
       return response.json();
     })
-    .then(movies => {
+    .then(media => {
       // Update the cache
-      movieCache = movies;
-      lastMovieCacheTime = currentTime;
+      mediaCache = media;
+      lastMediaCacheTime = currentTime;
 
-      processMoviesFromAPI(movies);
+      processMediaFromAPI(media);
     });
 }
 
-// Process movies from Radarr API and match with DOM elements
-function processMoviesFromAPI(movies) {
-  // This selector needs to be adjusted based on Radarr's actual DOM structure
-  const movieElements = document.querySelectorAll('div[class^="MovieIndexPoster-content"]');
+// Process media from API and match with DOM elements
+function processMediaFromAPI(media) {
+  const mediaElements = getMediaElements();
 
-  movieElements.forEach(element => {
-    processMovieElement(element);
+  mediaElements.forEach(element => {
+    processMediaElement(element);
   });
 }
 
-// Function to process a single movie element
-function processMovieElement(movieElement) {
-  if (!movieCache) {
+// Function to process a single media element (movie or TV show)
+function processMediaElement(mediaElement) {
+  if (!mediaCache) {
     return;
   }
 
-  // Extract TMDB ID from the element
-  const link = movieElement.querySelector('a[class^="MovieIndexPoster-link"]');
+  // Extract ID from the element
+  let link;
+
+  if (isRadarrPage) {
+    link = mediaElement.querySelector('a[class^="MovieIndexPoster-link"]');
+  } else if (isSonarrPage) {
+    link = mediaElement.querySelector('a[class^="SeriesIndexPoster-link"]');
+  } else {
+    return;
+  }
+
   if (!link || !link.href) return;
 
   const parts = link.href.split("/");
-  const tmdbId = parts[parts.length - 1];
+  const mediaId = parts[parts.length - 1];
 
-  if (!tmdbId) return;
+  if (!mediaId) return;
 
-  // Check if this element has already been processed for this specific movie
-  const currentMovieId = movieElement.getAttribute('data-douban-tmdb-id');
+  // Check if this element has already been processed for this specific media
+  const currentMediaId = mediaElement.getAttribute('data-douban-media-id');
 
-  // If the element has been processed for this specific movie, no need to process again
-  if (currentMovieId === tmdbId) {
+  // If the element has been processed for this specific media, no need to process again
+  if (currentMediaId === mediaId) {
     return;
   }
 
-  // If the element has a rating display but for a different movie, remove it
-  if (currentMovieId && currentMovieId !== tmdbId) {
-    const existingRating = movieElement.querySelector('.douban-rating');
+  // If the element has a rating display but for a different media, remove it
+  if (currentMediaId && currentMediaId !== mediaId) {
+    const existingRating = mediaElement.querySelector('.douban-rating');
     if (existingRating) {
       existingRating.remove();
     }
   }
 
-  // Find matching movie in our cache
-  const movie = movieCache.find(m => m.tmdbId == tmdbId);
+  // Find matching media in our cache
+  const mediaItem = mediaCache.find(m => {
+    if (isRadarrPage) {
+      return m.tmdbId == mediaId;
+    } else if (isSonarrPage) {
+      // For Sonarr, match by titleSlug
+      return m.titleSlug === mediaId;
+    }
+    return false;
+  });
 
-  if (movie && movie.imdbId) {
-    // Store the current movie ID to detect changes
-    movieElement.setAttribute('data-douban-tmdb-id', tmdbId);
+  // Only proceed if we have an IMDb ID
+  if (mediaItem) {
+    // Store the current media ID to detect changes
+    mediaElement.setAttribute('data-douban-media-id', mediaId);
 
     // Check if rating is already in cache
-    if (ratingCache[tmdbId] !== undefined) {
+    if (ratingCache[mediaId] !== undefined) {
       // Use cached rating and url
-      const { rating, url } = ratingCache[tmdbId];
-      displayDoubanRating(rating, url, movieElement);
+      const { rating, url } = ratingCache[mediaId];
+      displayDoubanRating(rating, url, mediaElement);
     } else {
-      // Fetch rating and then display it
-      fetchDoubanRating(movie.imdbId, tmdbId)
-        .then(({ rating, url }) => {
-          displayDoubanRating(rating, url, movieElement);
-        });
+      if (mediaItem.imdbId) {
+        // Fetch rating and then display it
+        fetchDoubanRating(mediaItem.imdbId, mediaId)
+          .then(({ rating, url }) => {
+            displayDoubanRating(rating, url, mediaElement);
+          });
+      } else {
+        // If no IMDb ID, display a placeholder
+        displayDoubanRating(null, null, mediaElement);
+      }
     }
   }
 }
 
 // Function to fetch Douban rating using the API
-function fetchDoubanRating(imdbId, tmdbId) {
+function fetchDoubanRating(imdbId, mediaId) {
   let url = `${doubanIdatabaseApiBaseUrl}/api/item?imdb_id=${imdbId}`;
   if (doubanIdatabaseApiKey) {
     url += `&api_key=${doubanIdatabaseApiKey}`;
@@ -392,16 +437,16 @@ function fetchDoubanRating(imdbId, tmdbId) {
       }
 
       // Store in cache as an object with both rating and url
-      ratingCache[tmdbId] = { rating, url };
+      ratingCache[mediaId] = { rating, url };
 
       return { rating, url };
     });
 }
 
 // Function to display the Douban rating in the UI
-function displayDoubanRating(ratingValue, url, movieElement) {
+function displayDoubanRating(ratingValue, url, mediaElement) {
   // Remove any existing rating element first
-  const existingRating = movieElement.querySelector('.douban-rating');
+  const existingRating = mediaElement.querySelector('.douban-rating');
   if (existingRating) {
     existingRating.remove();
   }
@@ -418,8 +463,8 @@ function displayDoubanRating(ratingValue, url, movieElement) {
   }
 
   // Ensure parent element has position relative for absolute positioning to work
-  if (getComputedStyle(movieElement).position === 'static') {
-    movieElement.classList.add('movie-container');
+  if (getComputedStyle(mediaElement).position === 'static') {
+    mediaElement.classList.add('media-container');
   }
 
   // Determine color based on rating value and thresholds
@@ -459,5 +504,5 @@ function displayDoubanRating(ratingValue, url, movieElement) {
   `;
 
   ratingElement.innerHTML = ratingHtml;
-  movieElement.appendChild(ratingElement);
+  mediaElement.appendChild(ratingElement);
 }

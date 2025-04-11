@@ -1,4 +1,4 @@
-// Background script for the Douban Ratings extension
+// Background script for the Douban Ratings extension for Radarr & Sonarr
 
 // Initialize default settings when extension is installed
 chrome.runtime.onInstalled.addListener(function() {
@@ -22,6 +22,11 @@ chrome.runtime.onMessage.addListener(function(request, sender, sendResponse) {
     const doubanIdatabaseApiBaseUrl = request.doubanIdatabaseApiBaseUrl || 'http://localhost:8000';
     const doubanIdatabaseApiKey = request.doubanIdatabaseApiKey || '';
     const imdbId = request.imdbId;
+
+    if (!imdbId) {
+      sendResponse({ success: false, error: 'No IMDb ID provided' });
+      return true;
+    }
 
     let url = `${doubanIdatabaseApiBaseUrl}/api/item?imdb_id=${imdbId}`;
     if (doubanIdatabaseApiKey) {

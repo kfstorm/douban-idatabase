@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
-  "name": "Radarr 豆瓣评分",
+  "name": "豆瓣评分 for Radarr & Sonarr",
   "version": "1.0",
-  "description": "在 Radarr 中显示电影的豆瓣评分",
+  "description": "在 Radarr 和 Sonarr 中显示电影与剧集的豆瓣评分",
   "icons": {
     "16": "images/icon16.png",
     "32": "images/icon32.png",
@@ -32,7 +32,7 @@
   ],
   "web_accessible_resources": [
     {
-      "resources": ["radarr-api-access.js"],
+      "resources": ["api-access.js"],
       "matches": ["<all_urls>"]
     }
   ],

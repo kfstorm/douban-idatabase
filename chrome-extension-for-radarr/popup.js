@@ -1,6 +1,6 @@
 // Simple popup functionality
 document.addEventListener('DOMContentLoaded', function() {
-  // Check if current page is a Radarr page
+  // Check if current page is a Radarr or Sonarr page
   checkCurrentTab();
 
   // Get current status from storage
@@ -49,40 +49,44 @@ document.addEventListener('DOMContentLoaded', function() {
   });
 });
 
-// Function to check if the current tab is a Radarr page
+// Function to check if the current tab is a Radarr or Sonarr page
 function checkCurrentTab() {
   chrome.tabs.query({active: true, currentWindow: true}, function(tabs) {
     if (tabs[0]) {
       chrome.tabs.sendMessage(
         tabs[0].id,
-        {action: "getRadarrStatus"},
+        {action: "getArrStatus"},
         function(response) {
-          displayRadarrStatus(response);
+          displayArrStatus(response);
         }
       );
     }
   });
 }
 
-// Function to display Radarr page status in the popup
-function displayRadarrStatus(response) {
+// Function to display Radarr/Sonarr page status in the popup
+function displayArrStatus(response) {
   const statusElement = document.createElement('div');
-  statusElement.className = 'radarr-status';
+  statusElement.className = 'arr-status';
 
   if (response) {
-    if (response.isRadarrPage) {
-      statusElement.innerHTML = '<p><strong>✅ 这是 Radarr 页面</strong></p>';
+    if (response.isRadarrPage || response.isSonarrPage) {
+      const appType = response.isRadarrPage ? 'Radarr' : 'Sonarr';
+      const contentType = response.isRadarrPage ? '电影' : '剧集';
+
+      statusElement.innerHTML = `<p><strong>✅ 这是 ${appType} 页面</strong></p>`;
       if (response.hasApiAccess) {
         statusElement.innerHTML += '<p>✅ API 访问: 可用</p>';
+        statusElement.innerHTML += `<p>豆瓣评分将显示在${contentType}旁边。</p>`;
       } else {
         statusElement.innerHTML += '<p>❌ API 访问: 不可用</p>';
       }
     } else {
-      statusElement.innerHTML = '<p><strong>❌ 这不是 Radarr 页面</strong></p>';
-      statusElement.innerHTML += '<p>豆瓣评分只会在 Radarr 页面上显示。</p>';
+      statusElement.innerHTML = '<p><strong>❌ 这不是 Radarr 或 Sonarr 页面</strong></p>';
+      statusElement.innerHTML += '<p>豆瓣评分只会在 Radarr 和 Sonarr 页面上显示。</p>';
     }
   } else {
-    statusElement.innerHTML = '<p><strong>❓ 无法确定这是否为 Radarr 页面</strong></p>';
+    statusElement.innerHTML = '<p><strong>❓ 无法确定这是否为 Radarr 或 Sonarr 页面</strong></p>';
     statusElement.innerHTML += '<p>扩展程序可能无法访问此页面。</p>';
   }
 
