@@ -155,8 +155,11 @@ def get_items(
     items = models.get_items(db, douban_id, imdb_id, douban_title)
     if not items:
         # Set cache for 1 day (86400 seconds) for 404 responses
-        response.headers["Cache-Control"] = "max-age=86400"
-        raise HTTPException(status_code=404, detail="No items found")
+        raise HTTPException(
+            status_code=404,
+            detail="No items found",
+            headers={"Cache-Control": "max-age=86400"},
+        )
 
     # Set cache for 7 days (604800 seconds) for successful responses
     response.headers["Cache-Control"] = "max-age=604800"
