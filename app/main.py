@@ -32,6 +32,26 @@ api_key_header = APIKeyHeader(name="X-API-Key", auto_error=False)
 api_key_query = APIKeyQuery(name="api_key", auto_error=False)
 
 
+def get_client_ip(request: Request) -> str:
+    """
+    Extract the client's real IP address from request headers.
+    When behind Nginx, we check X-Forwarded-For and X-Real-IP headers.
+    """
+    # X-Forwarded-For header contains client IPs in order: client, proxy1, proxy2, ...
+    forwarded_for = request.headers.get("X-Forwarded-For")
+    if forwarded_for:
+        # Get the first IP in the list which is the client's real IP
+        return forwarded_for.split(",")[0].strip()
+
+    # X-Real-IP header contains the original client IP
+    real_ip = request.headers.get("X-Real-IP")
+    if real_ip:
+        return real_ip
+
+    # Fall back to the direct client IP if no proxy headers are present
+    return request.client.host
+
+
 # API Key verification dependency
 def verify_api_key(
     request: Request,
@@ -45,8 +65,8 @@ def verify_api_key(
     if not api_key:
         # If anonymous access is allowed, use IP-based rate limiting
         if settings.ALLOW_ANONYMOUS_API_ACCESS:
-            # Get client IP address
-            client_ip = request.client.host
+            # Get real client IP address
+            client_ip = get_client_ip(request)
             anonymous_info = {
                 "user_id": client_ip,
                 "rate_limit": settings.ANONYMOUS_RATE_LIMIT,
