@@ -1,3 +1,4 @@
+import signal
 from fastapi import FastAPI, HTTPException, Query, Depends, Response, Security, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security.api_key import APIKeyHeader, APIKeyQuery
@@ -210,17 +211,27 @@ def main():
     else:
         logger.warning("Scheduler is disabled")
 
+    def signal_handler(signum, frame):
+        logger.info(f"Received signal {signum}, shutting down gracefully...")
+        _exit_gracefully(app_process)
+
+    signal.signal(signal.SIGTERM, signal_handler)
+
     try:
         # Wait for the app process to complete
         app_process.join()
     except KeyboardInterrupt:
-        logger.info("Shutting down...")
-        app.utils.shutdown_flag = True
+        logger.info("KeyboardInterrupt received, shutting down gracefully...")
+        _exit_gracefully(app_process)
 
-        if not settings.DISABLE_SCHEDULER:
-            stop_scheduler()
-        app_process.terminate()
-        app_process.join()
+
+def _exit_gracefully(app_process):
+    """Handle graceful exit"""
+    app.utils.shutdown_flag = True
+    if not settings.DISABLE_SCHEDULER:
+        stop_scheduler()
+    app_process.terminate()
+    app_process.join()
 
 
 if __name__ == "__main__":

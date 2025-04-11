@@ -364,6 +364,11 @@ def get_response(url: str, fallback_strategy=None, **kwargs):
         record_exception_metrics(e)
         raise e
 
+    if app.utils.shutdown_flag:
+        raise ApplicationShutdownException(
+            "Application is shutting down. HTTP requests are forbidden."
+        )
+
     try:
         logger.info(f"Accessing {url} with strategy {fallback_strategy}")
         response = session.get(url, timeout=60, **kwargs)
