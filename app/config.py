@@ -138,6 +138,10 @@ class Settings(BaseSettings):
         os.getenv("REQUESTS_PROXIES", "null")
     )
 
+    # Blacklist settings
+    BLACKLIST_THRESHOLD: int = int(os.getenv("BLACKLIST_THRESHOLD", "3"))
+    BLACKLIST_DURATION: int = int(os.getenv("BLACKLIST_DURATION", "2592000"))  # 30 days
+
     class Config:
         env_file = ".env"
         env_file_encoding = "utf-8"

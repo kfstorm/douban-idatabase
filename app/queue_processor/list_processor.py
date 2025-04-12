@@ -8,7 +8,12 @@ from app.info_provider.common import (
 from app.info_provider.imdb import fetch_imdb_id
 from app.info_provider.lists import extract_update_time, get_list_api_by_list_type
 from app.models import Item, List, Queue
-from app.queue_processor.common import allow_update_item, merge_item, save_item_to_db
+from app.queue_processor.common import (
+    allow_update_item,
+    merge_item,
+    save_item_to_db,
+    wrap_fetch_item,
+)
 from app.utils import now_timestamp, timestamp_to_local_time_str
 
 logger = logging.getLogger(__name__)
@@ -84,7 +89,13 @@ def process_list(db: Session, queue_item: Queue) -> None:
 
             existing_item = db.query(Item).filter(Item.douban_id == douban_id).first()
             if allow_update_item(existing_item):
-                imdb_info = fetch_imdb_id(douban_id, detail_info.get("in_blacklist"))
+                imdb_info = wrap_fetch_item(
+                    db,
+                    douban_id,
+                    lambda douban_id=douban_id, detail_info=detail_info: fetch_imdb_id(
+                        db, douban_id, detail_info.get("in_blacklist")
+                    ),
+                )
                 if not imdb_info:
                     logger.warning(f"Failed to fetch IMDb ID for douban_id={douban_id}")
                     continue

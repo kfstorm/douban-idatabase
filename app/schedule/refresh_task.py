@@ -3,7 +3,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import or_
 
 from app.config import settings
-from app.models import Item, List, Queue, Tag, add_to_queue
+from app.models import Item, List, Tag, add_to_queue
 from app.queue_processor.common import (
     allow_update_item,
     allow_update_list,
@@ -86,9 +86,7 @@ class RefreshTask(BaseTask):
         logger.info("Starting refresh from list table...")
 
         # Base query for lists not already in the queue
-        lists_base_query = (
-            db.query(List).filter(Queue.id == None).order_by(List.list_id)  # noqa: E711
-        )
+        lists_base_query = db.query(List).order_by(List.list_id)  # noqa: E711
 
         # Process list callback
         def process_list(list_: List):
@@ -115,9 +113,7 @@ class RefreshTask(BaseTask):
         logger.info("Starting refresh from tag table...")
 
         # Base query for tags not already in the queue
-        tags_base_query = (
-            db.query(Tag).filter(Queue.id == None).order_by(Tag.tag_name)  # noqa: E711
-        )
+        tags_base_query = db.query(Tag).order_by(Tag.tag_name)  # noqa: E711
 
         # Process tag callback
         def process_tag(tag: Tag):

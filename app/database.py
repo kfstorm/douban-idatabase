@@ -649,6 +649,32 @@ def migrate_item_add_next_update_time():
             raise
 
 
+def migrate_delete_deleted_item_table():
+    """Delete the `deleted_item` table if it exists."""
+    logger.info("Checking if `deleted_item` table exists for deletion...")
+
+    inspector = inspect(engine)
+
+    # Check if `deleted_item` table exists
+    if "deleted_item" not in inspector.get_table_names():
+        logger.info("`deleted_item` table does not exist, skipping migration.")
+        return False
+
+    with SessionLocal() as session:
+        try:
+            # Drop the `deleted_item` table
+            logger.info("Dropping `deleted_item` table...")
+            session.execute(text("DROP TABLE deleted_item"))
+            session.commit()
+            logger.info("Successfully dropped `deleted_item` table.")
+            return True
+        except Exception as e:
+            record_exception_metrics(e)
+            session.rollback()
+            logger.error(f"Error during `deleted_item` table deletion: {str(e)}")
+            return False
+
+
 def init_db():
     """Initialize the database, creating tables and migrating if needed"""
     # Create tables if they don't exist
@@ -667,3 +693,4 @@ def init_db():
     migrate_history_add_type_column()
     migrate_add_metrics_indices()
     migrate_item_add_next_update_time()  # Add this new migration
+    migrate_delete_deleted_item_table()

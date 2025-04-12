@@ -12,6 +12,7 @@ from sqlalchemy import and_
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
 
+from app.config import settings
 from app.database import Base
 from app.utils import now_timestamp
 
@@ -103,11 +104,15 @@ class Tag(Base):
     __table_args__ = (Index("idx_tag_fetch_last_check", fetch, last_check_time),)
 
 
-class DeletedItem(Base):
-    __tablename__ = "deleted_item"
+class Blacklist(Base):
+    __tablename__ = "blacklist"
 
-    douban_id = Column(String(16), primary_key=True, index=True)
-    delete_time = Column(Float, index=True)
+    type = Column(String(32), primary_key=True)
+    id = Column(String(128), primary_key=True)
+    count = Column(Integer, nullable=False)
+    update_time = Column(Float, nullable=False)
+
+    __table_args__ = (Index("idx_blacklist_type_id", type, id),)
 
 
 def get_items(
@@ -133,15 +138,28 @@ def get_items(
 
 def add_placeholder_item(db: Session, douban_id: str) -> bool:
     """
-    Add a placeholder item to the item table if it doesn't exist.
+    Add a placeholder item to the item table if it doesn't exist and is not blacklisted.
 
     Args:
         db: Database session
         douban_id: Douban ID of the item
 
     Returns:
-        bool: True if a new item was added, False if it already existed
+        bool: True if a new item was added,
+            False if it already existed or is blacklisted
     """
+    # Check blacklist
+    blacklist_entry = (
+        db.query(Blacklist)
+        .filter(Blacklist.type == "douban_id", Blacklist.id == douban_id)
+        .first()
+    )
+
+    if blacklist_entry and blacklist_entry.count >= settings.BLACKLIST_THRESHOLD:
+        if blacklist_entry.update_time + settings.BLACKLIST_DURATION >= now_timestamp():
+            logger.info(f"Skipping placeholder for blacklisted douban_id {douban_id}")
+            return False
+
     existing_item = db.query(Item).filter_by(douban_id=douban_id).first()
 
     if not existing_item:

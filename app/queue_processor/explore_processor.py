@@ -6,7 +6,12 @@ from typing import Dict
 from app.models import Item, Queue, add_placeholder_item, add_to_queue
 from app.info_provider.explore import explore
 from app.info_provider.imdb import fetch_imdb_id
-from app.queue_processor.common import allow_update_item, merge_item, save_item_to_db
+from app.queue_processor.common import (
+    allow_update_item,
+    merge_item,
+    save_item_to_db,
+    wrap_fetch_item,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -340,7 +345,13 @@ def process_explore(db: Session, queue_item: Queue) -> None:
             continue
 
         # Fetch IMDb data
-        imdb_info = fetch_imdb_id(douban_id, item_detail.get("in_blacklist"))
+        imdb_info = wrap_fetch_item(
+            db,
+            douban_id,
+            lambda douban_id=douban_id, item_detail=item_detail: fetch_imdb_id(
+                db, douban_id, item_detail.get("in_blacklist")
+            ),
+        )
         if not imdb_info:
             logger.warning(f"Failed to fetch IMDb ID for douban_id={douban_id}")
             continue

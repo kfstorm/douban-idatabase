@@ -5,7 +5,12 @@ from app.config import settings
 from app.info_provider.detail import fetch_douban_item_detail
 from app.info_provider.imdb import fetch_imdb_id
 from app.models import Item, Queue
-from app.queue_processor.common import allow_update_item, merge_item, save_item_to_db
+from app.queue_processor.common import (
+    allow_update_item,
+    merge_item,
+    save_item_to_db,
+    wrap_fetch_item,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -25,7 +30,7 @@ def process_douban_id(db: Session, queue_item: Queue) -> None:
         return
 
     # Fetch data from Douban and create Item object
-    item = _fetch_douban_item(douban_id)
+    item = wrap_fetch_item(db, douban_id, lambda: _fetch_douban_item(douban_id))
 
     if not item:
         logger.warning(f"Failed to fetch data for douban_id={douban_id}")

@@ -1,11 +1,14 @@
 import json
 import logging
 from datetime import datetime
+from typing import Any
+from requests.exceptions import HTTPError
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
 
 from app.config import settings
-from app.models import History, Item, List, Tag
+from app.http_utils import NoPermissionException
+from app.models import Blacklist, History, Item, List, Tag
 from app.utils import now_timestamp
 
 logger = logging.getLogger(__name__)
@@ -166,6 +169,17 @@ def save_item_to_db(db: Session, item: Item):
     )
     db.add(history)
 
+    existing_blacklist_entry = (
+        db.query(Blacklist)
+        .filter(Blacklist.type == "douban_id", Blacklist.id == item.douban_id)
+        .first()
+    )
+
+    if existing_blacklist_entry:
+        # If the item is blacklisted, remove it from the blacklist
+        db.delete(existing_blacklist_entry)
+        logger.info(f"Removed item from blacklist: douban_id={item.douban_id}")
+
     # Check if item already exists in database
     existing_item = db.query(Item).filter(Item.douban_id == item.douban_id).first()
 
@@ -200,3 +214,50 @@ def save_item_to_db(db: Session, item: Item):
                 )
 
     db.commit()
+
+
+def _update_blacklist(db: Session, douban_id: str):
+    # Increment blacklist counter
+    blacklist_entry = (
+        db.query(Blacklist)
+        .filter(Blacklist.type == "douban_id", Blacklist.id == douban_id)
+        .first()
+    )
+
+    if blacklist_entry:
+        blacklist_entry.count += 1
+        blacklist_entry.update_time = now_timestamp()
+    else:
+        blacklist_entry = Blacklist(
+            type="douban_id",
+            id=douban_id,
+            count=1,
+            update_time=now_timestamp(),
+        )
+        db.add(blacklist_entry)
+
+    db.commit()
+
+    # Check if counter exceeds threshold
+    if blacklist_entry.count >= settings.BLACKLIST_THRESHOLD:
+        existing_item = db.query(Item).filter(Item.douban_id == douban_id).first()
+        if existing_item:
+            db.delete(existing_item)
+            db.commit()
+            logger.info(f"Removed item for blacklisted douban_id {douban_id}")
+
+
+def wrap_fetch_item(
+    db: Session,
+    douban_id: str,
+    fetch_func: callable,
+) -> Any:
+    try:
+        return fetch_func()
+    except NoPermissionException:
+        _update_blacklist(db, douban_id)
+        raise
+    except HTTPError as e:
+        if e.response is not None and e.response.status_code == 404:
+            _update_blacklist(db, douban_id)
+        raise
