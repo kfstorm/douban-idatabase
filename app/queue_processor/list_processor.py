@@ -93,7 +93,7 @@ def process_list(db: Session, queue_item: Queue) -> None:
                     db,
                     douban_id,
                     lambda douban_id=douban_id, detail_info=detail_info: fetch_imdb_id(
-                        db, douban_id, detail_info.get("in_blacklist")
+                        douban_id, detail_info.get("in_blacklist")
                     ),
                 )
                 if not imdb_info:

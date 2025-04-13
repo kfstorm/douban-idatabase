@@ -349,7 +349,7 @@ def process_explore(db: Session, queue_item: Queue) -> None:
             db,
             douban_id,
             lambda douban_id=douban_id, item_detail=item_detail: fetch_imdb_id(
-                db, douban_id, item_detail.get("in_blacklist")
+                douban_id, item_detail.get("in_blacklist")
             ),
         )
         if not imdb_info:
