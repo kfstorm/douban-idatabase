@@ -1,3 +1,4 @@
+import json
 import logging
 from sqlalchemy.orm import Session
 
@@ -23,11 +24,15 @@ def process_douban_id(db: Session, queue_item: Queue) -> None:
         return
 
     douban_id = queue_item.id
-
-    # Check if item already exists and was updated within the refresh interval
-    existing_item = db.query(Item).filter(Item.douban_id == douban_id).first()
-    if not allow_update_item(existing_item):
-        return
+    params = {}
+    if queue_item.params:
+        params = json.loads(queue_item.params)
+    force = params.get("force", False)
+    if not force:
+        # Check if item already exists and was updated within the refresh interval
+        existing_item = db.query(Item).filter(Item.douban_id == douban_id).first()
+        if not allow_update_item(existing_item):
+            return
 
     # Fetch data from Douban and create Item object
     item = wrap_fetch_item(db, douban_id, lambda: _fetch_douban_item(douban_id))

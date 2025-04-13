@@ -1,10 +1,11 @@
+import json
 import logging
 from typing import Iterable, Optional
 from urllib.parse import urlparse
 from sqlalchemy.orm import Session
 
 from app.info_provider.google import google_search
-from app.models import add_placeholder_item
+from app.models import add_placeholder_item, add_to_queue
 from app.utils import record_exception_metrics
 from app.schedule.base_task import BaseTask
 from app.schedule.task_registry import register_task
@@ -85,6 +86,11 @@ class AddRecentItemsTask(BaseTask):
             try:
                 if add_placeholder_item(db, douban_id):
                     added_count += 1
+                # Add to queue no matter if the item is new or not.
+                # Add `force` parameter to ignore update_time when processing.
+                add_to_queue(
+                    db, "douban_id", douban_id, params=json.dumps({"force": True})
+                )
             except Exception as e:
                 record_exception_metrics(e)
                 logger.error(
