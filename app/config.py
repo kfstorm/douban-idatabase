@@ -128,7 +128,7 @@ class Settings(BaseSettings):
     # Configuration for rate limit fallbacks
     # Comma-separated list of fallback strategies: "ZENROWS,PROXY" or "PROXY,ZENROWS"
     RATE_LIMIT_FALLBACK_STRATEGIES: str = os.getenv(
-        "RATE_LIMIT_FALLBACK_STRATEGIES", "ZENROWS,PROXY"
+        "RATE_LIMIT_FALLBACK_STRATEGIES", "PROXY"
     )
 
     # Proxy settings (for PROXY fallback strategy)
