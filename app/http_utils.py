@@ -410,7 +410,6 @@ def get_response(url: str, fallback_strategy=None, **kwargs):
             response.raise_for_status()
         except requests.HTTPError as e:
             record_exception_metrics(e)
-            logger.error(f"Failed to fetch {url}: {str(e)}")
             raise
 
         if _test_check_response_compression:
@@ -431,7 +430,6 @@ def get_response(url: str, fallback_strategy=None, **kwargs):
         if not isinstance(e, requests.HTTPError):
             # Record network-level failures
             http_requests_total.labels(host=host, status_code="error").inc()
-            logger.error(f"Request exception for {url}: {str(e)}")
         raise
 
 

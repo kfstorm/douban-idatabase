@@ -1,6 +1,8 @@
 import logging
 from typing import Optional, Dict, Any
 
+from requests import HTTPError
+
 from app.config import settings
 from app.http_utils import get_json
 
@@ -54,7 +56,11 @@ def get_imdb_id_from_tmdb_id(tmdb_id: str, media_type: str) -> Optional[str]:
     else:
         raise ValueError("media_type must be 'movie' or 'tv'")
 
-    data = _make_tmdb_request(url)
+    try:
+        data = _make_tmdb_request(url)
+    except HTTPError as e:
+        if e.response is not None and e.response.status_code == 404:
+            return None
 
     if data and "imdb_id" in data and data["imdb_id"]:
         return data["imdb_id"]
