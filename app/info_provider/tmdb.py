@@ -61,6 +61,7 @@ def get_imdb_id_from_tmdb_id(tmdb_id: str, media_type: str) -> Optional[str]:
     except HTTPError as e:
         if e.response is not None and e.response.status_code == 404:
             return None
+        raise
 
     if data and "imdb_id" in data and data["imdb_id"]:
         return data["imdb_id"]

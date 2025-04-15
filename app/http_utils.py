@@ -36,6 +36,8 @@ DEFAULT_HEADERS = {
     )
 }
 
+CHECK_RATE_LIMIT_EXCLUDED_HOSTS = ["api.themoviedb.org"]
+
 _test_check_response_compression = False
 
 
@@ -95,6 +97,8 @@ class Throttler:
 
     def _check_rate_limit(self, host: str, fallback_strategy: FallbackStrategy):
         if fallback_strategy is not None:
+            return
+        if host in CHECK_RATE_LIMIT_EXCLUDED_HOSTS:
             return
         next_call_time = self.next_call_time[host]
         now = now_timestamp()

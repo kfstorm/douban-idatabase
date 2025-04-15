@@ -23,10 +23,30 @@ from app.metrics import (
     user_requests_total,
 )
 from app.rate_limit import rate_limit_middleware
+from app.redis_utils import (
+    is_redis_available,
+    get_from_cache,
+    set_in_cache,
+)
 import app.utils
 
 # Initialize logging
 logger = setup_logging()
+
+# Cache expiration times (in seconds)
+TMDB_CACHE_EXPIRY = 60 * 60 * 24 * 30  # 30 days
+TVDB_CACHE_EXPIRY = 60 * 60 * 24 * 30  # 30 days
+
+
+def make_tmdb_cache_key(tmdb_id: str, media_type: str) -> str:
+    """Make a cache key for TMDB to IMDb mapping"""
+    return f"tmdb_to_imdb:{media_type}:{tmdb_id}"
+
+
+def make_tvdb_cache_key(tvdb_id: str) -> str:
+    """Make a cache key for TVDB to IMDb mapping"""
+    return f"tvdb_to_imdb:{tvdb_id}"
+
 
 # API Key security schemes
 api_key_header = APIKeyHeader(name="X-API-Key", auto_error=False)
@@ -214,11 +234,11 @@ def get_items(
                     status_code=400,
                     detail="tmdb_media_type must be either 'movie' or 'tv'",
                 )
-            # Get IMDB ID from TMDB ID
-            external_imdb_id = get_imdb_id_from_tmdb_id(tmdb_id, tmdb_media_type)
+            # Get IMDB ID from TMDB ID using cached function
+            external_imdb_id = cached_get_imdb_id_from_tmdb_id(tmdb_id, tmdb_media_type)
         elif tvdb_id:
-            # Get IMDB ID from TVDB ID
-            external_imdb_id = get_imdb_id_from_tvdb_id(tvdb_id)
+            # Get IMDB ID from TVDB ID using cached function
+            external_imdb_id = cached_get_imdb_id_from_tvdb_id(tvdb_id)
 
         if external_imdb_id:
             # Try to find items with the IMDB ID we got from external sources
@@ -236,6 +256,81 @@ def get_items(
         detail="No items found",
         headers={"Cache-Control": "max-age=86400"},
     )
+
+
+def cached_get_imdb_id_from_tmdb_id(tmdb_id: str, media_type: str) -> Optional[str]:
+    """
+    Get IMDB ID from TMDB ID with Redis caching
+
+    Args:
+        tmdb_id: TMDB ID
+        media_type: 'movie' or 'tv'
+
+    Returns:
+        IMDB ID or None if not found
+    """
+    if not tmdb_id or not media_type:
+        return None
+
+    # Try to get from cache first
+    if is_redis_available():
+        cache_key = make_tmdb_cache_key(tmdb_id, media_type)
+        cached_value = get_from_cache(cache_key)
+        if cached_value is not None:
+            # Return None for empty string (we cache empty strings for not found IDs)
+            if cached_value == b"":
+                return None
+            # Return the cached IMDB ID
+            return cached_value.decode("utf-8")
+
+    # Not in cache, call the API
+    imdb_id = get_imdb_id_from_tmdb_id(tmdb_id, media_type)
+
+    # Save result in cache
+    if is_redis_available():
+        cache_key = make_tmdb_cache_key(tmdb_id, media_type)
+        # Cache empty string for None values
+        value_to_cache = imdb_id if imdb_id else ""
+        set_in_cache(cache_key, value_to_cache, TMDB_CACHE_EXPIRY)
+
+    return imdb_id
+
+
+def cached_get_imdb_id_from_tvdb_id(tvdb_id: str) -> Optional[str]:
+    """
+    Get IMDB ID from TVDB ID with Redis caching
+
+    Args:
+        tvdb_id: TVDB ID
+
+    Returns:
+        IMDB ID or None if not found
+    """
+    if not tvdb_id:
+        return None
+
+    # Try to get from cache first
+    if is_redis_available():
+        cache_key = make_tvdb_cache_key(tvdb_id)
+        cached_value = get_from_cache(cache_key)
+        if cached_value is not None:
+            # Return None for empty string (we cache empty strings for not found IDs)
+            if cached_value == b"":
+                return None
+            # Return the cached IMDB ID
+            return cached_value.decode("utf-8")
+
+    # Not in cache, call the API
+    imdb_id = get_imdb_id_from_tvdb_id(tvdb_id)
+
+    # Save result in cache
+    if is_redis_available():
+        cache_key = make_tvdb_cache_key(tvdb_id)
+        # Cache empty string for None values
+        value_to_cache = imdb_id if imdb_id else ""
+        set_in_cache(cache_key, value_to_cache, TVDB_CACHE_EXPIRY)
+
+    return imdb_id
 
 
 @my_app.get("/metrics")

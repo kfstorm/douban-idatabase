@@ -1,28 +1,17 @@
 import time
 import logging
 from fastapi import Request, HTTPException
-import redis
-from app.config import settings
+
 from app.metrics import user_rate_limit_hits, user_rate_limit_current
+from app.redis_utils import (
+    is_redis_available,
+    get_redis_client,
+)
 
 logger = logging.getLogger(__name__)
 
-# Check if Redis is configured
-if settings.REDIS_URL:
-    # If Redis URL is configured, try to connect to Redis
-    try:
-        redis_client = redis.from_url(settings.REDIS_URL)
-        USING_REDIS = True
-        logger.info("Successfully connected to Redis for rate limiting")
-    except Exception as e:
-        # If Redis is configured but connection fails, raise an error
-        logger.error(f"Failed to connect to Redis: {e}")
-        raise RuntimeError(f"Could not connect to Redis for rate limiting: {e}")
-else:
-    # If Redis URL is not configured, use in-memory storage
-    USING_REDIS = False
-    rate_limit_store = {}
-    logger.info("Redis URL not configured, using in-memory store for rate limiting")
+# In-memory rate limit store as a fallback when Redis is not available
+rate_limit_store = {}
 
 
 def rate_limit_middleware(request: Request, user_info: dict):
@@ -48,8 +37,9 @@ def rate_limit_middleware(request: Request, user_info: dict):
     # Create window key name
     window_key = f"rate_limit:{user_id}:{now // window_size}"
 
-    if USING_REDIS:
+    if is_redis_available():
         # Use Redis for rate limiting
+        redis_client = get_redis_client()
         current_count = redis_client.incr(window_key)
         if current_count == 1:
             # Set expiration time for new window
