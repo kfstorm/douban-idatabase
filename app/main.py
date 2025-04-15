@@ -11,6 +11,7 @@ import uvicorn
 
 from app import models, schemas
 from app.database import get_db, init_db
+from app.info_provider.tmdb import get_imdb_id_from_tmdb_id, get_imdb_id_from_tvdb_id
 from app.logging_config import setup_logging
 from app.schedule.scheduler import start_scheduler, stop_scheduler
 from app.config import settings
@@ -164,26 +165,77 @@ def get_items(
     douban_id: str = Query(None),
     imdb_id: str = Query(None),
     douban_title: str = Query(None),
+    tmdb_id: str = Query(None),
+    tmdb_media_type: str = Query(None),
+    tvdb_id: str = Query(None),
     db: Session = Depends(get_db),
 ):
-    if not any([douban_id, imdb_id, douban_title]):
+    """
+    Get items by various IDs:
+    - douban_id: Douban ID
+    - imdb_id: IMDB ID
+    - douban_title: Exact Douban title match
+    - tmdb_id: TMDB ID (will be converted to IMDB ID)
+    - tmdb_media_type: "movie" or "tv" (only used with tmdb_id)
+    - tvdb_id: TVDB ID (will be converted to IMDB ID)
+
+    At least one ID parameter must be provided.
+    """
+    items = []
+
+    # Check if we have any valid parameters
+    has_direct_identifiers = any([douban_id, imdb_id, douban_title])
+    has_external_identifiers = any([tmdb_id, tvdb_id])
+
+    if not has_direct_identifiers and not has_external_identifiers:
         raise HTTPException(
             status_code=400,
-            detail="At least one of douban_id, imdb_id, or douban_title must be provided",  # noqa: B950
+            detail="At least one ID parameter must be provided",
         )
 
-    items = models.get_items(db, douban_id, imdb_id, douban_title)
-    if not items:
-        # Set cache for 1 day (86400 seconds) for 404 responses
-        raise HTTPException(
-            status_code=404,
-            detail="No items found",
-            headers={"Cache-Control": "max-age=86400"},
-        )
+    # If we have direct identifiers, use them first
+    if has_direct_identifiers:
+        items = models.get_items(db, douban_id, imdb_id, douban_title)
+    else:
+        # If we don't have direct identifiers or no items were found with them,
+        # try to use external identifiers (TMDB, TVDB)
 
-    # Set cache for 7 days (604800 seconds) for successful responses
-    response.headers["Cache-Control"] = "max-age=604800"
-    return items
+        external_imdb_id = None
+
+        # Validate media_type parameter when using TMDB ID
+        if tmdb_id:
+            if not tmdb_media_type:
+                raise HTTPException(
+                    status_code=400,
+                    detail="tmdb_media_type is required when using tmdb_id",
+                )
+            if tmdb_media_type not in ["movie", "tv"]:
+                raise HTTPException(
+                    status_code=400,
+                    detail="tmdb_media_type must be either 'movie' or 'tv'",
+                )
+            # Get IMDB ID from TMDB ID
+            external_imdb_id = get_imdb_id_from_tmdb_id(tmdb_id, tmdb_media_type)
+        elif tvdb_id:
+            # Get IMDB ID from TVDB ID
+            external_imdb_id = get_imdb_id_from_tvdb_id(tvdb_id)
+
+        if external_imdb_id:
+            # Try to find items with the IMDB ID we got from external sources
+            items = models.get_items(db, imdb_id=external_imdb_id)
+
+    if items:
+        # Set cache for 7 days (604800 seconds) for successful responses
+        response.headers["Cache-Control"] = "max-age=604800"
+        return items
+
+    # If we get here, no items were found
+    # Set cache for 1 day (86400 seconds) for 404 responses
+    raise HTTPException(
+        status_code=404,
+        detail="No items found",
+        headers={"Cache-Control": "max-age=86400"},
+    )
 
 
 @my_app.get("/metrics")

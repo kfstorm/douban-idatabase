@@ -362,7 +362,7 @@ def get_response(url: str, fallback_strategy=None, **kwargs):
                     return get_response_via_proxy(url, **kwargs)
 
         record_exception_metrics(e)
-        raise e
+        raise
 
     if app.utils.shutdown_flag:
         raise ApplicationShutdownException(
@@ -404,14 +404,14 @@ def get_response(url: str, fallback_strategy=None, **kwargs):
                         return get_response_via_proxy(url, **kwargs)
 
             record_exception_metrics(e)
-            raise e
+            raise
 
         try:
             response.raise_for_status()
         except requests.HTTPError as e:
             record_exception_metrics(e)
             logger.error(f"Failed to fetch {url}: {str(e)}")
-            raise e
+            raise
 
         if _test_check_response_compression:
             if urlparse(url).path.endswith(".gz"):
@@ -432,7 +432,7 @@ def get_response(url: str, fallback_strategy=None, **kwargs):
             # Record network-level failures
             http_requests_total.labels(host=host, status_code="error").inc()
             logger.error(f"Request exception for {url}: {str(e)}")
-        raise e
+        raise
 
 
 def get_json(url, **kwargs):
