@@ -1,1 +1,2 @@
 pytest
+pycountry==24.6.1
