@@ -17,7 +17,6 @@ from app.schedule.scheduler import start_scheduler, stop_scheduler
 from app.config import settings
 from app.metrics import (
     get_metrics,
-    update_db_metrics,
     api_requests_total,
     api_request_duration,
     user_requests_total,
@@ -344,10 +343,7 @@ def metrics_endpoint(
             status_code=403, detail="Admin privileges required to access metrics"
         )
 
-    # Update database metrics before returning
-    update_db_metrics(db)
-
-    return Response(content=get_metrics(), media_type=CONTENT_TYPE_LATEST)
+    return Response(content=get_metrics(db), media_type=CONTENT_TYPE_LATEST)
 
 
 def run_app():

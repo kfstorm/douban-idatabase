@@ -1,7 +1,5 @@
 import logging
 import os
-import time
-import threading
 from prometheus_client import (
     Counter,
     Gauge,
@@ -13,8 +11,8 @@ from prometheus_client import (
 from sqlalchemy.orm import Session
 
 from app.config import settings
-from app.models import Item, Queue, History, List, Tag
-from app.utils import record_exception_metrics
+from app.models import Item, Queue, History, List, Tag, DbStatistics
+from app.utils import record_exception_metrics, now_timestamp
 
 logger = logging.getLogger(__name__)
 
@@ -139,7 +137,7 @@ process_start_time = Gauge(
     "douban_idatabase_process_start_time_seconds",
     "Start time of the process since unix epoch in seconds",
 )
-process_start_time.set(time.time())
+process_start_time.set(now_timestamp())
 
 # HTTP metrics
 http_requests_total = Counter(
@@ -173,41 +171,27 @@ exception_counts = Counter(
 # to reset metrics when groups don't exist anymore
 _known_item_types = set()
 _known_queue_types = set()
-_metrics_cache_lock = threading.Lock()
-_last_metrics_update = 0
 
 
-def update_db_metrics(db: Session, force=False):
-    """Update all database-related metrics with optimized queries
+def update_db_metrics(db: Session):
+    """Update database-related metrics and store in db_statistics
+
+    This function collects statistics about the database and stores them
+    in the DbStatistics table. It doesn't update Prometheus metrics directly.
+    Prometheus metrics are updated when get_metrics is called.
 
     Args:
         db: Database session
-        force: Force update regardless of cache status
     """
-    global _last_metrics_update, _known_item_types, _known_queue_types
-
-    # Skip update if it's been refreshed recently
-    current_time = time.time()
-    with _metrics_cache_lock:
-        if (
-            not force
-            and (current_time - _last_metrics_update)
-            < settings.DB_METRICS_MIN_UPDATE_INTERVAL_SECONDS
-        ):
-            logger.debug("Skipping metrics update, last update was too recent")
-            return
-
-        # Update the timestamp before running queries to prevent concurrent updates
-        _last_metrics_update = current_time
-
     from sqlalchemy import func, case
     from sqlalchemy.exc import SQLAlchemyError, TimeoutError
 
     db_path = settings.SQLALCHEMY_DATABASE_URL
 
     try:
+        now = now_timestamp()
+
         # Optimize item statistics query with indexed columns
-        # Use compiled query with hints for better performance
         item_stats = (
             db.query(
                 func.coalesce(Item.type, "unknown").label("type"),
@@ -222,22 +206,23 @@ def update_db_metrics(db: Session, force=False):
             .all()
         )
 
-        # Get current item types
-        current_item_types = set()
         for item_type, placeholder_count, fetched_count in item_stats:
-            current_item_types.add(item_type)
-            db_items.labels(type=item_type, state="fetched").set(fetched_count)
-            db_items.labels(type=item_type, state="placeholder").set(placeholder_count)
+            # Write to db_statistics
+            db.merge(
+                DbStatistics(
+                    key=f"item_fetched_{item_type}",
+                    value=fetched_count,
+                    update_time=now,
+                )
+            )
+            db.merge(
+                DbStatistics(
+                    key=f"item_placeholder_{item_type}",
+                    value=placeholder_count,
+                    update_time=now,
+                )
+            )
 
-        # Reset metrics for item types that no longer exist
-        for item_type in _known_item_types - current_item_types:
-            db_items.labels(type=item_type, state="fetched").set(0)
-            db_items.labels(type=item_type, state="placeholder").set(0)
-
-        # Update known item types
-        _known_item_types = current_item_types
-
-        # Use optimized queries for list statistics
         list_stats = db.query(
             func.sum(
                 case((List.last_check_time == None, 1), else_=0)  # noqa: E711
@@ -246,11 +231,19 @@ def update_db_metrics(db: Session, force=False):
                 case((List.last_check_time != None, 1), else_=0)  # noqa: E711
             ).label("fetched_count"),
         ).one()
+        db.merge(
+            DbStatistics(
+                key="list_fetched", value=list_stats.fetched_count or 0, update_time=now
+            )
+        )
+        db.merge(
+            DbStatistics(
+                key="list_placeholder",
+                value=list_stats.placeholder_count or 0,
+                update_time=now,
+            )
+        )
 
-        db_lists.labels(state="fetched").set(list_stats.fetched_count or 0)
-        db_lists.labels(state="placeholder").set(list_stats.placeholder_count or 0)
-
-        # Use optimized query for tag statistics with indexed columns
         tag_stats = db.query(
             func.sum(case((Tag.fetch == True, 1), else_=0)).label(  # noqa: E712
                 "valid_count"
@@ -262,41 +255,56 @@ def update_db_metrics(db: Session, force=False):
                 case((Tag.last_check_time == None, 1), else_=0)  # noqa: E711
             ).label("placeholder_count"),
         ).one()
+        db.merge(
+            DbStatistics(
+                key="tag_valid", value=tag_stats.valid_count or 0, update_time=now
+            )
+        )
+        db.merge(
+            DbStatistics(
+                key="tag_not_valid",
+                value=tag_stats.not_valid_count or 0,
+                update_time=now,
+            )
+        )
+        db.merge(
+            DbStatistics(
+                key="tag_placeholder",
+                value=tag_stats.placeholder_count or 0,
+                update_time=now,
+            )
+        )
 
-        db_tags.labels(state="valid").set(tag_stats.valid_count or 0)
-        db_tags.labels(state="not_valid").set(tag_stats.not_valid_count or 0)
-        db_tags.labels(state="placeholder").set(tag_stats.placeholder_count or 0)
-
-        # Use indexed query for queue statistics
         queue_stats = (
             db.query(Queue.type, func.count(Queue.type).label("count"))
             .group_by(Queue.type)
             .all()
         )
-
-        # Get current queue types
-        current_queue_types = set()
         for queue_type, count in queue_stats:
-            current_queue_types.add(queue_type)
-            db_queue_size.labels(type=queue_type).set(count)
+            db.merge(
+                DbStatistics(key=f"queue_{queue_type}", value=count, update_time=now)
+            )
 
-        # Reset metrics for queue types that no longer exist
-        for queue_type in _known_queue_types - current_queue_types:
-            db_queue_size.labels(type=queue_type).set(0)
+        history_total = db.query(func.count(History.change_id)).scalar() or 0
+        db.merge(
+            DbStatistics(key="history_total", value=history_total, update_time=now)
+        )
 
-        # Update known queue types
-        _known_queue_types = current_queue_types
+        db.commit()
 
-        # Fast count query for history using primary key index
-        db_history_total.set(db.query(func.count(History.change_id)).scalar() or 0)
+        # Delete old statistics after successful commit
+        db.query(DbStatistics).filter(DbStatistics.update_time < now).delete()
+        db.commit()
 
         # Set database file size (SQLite specific)
-        # - outside transaction as it doesn't need DB access
         if db_path.startswith("sqlite:///"):
             db_file = db_path[10:]
             if os.path.exists(db_file):
-                database_size.set(os.path.getsize(db_file))
-
+                size = os.path.getsize(db_file)
+                db.merge(
+                    DbStatistics(key="database_size_bytes", value=size, update_time=now)
+                )
+                db.commit()
     except TimeoutError as e:
         logger.error(f"Database connection timeout during metrics collection: {e}")
         record_exception_metrics(e)
@@ -308,6 +316,85 @@ def update_db_metrics(db: Session, force=False):
         record_exception_metrics(e)
 
 
-def get_metrics():
-    """Generate latest metrics in Prometheus format"""
+def get_metrics(db: Session):
+    """Generate latest metrics in Prometheus format
+
+    This function reads stored metrics from the DbStatistics table,
+    updates the Prometheus metrics objects, and then generates the
+    metrics output in Prometheus format.
+
+    Args:
+        db: Database session
+    """
+    try:
+        # Read all metrics from DbStatistics table
+        stats = db.query(DbStatistics).all()
+
+        # Process each stat based on its key pattern
+        item_types = set()
+        queue_types = set()
+
+        # First pass - identify all item and queue types
+        for stat in stats:
+            # Process item metrics
+            if stat.key.startswith("item_fetched_"):
+                item_type = stat.key[len("item_fetched_") :]
+                item_types.add(item_type)
+            elif stat.key.startswith("queue_"):
+                queue_type = stat.key[len("queue_") :]
+                queue_types.add(queue_type)
+
+        # Second pass - set all metrics
+        for stat in stats:
+            # Handle item metrics
+            if stat.key.startswith("item_fetched_"):
+                item_type = stat.key[len("item_fetched_") :]
+                db_items.labels(type=item_type, state="fetched").set(stat.value)
+            elif stat.key.startswith("item_placeholder_"):
+                item_type = stat.key[len("item_placeholder_") :]
+                db_items.labels(type=item_type, state="placeholder").set(stat.value)
+            # Handle list metrics
+            elif stat.key == "list_fetched":
+                db_lists.labels(state="fetched").set(stat.value)
+            elif stat.key == "list_placeholder":
+                db_lists.labels(state="placeholder").set(stat.value)
+            # Handle tag metrics
+            elif stat.key == "tag_valid":
+                db_tags.labels(state="valid").set(stat.value)
+            elif stat.key == "tag_not_valid":
+                db_tags.labels(state="not_valid").set(stat.value)
+            elif stat.key == "tag_placeholder":
+                db_tags.labels(state="placeholder").set(stat.value)
+            # Handle queue metrics
+            elif stat.key.startswith("queue_"):
+                queue_type = stat.key[len("queue_") :]
+                db_queue_size.labels(type=queue_type).set(stat.value)
+            # Handle history total
+            elif stat.key == "history_total":
+                db_history_total.set(stat.value)
+            # Handle database size
+            elif stat.key == "database_size_bytes":
+                database_size.set(stat.value)
+
+        # Reset any metrics that aren't present in the current stats
+        global _known_item_types, _known_queue_types
+
+        # Reset metrics for item types that no longer exist
+        for old_type in _known_item_types - item_types:
+            db_items.labels(type=old_type, state="fetched").set(0)
+            db_items.labels(type=old_type, state="placeholder").set(0)
+
+        # Reset metrics for queue types that no longer exist
+        for old_type in _known_queue_types - queue_types:
+            db_queue_size.labels(type=old_type).set(0)
+
+        # Update known types
+        _known_item_types = item_types
+        _known_queue_types = queue_types
+
+    except Exception as e:
+        logger.error(f"Error updating Prometheus metrics from database: {e}")
+        record_exception_metrics(e)
+
+    # Generate and return metrics in Prometheus format
     return generate_latest(registry)

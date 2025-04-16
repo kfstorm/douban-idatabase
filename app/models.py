@@ -115,6 +115,14 @@ class Blacklist(Base):
     __table_args__ = (Index("idx_blacklist_type_id", type, id),)
 
 
+class DbStatistics(Base):
+    __tablename__ = "db_statistics"
+
+    key = Column(String(64), primary_key=True)
+    value = Column(Integer, nullable=False)
+    update_time = Column(Float, nullable=False)
+
+
 def get_items(
     db: Session, douban_id: str = None, imdb_id: str = None, douban_title: str = None
 ):

@@ -58,3 +58,4 @@ def register_all_tasks():
     from app.schedule.process_queue_task import ProcessQueueTask
     from app.schedule.fetch_sitemap_task import FetchSitemapTask
     from app.schedule.discover_by_explore_task import DiscoverItemsByExploreTask
+    from app.schedule.update_db_metrics_task import UpdateDbMetricsTask
