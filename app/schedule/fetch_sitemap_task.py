@@ -3,7 +3,7 @@ from sqlalchemy.orm import Session
 
 from app.info_provider.sitemap import fetch_sitemap_urls_from_sitemap_index
 from app.schedule.base_task import BaseTask
-from app.models import add_to_queue
+from app.model_utils import add_to_queue
 from app.schedule.task_registry import register_task
 
 logger = logging.getLogger(__name__)

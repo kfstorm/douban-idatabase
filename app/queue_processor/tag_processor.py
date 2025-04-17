@@ -9,7 +9,8 @@ from app.info_provider.common import (
 )
 from app.info_provider.lists import get_list_api_by_list_type
 from app.info_provider.tags import fetch_lists_from_tag
-from app.models import Tag, Queue, add_placeholder_list
+from app.model_utils import add_placeholder_list
+from app.models import Tag, Queue
 from app.queue_processor.common import (
     allow_update_tag,
 )

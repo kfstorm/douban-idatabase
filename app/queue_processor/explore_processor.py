@@ -3,7 +3,8 @@ import logging
 from sqlalchemy.orm import Session
 from typing import Dict
 
-from app.models import Queue, add_placeholder_item, add_to_queue
+from app.model_utils import add_placeholder_item, add_to_queue
+from app.models import Queue
 from app.info_provider.explore import explore
 from app.queue_processor.common import try_to_save_item_to_db_with_detail
 

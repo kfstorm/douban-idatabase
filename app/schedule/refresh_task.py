@@ -3,7 +3,8 @@ from sqlalchemy.orm import Session
 from sqlalchemy import or_
 
 from app.config import settings
-from app.models import Item, List, Tag, add_to_queue
+from app.model_utils import add_to_queue
+from app.models import Item, List, Tag
 from app.queue_processor.common import (
     allow_update_item,
     allow_update_list,

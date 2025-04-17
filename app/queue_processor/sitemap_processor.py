@@ -1,7 +1,8 @@
 import logging
 from sqlalchemy.orm import Session
 
-from app.models import Queue, add_placeholder_item
+from app.model_utils import add_placeholder_item
+from app.models import Queue
 from app.info_provider.sitemap import fetch_douban_ids_from_sitemap
 
 logger = logging.getLogger(__name__)

@@ -5,7 +5,8 @@ from urllib.parse import urlparse
 from sqlalchemy.orm import Session
 
 from app.info_provider.google import google_search
-from app.models import add_placeholder_item, add_to_queue
+from app.model_utils import add_placeholder_item
+from app.model_utils import add_to_queue
 from app.utils import record_exception_metrics
 from app.schedule.base_task import BaseTask
 from app.schedule.task_registry import register_task

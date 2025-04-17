@@ -2,7 +2,7 @@ import logging
 from sqlalchemy.orm import Session
 
 from app.info_provider.lists import ListsApi
-from app.models import add_placeholder_list
+from app.model_utils import add_placeholder_list
 from app.utils import now_timestamp, record_exception_metrics
 from app.schedule.base_task import BaseTask
 from app.schedule.task_registry import register_task

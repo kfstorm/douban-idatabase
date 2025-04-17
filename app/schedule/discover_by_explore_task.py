@@ -2,7 +2,7 @@ import logging
 from sqlalchemy.orm import Session
 
 from app.info_provider.common import ITEM_TYPES
-from app.models import add_to_queue
+from app.model_utils import add_to_queue
 from app.queue_processor.explore_processor import SCORE_RANGES
 from app.schedule.base_task import BaseTask
 from app.schedule.task_registry import register_task

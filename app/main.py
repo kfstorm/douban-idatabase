@@ -9,10 +9,11 @@ import time
 import multiprocessing
 import uvicorn
 
-from app import models, schemas
+from app import schemas
 from app.database import get_db, init_db
 from app.info_provider.tmdb import get_imdb_id_from_tmdb_id, get_imdb_id_from_tvdb_id
 from app.logging_config import setup_logging
+import app.model_utils
 from app.schedule.scheduler import start_scheduler, stop_scheduler
 from app.config import settings
 from app.metrics import (
@@ -100,7 +101,7 @@ def verify_api_key(
         raise HTTPException(status_code=401, detail="API Key required")
     else:
         # Check if API key exists in user table
-        user = models.get_user_by_api_key(db, api_key)
+        user = app.model_utils.get_user_by_api_key(db, api_key)
         if user and not user.disabled:
             user_info = {
                 "user_id": user.user_id,
@@ -214,7 +215,7 @@ def get_items(
 
     # If we have direct identifiers, use them first
     if has_direct_identifiers:
-        items = models.get_items(db, douban_id, imdb_id, douban_title)
+        items = app.model_utils.get_items(db, douban_id, imdb_id, douban_title)
     else:
         # If we don't have direct identifiers or no items were found with them,
         # try to use external identifiers (TMDB, TVDB)
@@ -241,7 +242,7 @@ def get_items(
 
         if external_imdb_id:
             # Try to find items with the IMDB ID we got from external sources
-            items = models.get_items(db, imdb_id=external_imdb_id)
+            items = app.model_utils.get_items(db, imdb_id=external_imdb_id)
 
     if items:
         # Set cache for 7 days (604800 seconds) for successful responses
