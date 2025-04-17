@@ -156,7 +156,7 @@ class DashboardGenerator:
         title: str,
         metrics: list,
         height: int = 8,
-        width: int = 12,
+        width: int = 8,
         y_axis_label: str = None,
         y_axis_format: str = "short",
     ) -> int:
@@ -282,7 +282,7 @@ def generate_dashboard():
 
     # Add new panel for tracking item operations
     generator.add_graph_panel(
-        "Item Operations (Add/Update) by Type",
+        "Item Operations by Type",
         [
             {
                 "expr": "rate(douban_idatabase_item_operations_total[5m])",
@@ -371,8 +371,6 @@ def generate_dashboard():
                 "legendFormat": "User {{user_id}}",
             }
         ],
-        height=8,
-        width=12,
         y_axis_format="reqps",
     )
 
@@ -385,8 +383,6 @@ def generate_dashboard():
                 "legendFormat": "User {{user_id}}",
             }
         ],
-        height=8,
-        width=12,
         y_axis_format="reqps",
     )
 
@@ -399,8 +395,6 @@ def generate_dashboard():
                 "legendFormat": "User {{user_id}}",
             }
         ],
-        height=8,
-        width=12,
     )
 
     # Rate Limit Hits
@@ -412,8 +406,6 @@ def generate_dashboard():
                 "legendFormat": "User {{user_id}}",
             }
         ],
-        height=8,
-        width=12,
         y_axis_format="rpm",
     )
 
@@ -421,8 +413,6 @@ def generate_dashboard():
     generator.add_stat_panel(
         "Total Rate Limit Hits (1h)",
         "sum(increase(douban_idatabase_user_rate_limit_hits_total[1h]))",
-        height=4,
-        width=8,
         color_mode="value",
         threshold_mode="absolute",
         aggregation=None,
@@ -518,15 +508,12 @@ def generate_dashboard():
                 "legendFormat": "{{type}} - {{module}}",
             }
         ],
-        width=24,
         y_axis_format="ops",
         y_axis_label="exceptions/sec",
     )
     generator.add_stat_panel(
         "Total Exceptions (1h)",
         "sum(increase(douban_idatabase_exceptions_total[1h]))",
-        width=8,
-        height=4,
         color_mode="value",
         threshold_mode="absolute",
         unit="short",
@@ -535,8 +522,6 @@ def generate_dashboard():
     generator.add_stat_panel(
         "Total Exceptions (24h)",
         "sum(increase(douban_idatabase_exceptions_total[24h]))",
-        width=8,
-        height=4,
         color_mode="value",
         threshold_mode="absolute",
         unit="short",
