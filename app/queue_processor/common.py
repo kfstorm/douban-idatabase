@@ -204,12 +204,12 @@ def save_item_to_db(db: Session, item: Item):
     existing_item = db.query(Item).filter(Item.douban_id == item.douban_id).first()
 
     if existing_item:
-        # Update the existing item with new values
-        _update_existing_item_columns(existing_item, item)
-
         # Count updating a placeholder item as an add operation instead of update.
         # A placeholder item doesn't have update_time set yet
         is_update = existing_item.update_time is not None
+
+        # Update the existing item with new values
+        _update_existing_item_columns(existing_item, item)
     else:
         try:
             # Add the new item directly
@@ -235,14 +235,14 @@ def save_item_to_db(db: Session, item: Item):
                 db.query(Item).filter(Item.douban_id == item.douban_id).first()
             )
             if existing_item:
-                _update_existing_item_columns(
-                    existing_item, item, "after integrity error"
-                )
-
                 # Count updating a placeholder item as an add operation instead of
                 # update.
                 # A placeholder item doesn't have update_time set yet
                 is_update = existing_item.update_time is not None
+
+                _update_existing_item_columns(
+                    existing_item, item, "after integrity error"
+                )
 
     # Commit the transaction
     db.commit()
