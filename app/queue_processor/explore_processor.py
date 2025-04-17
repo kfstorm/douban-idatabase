@@ -23,10 +23,14 @@ SCORE_RANGES = [f"{i},{i+1}" for i in range(9, -1, -1)]
 
 # Predefined conditions for narrowing down exploration
 
-# Years from 1980 to current year + 5. Later years come first.
-YEARS = [str(year) for year in range(datetime.now().year + 5, 1979, -1)]
-# Years before 1980. We expect fewer items in these ranges.
-YEARS += ["70年代", "60年代", "更早"]
+
+def _get_years():
+    # Years from 1980 to current year + 5. Later years come first.
+    years = [str(year) for year in range(datetime.now().year + 5, 1979, -1)]
+    # Years before 1980. We expect fewer items in these ranges.
+    years += ["70年代", "60年代", "更早"]
+    return years
+
 
 # Based on existing data in database
 # Double-checked with https://movie.douban.com/new_subject
@@ -601,7 +605,7 @@ def _add_narrower_conditions(db: Session, conditions: dict) -> bool:
     # Determine which level of condition to add
     if not year:
         # Add year condition
-        for year in YEARS:
+        for year in _get_years():
             new_conditions = conditions.copy()
             new_conditions["year"] = year
             new_id = encode_explore_queue_id(new_conditions)
