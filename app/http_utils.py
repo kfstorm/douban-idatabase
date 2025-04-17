@@ -20,7 +20,6 @@ from app.utils import (
 )
 import app.utils
 from app.metrics import (
-    rate_limit_hits,
     http_requests_total,
     http_request_duration,
     proxy_failures_total,
@@ -108,8 +107,6 @@ class Throttler:
 
     def _handle_response(self, response: requests.Response):
         all_responses = response.history + [response]
-        host = urlparse(all_responses[0].request.url).netloc
-
         for resp in all_responses:
             # Example response:
             # {
@@ -144,9 +141,6 @@ class Throttler:
             ):
                 # Rate limited.
                 next_call_time = now_timestamp() + settings.RATE_LIMIT_DELAY_SECONDS
-
-                # Record rate limit hit
-                rate_limit_hits.labels(host=host).inc()
 
                 raise RateLimitException(next_call_time)
 
@@ -383,7 +377,9 @@ def get_response(url: str, fallback_strategy=None, **kwargs):
 
         # Record request with status code
         http_requests_total.labels(
-            host=host, status_code=str(response.status_code)
+            host=host,
+            status_code=str(response.status_code),
+            strategy=fallback_strategy.name if fallback_strategy else "direct",
         ).inc()
 
         try:
@@ -433,7 +429,11 @@ def get_response(url: str, fallback_strategy=None, **kwargs):
         record_exception_metrics(e)
         if not isinstance(e, requests.HTTPError):
             # Record network-level failures
-            http_requests_total.labels(host=host, status_code="error").inc()
+            http_requests_total.labels(
+                host=host,
+                status_code="error",
+                strategy=fallback_strategy.name if fallback_strategy else "direct",
+            ).inc()
         raise
 
 

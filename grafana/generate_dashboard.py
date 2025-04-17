@@ -469,28 +469,14 @@ def generate_dashboard():
         show_percentage=True,
     )
 
-    # Rate Limiting
-    generator.add_row("Rate Limiting")
-    generator.add_graph_panel(
-        "Rate Limit Hits",
-        [
-            {
-                "expr": "rate(douban_idatabase_rate_limit_hits_total[5m])",
-                "legendFormat": "{{host}}",
-            }
-        ],
-        width=24,
-        y_axis_format="ops",
-    )
-
     # HTTP Metrics
     generator.add_row("HTTP Metrics")
     generator.add_graph_panel(
-        "HTTP Requests by Host and Status",
+        "HTTP Requests by Host, Status, and Strategy",
         [
             {
                 "expr": "rate(douban_idatabase_http_requests_total[5m])",
-                "legendFormat": "{{host}} - {{status_code}}",
+                "legendFormat": "{{host}} - {{status_code}} - {{strategy}}",
             }
         ],
         y_axis_format="reqps",

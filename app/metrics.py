@@ -119,13 +119,6 @@ backup_file_size = Gauge(
     "Size of the latest backup file in bytes",
 )
 
-# Rate limiting metrics
-rate_limit_hits = Counter(
-    "douban_idatabase_rate_limit_hits_total",
-    "Total number of rate limit hits",
-    ["host"],
-)
-
 # Database size metric
 database_size = Gauge(
     "douban_idatabase_database_size_bytes",
@@ -143,7 +136,7 @@ process_start_time.set(now_timestamp())
 http_requests_total = Counter(
     "douban_idatabase_http_requests_total",
     "Total number of HTTP requests",
-    ["host", "status_code"],
+    ["host", "status_code", "strategy"],
 )
 
 http_request_duration = Histogram(
