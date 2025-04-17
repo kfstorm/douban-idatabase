@@ -296,7 +296,10 @@ def try_to_save_item_to_db_with_detail(
         existing_raw_data = json.loads(existing_item.raw_data)
         imdb_info = {
             "imdb_id": existing_raw_data.get("imdb_id"),
-            "imdb_source": existing_raw_data.get("imdb_source"),
+            "raw_data": {
+                "imdb_id": existing_raw_data.get("imdb_id"),
+                "imdb_source": existing_raw_data.get("imdb_source"),
+            },
         }
     else:
         # Fetch IMDb data
