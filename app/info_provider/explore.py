@@ -80,15 +80,20 @@ def explore(
             break
 
         if not items:
+            # No items returned, count as a failure
             logger.warning(
                 f"Received empty response for {source_context}"
-                f" with start={fetched_count}, count={current_page_size}"
+                f" with start={fetched_count}, count={current_page_size}, total={total}"
             )
-            # No items returned, count as a failure
             consecutive_failures += 1
 
             if consecutive_failures >= MAX_CONSECUTIVE_FAILURES:
                 # Too many consecutive failures, abort
+                logger.error(
+                    f"Too many consecutive failures for {source_context}"
+                    f" with start={fetched_count}, count={current_page_size}"
+                    f", total={total}"
+                )
                 break
 
             # Wait before retrying
@@ -97,8 +102,8 @@ def explore(
         elif fetched_count + len(items) < total and len(items) < current_page_size:
             logger.warning(
                 f"Received fewer items than requested for {source_context}"
-                f" with start={fetched_count}, count={current_page_size}."
-                f" Received: {len(items)}"
+                f" with start={fetched_count}, count={current_page_size},"
+                f" total={total}. Received: {len(items)}"
             )
 
         # Successfully got some items, reset the failure counter
