@@ -3,22 +3,39 @@ import gettext
 import gzip
 import json
 import logging
+from typing import Optional
 
 import pytest
 import pycountry
-from app.info_provider.explore import explore
+from app.info_provider.explore import PAGE_SIZE, explore
 from app.queue_processor.explore_processor import REGION_KEYWORDS, TYPES
 from app.test.common import check_detail
 
 logger = logging.getLogger(__name__)
 
-DEFAULT_TEST_COUNT = 20
+DEFAULT_TEST_COUNT = PAGE_SIZE + 1
 
 
 def check_explore_result(
-    result: dict, item_check_func, allow_no_results: bool = False, **kwargs
+    result: dict,
+    max_count: Optional[int],
+    item_check_func,
+    allow_no_results: bool = False,
+    **kwargs,
 ):
     logger.info(f"Items count: {len(result['items'])}, Total: {result['total']}")
+
+    assert len(result["items"]) <= result["total"]
+
+    if max_count is not None:
+        assert len(result["items"]) <= max_count
+        if result["total"] >= max_count:
+            assert len(result["items"]) == max_count
+        else:
+            assert len(result["items"]) == result["total"]
+    else:
+        assert len(result["items"]) == result["total"]
+
     if not allow_no_results:
         assert len(result["items"]) > 0
         assert result["total"] > 0
@@ -32,17 +49,20 @@ def check_explore_result(
 
 def test_explore_with_score_range():
     """Test the explore function with just a score range and no other filters."""
-    result = explore("movie", "9,10", count=DEFAULT_TEST_COUNT)
+    result = explore("movie", "9,10", max_count=DEFAULT_TEST_COUNT)
     check_explore_result(
-        result, lambda item: item["type"] == "movie" and item["rating"] >= 9.0
+        result,
+        DEFAULT_TEST_COUNT,
+        lambda item: item["type"] == "movie" and item["rating"] >= 9.0,
     )
 
 
 def test_explore_with_year_filter():
     """Test the explore function with a score range and a specific year filter."""
-    result = explore("movie", "9,10", tags=["2023"], count=DEFAULT_TEST_COUNT)
+    result = explore("movie", "9,10", tags=["2023"], max_count=DEFAULT_TEST_COUNT)
     check_explore_result(
         result,
+        DEFAULT_TEST_COUNT,
         lambda item: item["type"] == "movie"
         and item["rating"] >= 9.0
         and item["year"] == 2023,
@@ -52,9 +72,10 @@ def test_explore_with_year_filter():
 def test_explore_with_type_filter():
     """Test the explore function with a score range, year,
     and a specific type filter."""
-    result = explore("movie", "9,10", tags=["2023", "喜剧"], count=DEFAULT_TEST_COUNT)
+    result = explore("movie", "9,10", tags=["2023", "喜剧"], max_count=DEFAULT_TEST_COUNT)
     check_explore_result(
         result,
+        DEFAULT_TEST_COUNT,
         lambda item: item["type"] == "movie"
         and item["rating"] >= 9.0
         and item["year"] == 2023
@@ -66,10 +87,11 @@ def test_explore_with_region_filter():
     """Test the explore function with a score range, year, type,
     and a specific region filter."""
     result = explore(
-        "movie", "9,10", tags=["2023", "喜剧", "意大利"], count=DEFAULT_TEST_COUNT
+        "movie", "9,10", tags=["2023", "喜剧", "意大利"], max_count=DEFAULT_TEST_COUNT
     )
     check_explore_result(
         result,
+        DEFAULT_TEST_COUNT,
         lambda item: item["type"] == "movie"
         and item["rating"] >= 9.0
         and item["year"] == 2023
@@ -81,9 +103,10 @@ def test_explore_with_region_filter():
 def test_explore_type_filter_not_on_website():
     """Test the explore function with a type filter
     that is not present on the website."""
-    result = explore("movie", "0,10", tags=["脱口秀"], count=DEFAULT_TEST_COUNT)
+    result = explore("movie", "0,10", tags=["脱口秀"], max_count=DEFAULT_TEST_COUNT)
     check_explore_result(
         result,
+        DEFAULT_TEST_COUNT,
         lambda item: item["type"] == "movie"
         and "脱口秀" in item["raw_data"]["detail"]["card_subtitle"],
     )
@@ -92,9 +115,10 @@ def test_explore_type_filter_not_on_website():
 def test_explore_region_filter_not_on_website():
     """Test the explore function with a region filter
     that is not present on the website."""
-    result = explore("movie", "1,10", tags=["挪威"], count=DEFAULT_TEST_COUNT)
+    result = explore("movie", "1,10", tags=["挪威"], max_count=DEFAULT_TEST_COUNT)
     check_explore_result(
         result,
+        DEFAULT_TEST_COUNT,
         lambda item: item["type"] == "movie"
         and "挪威" in item["raw_data"]["detail"]["card_subtitle"],
     )
@@ -103,9 +127,10 @@ def test_explore_region_filter_not_on_website():
 def test_explore_year_filter_not_on_website():
     """Test the explore function with a year filter
     that is not present on the website."""
-    result = explore("movie", "9,10", tags=["2015"], count=DEFAULT_TEST_COUNT)
+    result = explore("movie", "9,10", tags=["2015"], max_count=DEFAULT_TEST_COUNT)
     check_explore_result(
         result,
+        DEFAULT_TEST_COUNT,
         lambda item: item["type"] == "movie"
         and item["rating"] >= 9.0
         and item["year"] == 2015,
@@ -124,6 +149,7 @@ def test_explore_year_range():
     def check(result):
         check_explore_result(
             result,
+            DEFAULT_TEST_COUNT,
             lambda item: (
                 item["type"] == "movie"
                 and (item["rating"] is None or item["rating"] <= 1.0)
@@ -271,12 +297,28 @@ def test_extract_type_region_from_raw_data_file():
 
 def test_explore_tv():
     """Test the explore function with tv type"""
-    result = explore("tv", "9,10", tags=["2021", "喜剧", "意大利"], count=DEFAULT_TEST_COUNT)
+    result = explore(
+        "tv", "9,10", tags=["2021", "喜剧", "意大利"], max_count=DEFAULT_TEST_COUNT
+    )
     check_explore_result(
         result,
+        DEFAULT_TEST_COUNT,
         lambda item: item["type"] == "tv"
         and item["rating"] >= 9.0
         and item["year"] == 2021
         and "喜剧" in item["raw_data"]["detail"]["card_subtitle"]
         and "意大利" in item["raw_data"]["detail"]["card_subtitle"],
+    )
+
+
+def test_explore_all():
+    """Test the explore function to return all items"""
+    result = explore("movie", "7,8", tags=["2000", "喜剧"])
+    check_explore_result(
+        result,
+        None,
+        lambda item: item["type"] == "movie"
+        and item["year"] == 2000
+        and 7.0 <= item["rating"] <= 8.0
+        and "喜剧" in item["raw_data"]["detail"]["card_subtitle"],
     )

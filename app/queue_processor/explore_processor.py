@@ -15,7 +15,8 @@ from app.queue_processor.common import (
 
 logger = logging.getLogger(__name__)
 
-COUNT = 500
+# This is because the explore API returns a maximum of 500 items
+NARROW_THRESHOLD = 500
 
 # Score ranges for exploration. Higher scores come first.
 SCORE_RANGES = [f"{i},{i+1}" for i in range(9, -1, -1)]
@@ -522,7 +523,7 @@ def process_explore(db: Session, queue_item: Queue) -> None:
         f"Calling explore API with item_type={item_type},"
         f" score_range={score_range}, tags={tags}"
     )
-    result = explore(item_type, score_range, tags, count=COUNT)
+    result = explore(item_type, score_range, tags)
 
     reported_total = result["total"]
     items = result["items"]
@@ -537,9 +538,9 @@ def process_explore(db: Session, queue_item: Queue) -> None:
         )
         return
 
-    # If reported total is large or items are less than 95% of reported total,
+    # If reported total is >= NARROW_THRESHOLD,
     # add narrower conditions to the queue.
-    if reported_total > 400 or len(items) / reported_total < 0.95:
+    if reported_total >= NARROW_THRESHOLD:
         if not _add_narrower_conditions(db, conditions):
             logger.warning(
                 f"All conditions already present in queue item: {queue_id}."
