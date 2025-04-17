@@ -84,10 +84,6 @@ def allow_update_item(
     return True
 
 
-def allow_update_imdb_id(existing_item: Item) -> bool:
-    return allow_update_item(existing_item, None) or not existing_item.raw_data
-
-
 def allow_update_list(existing_list: List) -> bool:
     if existing_list and existing_list.last_check_time:
         current_time = now_timestamp()
@@ -284,6 +280,9 @@ def wrap_fetch_item(
         raise
 
 
+IMDB_ID_UPDATE_INTERVAL = 3 * 30 * 24 * 60 * 60  # 3 months
+
+
 def try_to_save_item_to_db_with_detail(
     db: Session, detail_info: Dict[str, Any]
 ) -> bool:
@@ -292,13 +291,34 @@ def try_to_save_item_to_db_with_detail(
     if not allow_update_item(existing_item, detail_info):
         return False
 
-    if not allow_update_imdb_id(existing_item):
+    existing_raw_data = (
+        json.loads(existing_item.raw_data)
+        if existing_item and existing_item.raw_data
+        else None
+    )
+    existing_imdb_update_time = (
+        (existing_raw_data.get("imdb_update_time") or existing_item.update_time)
+        if existing_raw_data
+        else None
+    )
+    if allow_update_item(existing_item, None):
+        allow_update_imdb_id = True
+    elif (
+        not existing_imdb_update_time
+        or existing_imdb_update_time + IMDB_ID_UPDATE_INTERVAL < now_timestamp()
+    ):
+        allow_update_imdb_id = True
+    else:
+        allow_update_imdb_id = False
+
+    if not allow_update_imdb_id:
         existing_raw_data = json.loads(existing_item.raw_data)
         imdb_info = {
             "imdb_id": existing_raw_data.get("imdb_id"),
             "raw_data": {
                 "imdb_id": existing_raw_data.get("imdb_id"),
                 "imdb_source": existing_raw_data.get("imdb_source"),
+                "imdb_update_time": existing_imdb_update_time,
             },
         }
     else:

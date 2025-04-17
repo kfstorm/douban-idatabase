@@ -7,7 +7,11 @@ from typing import Optional
 from app.config import settings
 from app.http_utils import get_response
 from app.info_provider.common import COMMON_HEADERS
-from app.utils import ApplicationShutdownException, record_exception_metrics
+from app.utils import (
+    ApplicationShutdownException,
+    now_timestamp,
+    record_exception_metrics,
+)
 
 
 logger = logging.getLogger(__name__)
@@ -47,6 +51,7 @@ def _fetch_imdb_id_from_csv(douban_id: str) -> dict:
                         "raw_data": {
                             "imdb_id": imdb_id,
                             "imdb_source": os.path.basename(csv_path),
+                            "imdb_update_time": now_timestamp(),
                         },
                     }
 
@@ -103,6 +108,7 @@ def _fetch_imdb_id_with_html_regex(
         "raw_data": {
             "imdb_id": imdb_id,
             "imdb_source": url,
+            "imdb_update_time": now_timestamp(),
         },
     }
 
@@ -134,6 +140,7 @@ def fetch_imdb_id(douban_id: str, in_blacklist: Optional[bool]) -> dict:
             "raw_data": {
                 "imdb_id": None,
                 "imdb_source": "in_blacklist",
+                "imdb_update_time": now_timestamp(),
             },
         }
 
