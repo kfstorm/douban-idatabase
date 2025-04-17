@@ -1,7 +1,7 @@
 import json
 import logging
 from datetime import datetime
-from typing import Any
+from typing import Any, Dict, Optional
 from requests.exceptions import HTTPError
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
@@ -59,8 +59,24 @@ def fill_next_update_time(item: Item) -> None:
     item.next_update_time = item.update_time + interval_seconds
 
 
-def allow_update_item(existing_item: Item) -> bool:
+def allow_update_item(
+    existing_item: Item, detail_info: Optional[Dict[str, Any]] = None
+) -> bool:
     if existing_item and existing_item.next_update_time:
+        if detail_info:
+            if detail_info["douban_title"] != existing_item.douban_title:
+                # If the title has changed, allow immediate update
+                return True
+            if detail_info["rating"] != existing_item.rating:
+                # If the rating has changed, allow immediate update
+                return True
+            if detail_info["year"] != existing_item.year:
+                # If the year has changed, allow immediate update
+                return True
+            if detail_info["type"] != existing_item.type:
+                # If the type has changed, allow immediate update
+                return True
+
         current_time = now_timestamp()
         if current_time < existing_item.next_update_time:
             return False

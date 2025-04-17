@@ -47,7 +47,7 @@ def process_type_rank(db: Session, queue_item: Queue) -> None:
         # Check if item already exists
         existing_item = db.query(Item).filter(Item.douban_id == douban_id).first()
 
-        if allow_update_item(existing_item):
+        if allow_update_item(existing_item, item_detail):
             # Fetch IMDb data
             imdb_info = wrap_fetch_item(
                 db, douban_id, fetch_imdb_id(douban_id, item_detail.get("in_blacklist"))

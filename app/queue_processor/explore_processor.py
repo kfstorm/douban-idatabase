@@ -567,7 +567,7 @@ def process_explore(db: Session, queue_item: Queue) -> None:
     for item_detail in items:
         douban_id = item_detail["douban_id"]
         existing_item = db.query(Item).filter(Item.douban_id == douban_id).first()
-        if not allow_update_item(existing_item):
+        if not allow_update_item(existing_item, item_detail):
             continue
 
         # Fetch IMDb data

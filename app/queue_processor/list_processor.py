@@ -88,7 +88,7 @@ def process_list(db: Session, queue_item: Queue) -> None:
             known_ids.add(douban_id)
 
             existing_item = db.query(Item).filter(Item.douban_id == douban_id).first()
-            if allow_update_item(existing_item):
+            if allow_update_item(existing_item, detail_info):
                 imdb_info = wrap_fetch_item(
                     db,
                     douban_id,
