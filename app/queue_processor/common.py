@@ -8,6 +8,7 @@ from sqlalchemy.exc import IntegrityError
 
 from app.config import settings
 from app.http_utils import NoPermissionException
+from app.info_provider.imdb import fetch_imdb_id
 from app.models import Blacklist, History, Item, List, Tag
 from app.utils import now_timestamp
 
@@ -81,6 +82,10 @@ def allow_update_item(
         if current_time < existing_item.next_update_time:
             return False
     return True
+
+
+def allow_update_imdb_id(existing_item: Item) -> bool:
+    return allow_update_item(existing_item, None) or not existing_item.raw_data
 
 
 def allow_update_list(existing_list: List) -> bool:
@@ -277,3 +282,37 @@ def wrap_fetch_item(
         if e.response is not None and e.response.status_code == 404:
             _update_blacklist(db, douban_id)
         raise
+
+
+def try_to_save_item_to_db_with_detail(
+    db: Session, detail_info: Dict[str, Any]
+) -> bool:
+    douban_id = detail_info["douban_id"]
+    existing_item = db.query(Item).filter(Item.douban_id == douban_id).first()
+    if not allow_update_item(existing_item, detail_info):
+        return False
+
+    if not allow_update_imdb_id(existing_item):
+        existing_raw_data = json.loads(existing_item.raw_data)
+        imdb_info = {
+            "imdb_id": existing_raw_data.get("imdb_id"),
+            "imdb_source": existing_raw_data.get("imdb_source"),
+        }
+    else:
+        # Fetch IMDb data
+        imdb_info = wrap_fetch_item(
+            db,
+            douban_id,
+            lambda douban_id=douban_id, detail_info=detail_info: fetch_imdb_id(
+                douban_id, detail_info.get("in_blacklist")
+            ),
+        )
+        if not imdb_info:
+            logger.warning(f"Failed to fetch IMDb ID for douban_id={douban_id}")
+            return False
+
+    # Merge item data and save to database
+    item = merge_item(detail_info, imdb_info)
+    save_item_to_db(db, item)
+
+    return True

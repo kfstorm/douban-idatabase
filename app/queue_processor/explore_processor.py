@@ -3,15 +3,9 @@ import logging
 from sqlalchemy.orm import Session
 from typing import Dict
 
-from app.models import Item, Queue, add_placeholder_item, add_to_queue
+from app.models import Queue, add_placeholder_item, add_to_queue
 from app.info_provider.explore import explore
-from app.info_provider.imdb import fetch_imdb_id
-from app.queue_processor.common import (
-    allow_update_item,
-    merge_item,
-    save_item_to_db,
-    wrap_fetch_item,
-)
+from app.queue_processor.common import try_to_save_item_to_db_with_detail
 
 logger = logging.getLogger(__name__)
 
@@ -565,27 +559,8 @@ def process_explore(db: Session, queue_item: Queue) -> None:
     # Process retrieved items
     processed_count = 0
     for item_detail in items:
-        douban_id = item_detail["douban_id"]
-        existing_item = db.query(Item).filter(Item.douban_id == douban_id).first()
-        if not allow_update_item(existing_item, item_detail):
-            continue
-
-        # Fetch IMDb data
-        imdb_info = wrap_fetch_item(
-            db,
-            douban_id,
-            lambda douban_id=douban_id, item_detail=item_detail: fetch_imdb_id(
-                douban_id, item_detail.get("in_blacklist")
-            ),
-        )
-        if not imdb_info:
-            logger.warning(f"Failed to fetch IMDb ID for douban_id={douban_id}")
-            continue
-
-        # Merge item data and save to database
-        item = merge_item(item_detail, imdb_info)
-        save_item_to_db(db, item)
-        processed_count += 1
+        if try_to_save_item_to_db_with_detail(db, item_detail):
+            processed_count += 1
 
     logger.info(
         f"Completed processing explore queue item: {queue_id}."

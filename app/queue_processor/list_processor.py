@@ -5,15 +5,9 @@ from app.http_utils import NoPermissionException
 from app.info_provider.common import (
     extract_douban_item_detail,
 )
-from app.info_provider.imdb import fetch_imdb_id
 from app.info_provider.lists import extract_update_time, get_list_api_by_list_type
-from app.models import Item, List, Queue
-from app.queue_processor.common import (
-    allow_update_item,
-    merge_item,
-    save_item_to_db,
-    wrap_fetch_item,
-)
+from app.models import List, Queue
+from app.queue_processor.common import try_to_save_item_to_db_with_detail
 from app.utils import now_timestamp, timestamp_to_local_time_str
 
 logger = logging.getLogger(__name__)
@@ -87,21 +81,7 @@ def process_list(db: Session, queue_item: Queue) -> None:
                 continue
             known_ids.add(douban_id)
 
-            existing_item = db.query(Item).filter(Item.douban_id == douban_id).first()
-            if allow_update_item(existing_item, detail_info):
-                imdb_info = wrap_fetch_item(
-                    db,
-                    douban_id,
-                    lambda douban_id=douban_id, detail_info=detail_info: fetch_imdb_id(
-                        douban_id, detail_info.get("in_blacklist")
-                    ),
-                )
-                if not imdb_info:
-                    logger.warning(f"Failed to fetch IMDb ID for douban_id={douban_id}")
-                    continue
-
-                item = merge_item(detail_info, imdb_info)
-                save_item_to_db(db, item)
+            try_to_save_item_to_db_with_detail(db, detail_info)
 
         logger.info(f"Processed {len(known_ids)} items from list {list_type}/{list_id}")
 
