@@ -675,6 +675,43 @@ def migrate_delete_deleted_item_table():
             return False
 
 
+def migrate_history_add_douban_id_index():
+    """Add index on douban_id column in history table if it doesn't exist"""
+    logger.info("Checking if history table needs douban_id index...")
+
+    inspector = inspect(engine)
+
+    # Check if history table exists
+    if "history" not in inspector.get_table_names():
+        logger.info("history table doesn't exist, skipping migration.")
+        return False
+
+    # Check if index already exists
+    indices = inspector.get_indexes("history")
+    for index in indices:
+        if len(index["column_names"]) == 1 and index["column_names"][0] == "douban_id":
+            logger.info("Index on douban_id already exists in history table.")
+            return False
+
+    with SessionLocal() as session:
+        try:
+            # Create the index
+            logger.info("Creating index on douban_id column in history table...")
+            session.execute(
+                text("CREATE INDEX idx_history_douban_id ON history(douban_id)")
+            )
+            session.commit()
+            logger.info(
+                "Successfully created index on douban_id column in history table"
+            )
+            return True
+        except Exception as e:
+            record_exception_metrics(e)
+            session.rollback()
+            logger.error(f"Error creating douban_id index on history table: {str(e)}")
+            raise
+
+
 def init_db():
     """Initialize the database, creating tables and migrating if needed"""
     # Create tables if they don't exist
@@ -692,5 +729,6 @@ def init_db():
     migrate_item_add_type_column()
     migrate_history_add_type_column()
     migrate_add_metrics_indices()
-    migrate_item_add_next_update_time()  # Add this new migration
+    migrate_item_add_next_update_time()
     migrate_delete_deleted_item_table()
+    migrate_history_add_douban_id_index()

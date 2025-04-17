@@ -67,7 +67,7 @@ class History(Base):
     __tablename__ = "history"
 
     change_id = Column(Integer, primary_key=True, autoincrement=True)
-    douban_id = Column(String(16), nullable=False)
+    douban_id = Column(String(16), nullable=False, index=True)
     imdb_id = Column(String(16), nullable=True)
     douban_title = Column(String(128), nullable=True)
     year = Column(Integer, nullable=True)
