@@ -160,6 +160,13 @@ exception_counts = Counter(
     ["type", "module"],
 )
 
+# New counter for item operations
+item_operations = Counter(
+    "douban_idatabase_item_operations_total",
+    "Total number of item operations (add/update)",
+    ["type", "operation"],  # Track by item type and operation type (add vs update)
+)
+
 # Track known labels for group-by metrics
 # to reset metrics when groups don't exist anymore
 _known_item_types = set()

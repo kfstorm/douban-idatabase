@@ -15,6 +15,7 @@ from sqlalchemy.exc import IntegrityError
 from app.config import settings
 from app.database import Base
 from app.utils import now_timestamp
+from app.metrics import item_operations
 
 logger = logging.getLogger(__name__)
 
@@ -179,6 +180,10 @@ def add_placeholder_item(db: Session, douban_id: str) -> bool:
             )
             db.add(minimal_item)
             db.commit()
+
+            # Record the placeholder operation in metrics after successful commit
+            item_operations.labels(type="unknown", operation="placeholder").inc()
+
             logger.info(f"Added placeholder item {douban_id}")
             return True
         except IntegrityError:

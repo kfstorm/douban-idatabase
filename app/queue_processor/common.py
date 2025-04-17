@@ -11,6 +11,7 @@ from app.http_utils import NoPermissionException
 from app.info_provider.imdb import fetch_imdb_id
 from app.models import Blacklist, History, Item, List, Tag
 from app.utils import now_timestamp
+from app.metrics import item_operations
 
 logger = logging.getLogger(__name__)
 
@@ -169,6 +170,8 @@ def save_item_to_db(db: Session, item: Item):
     Save or update item in database and log history
     Now accepts an Item object directly instead of raw data
     """
+    # Track operation type for metrics - will only be used after successful commit
+    is_update = False
 
     # Calculate next_update_time
     fill_next_update_time(item)
@@ -203,6 +206,10 @@ def save_item_to_db(db: Session, item: Item):
     if existing_item:
         # Update the existing item with new values
         _update_existing_item_columns(existing_item, item)
+
+        # Count updating a placeholder item as an add operation instead of update.
+        # A placeholder item doesn't have update_time set yet
+        is_update = existing_item.update_time is not None
     else:
         try:
             # Add the new item directly
@@ -210,6 +217,8 @@ def save_item_to_db(db: Session, item: Item):
             logger.info(
                 f"Added new item: douban_id={item.douban_id}, title={item.douban_title}"
             )
+            # This is an add operation
+            is_update = False
         except IntegrityError:
             # Another thread might have added the same item
             db.rollback()
@@ -230,7 +239,17 @@ def save_item_to_db(db: Session, item: Item):
                     existing_item, item, "after integrity error"
                 )
 
+                # Count updating a placeholder item as an add operation instead of
+                # update.
+                # A placeholder item doesn't have update_time set yet
+                is_update = existing_item.update_time is not None
+
+    # Commit the transaction
     db.commit()
+
+    # Only increment metrics after successful commit
+    operation_type = "update" if is_update else "add"
+    item_operations.labels(type=item.type or "unknown", operation=operation_type).inc()
 
 
 def _update_blacklist(db: Session, douban_id: str):
@@ -259,8 +278,16 @@ def _update_blacklist(db: Session, douban_id: str):
     if blacklist_entry.count >= settings.BLACKLIST_THRESHOLD:
         existing_item = db.query(Item).filter(Item.douban_id == douban_id).first()
         if existing_item:
+            # Store the item type before deletion for metrics
+            item_type = existing_item.type or "unknown"
+
+            # Delete the item
             db.delete(existing_item)
             db.commit()
+
+            # Record the delete operation in metrics after successful commit
+            item_operations.labels(type=item_type, operation="delete").inc()
+
             logger.info(f"Removed item for blacklisted douban_id {douban_id}")
 
 

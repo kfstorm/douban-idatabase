@@ -280,6 +280,18 @@ def generate_dashboard():
     # Database Metrics
     generator.add_row("Database Metrics")
 
+    # Add new panel for tracking item operations
+    generator.add_graph_panel(
+        "Item Operations (Add/Update) by Type",
+        [
+            {
+                "expr": "rate(douban_idatabase_item_operations_total[5m])",
+                "legendFormat": "{{type}} - {{operation}}",
+            }
+        ],
+        y_axis_format="recps",
+    )
+
     # Replace item stat panels with graph panel
     generator.add_graph_panel(
         "Items by Type and State",
