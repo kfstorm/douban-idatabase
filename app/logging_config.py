@@ -18,13 +18,14 @@ def setup_logging():
     logger = logging.getLogger()
     logger.setLevel(logging.INFO)
 
+    # Create common formatter to avoid duplication
+    log_format = "%(asctime)s - %(threadName)s - %(name)s - %(levelname)s - %(message)s"
+    formatter = logging.Formatter(log_format)
+
     # Console handler - INFO level
     console_handler = logging.StreamHandler(sys.stdout)
     console_handler.setLevel(logging.INFO)
-    console_format = logging.Formatter(
-        "%(asctime)s - %(threadName)s - %(name)s - %(levelname)s - %(message)s"
-    )
-    console_handler.setFormatter(console_format)
+    console_handler.setFormatter(formatter)
 
     # File handler with rotation - INFO level
     file_handler = TimedRotatingFileHandler(
@@ -36,11 +37,7 @@ def setup_logging():
         delay=False,
     )
     file_handler.setLevel(logging.INFO)
-    file_format = logging.Formatter(
-        "%(asctime)s - %(threadName)s - %(name)s - %(levelname)s - %(message)s"
-    )
-    file_handler.setFormatter(file_format)
-    file_handler.suffix = "%Y-%m-%d"  # Append date to rotated files
+    file_handler.setFormatter(formatter)
 
     # Add handlers to root logger
     logger.addHandler(console_handler)

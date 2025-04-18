@@ -1,7 +1,10 @@
+import logging
 from typing import Dict, Type, List
 
 from app.config import settings
 from app.schedule.base_task import BaseTask
+
+logger = logging.getLogger(__name__)
 
 # Registry for all registered tasks
 _TASK_REGISTRY: Dict[str, Type[BaseTask]] = {}
@@ -15,10 +18,10 @@ def register_task(task_class: Type[BaseTask]) -> Type[BaseTask]:
         task_instance = task_class()  # Instantiate to verify properties
         task_type = task_instance.task_type
         _TASK_REGISTRY[task_type] = task_class
-        print(f"Registered task: {task_type}")  # For debugging
+        logger.info(f"Registered task: {task_type}")  # For debugging
         return task_class
     except Exception as e:
-        print(f"Error registering task {task_class.__name__}: {e}")
+        logger.error(f"Error registering task {task_class.__name__}: {e}")
         raise
 
 
