@@ -1,7 +1,7 @@
 import logging
 import sys
-from logging.handlers import TimedRotatingFileHandler
 import os
+from concurrent_log_handler import ConcurrentTimedRotatingFileHandler
 from app.config import settings
 
 # Create logs directory if it doesn't exist
@@ -18,6 +18,10 @@ def setup_logging():
     logger = logging.getLogger()
     logger.setLevel(logging.INFO)
 
+    # Clear existing handlers to avoid duplicate logging
+    if logger.hasHandlers():
+        logger.handlers.clear()
+
     # Create common formatter to avoid duplication
     log_format = "%(asctime)s - %(threadName)s - %(name)s - %(levelname)s - %(message)s"
     formatter = logging.Formatter(log_format)
@@ -27,14 +31,13 @@ def setup_logging():
     console_handler.setLevel(logging.INFO)
     console_handler.setFormatter(formatter)
 
-    # File handler with rotation - INFO level
-    file_handler = TimedRotatingFileHandler(
+    # File handler with rotation - INFO level using multiprocessing-safe handler
+    file_handler = ConcurrentTimedRotatingFileHandler(
         filename=log_file,
         when="midnight",  # Rotate at midnight each day
         interval=1,  # Rotate every day
         backupCount=30,  # Keep 30 days of logs
         encoding="utf-8",
-        delay=False,
     )
     file_handler.setLevel(logging.INFO)
     file_handler.setFormatter(formatter)
