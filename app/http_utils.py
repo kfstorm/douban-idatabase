@@ -35,17 +35,6 @@ DEFAULT_HEADERS = {
     )
 }
 
-# Max number of *retries* allowed for a specific fallback strategy
-# (PROXY/ZENROWS) when a RateLimitException occurs *while using that strategy*.
-# The check is `retry_count + 1 <= MAX_RATE_LIMIT_RETRIES`.
-# So, a value of 3 means:
-# - Initial attempt (retry_count=0)
-# - Retry 1 (retry_count=1) if initial fails
-# - Retry 2 (retry_count=2) if Retry 1 fails
-# - Retry 3 (retry_count=3) if Retry 2 fails
-# Total attempts for the strategy = 1 (initial) + MAX_RATE_LIMIT_RETRIES.
-MAX_RATE_LIMIT_RETRIES = 3
-
 CHECK_RATE_LIMIT_EXCLUDED_HOSTS = ["api.themoviedb.org"]
 
 _test_check_response_compression = False
@@ -125,22 +114,17 @@ class Throttler:
         logger.info(f"Effective fallback strategies: {[s.name for s in strategies]}")
         return strategies
 
-    def _check_rate_limit(self, host: str) -> None:
-        """
-        Checks if a direct request to the host is allowed based on the last known
-        rate limit time for that host. If the host is currently rate-limited,
-        raises RateLimitException. Otherwise, introduces a small random delay
-        before allowing the request to proceed. This check is skipped for hosts
-        in CHECK_RATE_LIMIT_EXCLUDED_HOSTS.
-        """
+    def _check_rate_limit(
+        self, host: str, fallback_strategy: Optional[FallbackStrategy]
+    ) -> None:
+        if fallback_strategy is not None:
+            return
         if host in CHECK_RATE_LIMIT_EXCLUDED_HOSTS:
             return
         next_call_time = self.next_call_time[host]
         now = now_timestamp()
         if now < next_call_time:
             raise RateLimitException(next_call_time)
-        # Introduce a small random delay for direct requests to mimic human behavior
-        # and potentially avoid hitting rate limits proactively.
         time.sleep(random.uniform(0, settings.REQUEST_DELAY_MAX_SECONDS))
 
     def _handle_response(self, response: requests.Response) -> requests.Response:
@@ -390,7 +374,6 @@ def _get_response_internal(
     url: str,
     current_strategy: Optional[FallbackStrategy] = None,
     proxy_index: Optional[int] = None,
-    retry_count: int = 0,  # Tracks the number of retries already performed
     **kwargs,
 ) -> requests.Response:
     if app.utils.shutdown_flag:
@@ -427,12 +410,23 @@ def _get_response_internal(
         request_url, request_proxy_index, **request_kwargs
     )
 
-    # Before making a direct request (not using a fallback strategy),
-    # check if we know we are rate-limited for this host.
-    # This avoids sending unnecessary direct traffic if we expect it to fail.
-    # Also adds a small random delay for direct requests.
-    if current_strategy is None:
-        throttler._check_rate_limit(host)
+    # Check rate limit before making the request
+    try:
+        throttler._check_rate_limit(host, current_strategy)
+    except RateLimitException as e:
+        # If rate limited, attempt fallback only if this is the initial direct request
+        if current_strategy is None:
+            next_strategy = throttler.get_next_fallback_strategy(host)
+            if next_strategy and can_use_fallback(next_strategy, host):
+                # Don't print logs here
+                # Pass original URL and kwargs to the retry (call internal function)
+                return _get_response_internal(
+                    url, current_strategy=next_strategy, **kwargs
+                )
+
+        # If already using a fallback or no fallback available, re-raise
+        record_exception_metrics(e)
+        raise
 
     # Execute the request
     try:
@@ -454,11 +448,11 @@ def _get_response_internal(
             if next_strategy and can_use_fallback(next_strategy, host):
                 logger.warning(
                     f"Proxy {proxy_id} failed for {url}."
-                    f" Switching to {next_strategy.name}..."
+                    f" Retrying via {next_strategy.name}..."
                 )
-                # Pass original URL and kwargs, reset retry count
+                # Pass original URL and kwargs (call internal function)
                 return _get_response_internal(
-                    url, current_strategy=next_strategy, retry_count=0, **kwargs
+                    url, current_strategy=next_strategy, **kwargs
                 )
         # If not a proxy error, or no further fallbacks, raise
         raise
@@ -468,54 +462,23 @@ def _get_response_internal(
         throttler._handle_response(response)
         response.raise_for_status()  # Check for HTTP errors (4xx, 5xx)
     except RateLimitException as e:
-        # Only update the next call time for the host if the rate limit
-        # occurred during a direct request. Rate limits via fallbacks
-        # might be specific to the proxy/service, not the target host.
-        if current_strategy is None:
-            throttler.next_call_time[host] = e.next_call_time
+        throttler.next_call_time[host] = e.next_call_time
         response.close()  # Close the connection before retrying/raising
 
-        # Handle post-request rate limit retry for fallback strategies
-        if current_strategy is not None:
-            new_retry_count = retry_count + 1
-            # Check if the number of retries performed is less than or equal to
-            # the max allowed
-            if new_retry_count <= MAX_RATE_LIMIT_RETRIES:
+        # Attempt fallback only if this was the initial direct request
+        if current_strategy is None:
+            next_strategy = throttler.get_next_fallback_strategy(host)
+            if next_strategy and can_use_fallback(next_strategy, host):
                 logger.warning(
-                    f"Host {host} rate limited (post-check) with strategy "
-                    f"{current_strategy.name}. Retrying "
-                    f"({new_retry_count}/{MAX_RATE_LIMIT_RETRIES})..."
+                    f"Host {host} rate limited (post-check)."
+                    f" Retrying via {next_strategy.name}..."
                 )
-                # Retry with the same strategy, incremented count
+                # Pass original URL and kwargs to the retry (call internal function)
                 return _get_response_internal(
-                    url,
-                    current_strategy=current_strategy,
-                    proxy_index=request_proxy_index,  # Keep same proxy if specified
-                    retry_count=new_retry_count,  # Pass the count of this retry attempt
-                    **kwargs,
+                    url, current_strategy=next_strategy, **kwargs
                 )
-            else:
-                logger.warning(
-                    f"Host {host} rate limited (post-check) with strategy "
-                    f"{current_strategy.name}. Retry limit "
-                    f"({MAX_RATE_LIMIT_RETRIES} retries) reached after "
-                    f"{1 + MAX_RATE_LIMIT_RETRIES} total attempts."
-                )
-                # Fall through to try next strategy
 
-        # Try next fallback strategy (or if direct request was rate limited)
-        next_strategy = throttler.get_next_fallback_strategy(host, current_strategy)
-        if next_strategy and can_use_fallback(next_strategy, host):
-            logger.warning(
-                f"Host {host} rate limited (post-check)."
-                f" Switching to {next_strategy.name}..."
-            )
-            # Pass original URL and kwargs, reset retry count for new strategy
-            return _get_response_internal(
-                url, current_strategy=next_strategy, retry_count=0, **kwargs
-            )
-
-        # If no fallback available or applicable, re-raise
+        # If already using a fallback or no fallback available, re-raise
         record_exception_metrics(e)
         raise
     except requests.HTTPError as e:
@@ -546,7 +509,6 @@ def _get_response_internal(
 def get_response(url: str, **kwargs) -> requests.Response:
     """Makes an HTTP GET request with built-in retries,
     rate limiting, and fallback strategies."""
-    # Initial call starts with retry_count=0
     return _get_response_internal(url, **kwargs)
 
 
