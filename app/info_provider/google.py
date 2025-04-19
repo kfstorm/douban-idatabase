@@ -179,35 +179,35 @@ def _direct_google_search(
             time.sleep(random.uniform(1.0, 3.0))
 
             # Make the request
-            response = get_response(url, headers=headers)
+            # Wrap get_response in a with statement
+            with get_response(url, headers=headers) as response:
+                # Parse the HTML response
+                soup = BeautifulSoup(response.text, "html.parser")
 
-            # Parse the HTML response
-            soup = BeautifulSoup(response.text, "html.parser")
+                # Extract search results
+                search_results = _extract_search_results_from_html(soup)
 
-            # Extract search results
-            search_results = _extract_search_results_from_html(soup)
+                if not search_results:
+                    logger.info("No more search results found or CAPTCHA encountered")
+                    break
 
-            if not search_results:
-                logger.info("No more search results found or CAPTCHA encountered")
-                break
+                logger.info(f"Found {len(search_results)} results on page {page}")
 
-            logger.info(f"Found {len(search_results)} results on page {page}")
+                for result in search_results:
+                    processed_result = extractor(result) if extractor else result
+                    if processed_result is not None:
+                        yield processed_result
+                        count += 1
+                        if count >= max_results:
+                            break
 
-            for result in search_results:
-                processed_result = extractor(result) if extractor else result
-                if processed_result is not None:
-                    yield processed_result
-                    count += 1
-                    if count >= max_results:
-                        break
+                # Update start parameter for next page
+                start += len(search_results)
 
-            # Update start parameter for next page
-            start += len(search_results)
-
-            # Check if we've reached the end of results
-            if len(search_results) < results_per_page:
-                logger.info("End of search results reached")
-                break
+                # Check if we've reached the end of results
+                if len(search_results) < results_per_page:
+                    logger.info("End of search results reached")
+                    break
 
         except ApplicationShutdownException:
             raise

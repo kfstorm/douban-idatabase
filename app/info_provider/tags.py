@@ -21,47 +21,49 @@ def fetch_lists_from_tag(
 
     page = 0
     while True:
-        response = get_response(url, params={"start": page * TAG_LISTS_PAGE_SIZE})
+        # Wrap get_response in a with statement
+        with get_response(
+            url, params={"start": page * TAG_LISTS_PAGE_SIZE}
+        ) as response:
+            # Parse HTML content
+            from bs4 import BeautifulSoup
+            import re
 
-        # Parse HTML content
-        from bs4 import BeautifulSoup
-        import re
+            soup = BeautifulSoup(response.text, "html.parser")
+            dl_tags = soup.find_all("dl")
 
-        soup = BeautifulSoup(response.text, "html.parser")
-        dl_tags = soup.find_all("dl")
-
-        has_list_in_page = False
-        for dl in dl_tags:
-            # Find the doulist URL and extract list ID
-            a_tag = dl.find("a")
-            list_url = a_tag["href"]
-            path = urlparse(list_url).path
-            if not path.startswith("/doulist/"):
-                continue
-            list_id = path.split("/")[2]
-
-            has_list_in_page = True
-            if min_favorites is not None:
-                # Extract favorite count from meta div
-                meta_div = dl.find("div", class_="meta")
-                if not meta_div:
+            has_list_in_page = False
+            for dl in dl_tags:
+                # Find the doulist URL and extract list ID
+                a_tag = dl.find("a")
+                list_url = a_tag["href"]
+                path = urlparse(list_url).path
+                if not path.startswith("/doulist/"):
                     continue
+                list_id = path.split("/")[2]
 
-                meta_text = meta_div.get_text(strip=True)
-                fav_match = re.search(r"(\d+)人关注", meta_text)
-                if not fav_match:
-                    continue
+                has_list_in_page = True
+                if min_favorites is not None:
+                    # Extract favorite count from meta div
+                    meta_div = dl.find("div", class_="meta")
+                    if not meta_div:
+                        continue
 
-                fav_count = int(fav_match.group(1))
+                    meta_text = meta_div.get_text(strip=True)
+                    fav_match = re.search(r"(\d+)人关注", meta_text)
+                    if not fav_match:
+                        continue
 
-                # Only return lists with enough favorites
-                if fav_count >= min_favorites:
+                    fav_count = int(fav_match.group(1))
+
+                    # Only return lists with enough favorites
+                    if fav_count >= min_favorites:
+                        yield ("doulist", list_id)
+                else:
                     yield ("doulist", list_id)
-            else:
-                yield ("doulist", list_id)
 
-        if not has_list_in_page:
-            break
+            if not has_list_in_page:
+                break
 
         # Move to next page
         page += 1

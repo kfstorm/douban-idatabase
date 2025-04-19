@@ -2,7 +2,7 @@ from collections import defaultdict
 import logging
 import random
 import time
-from typing import Optional
+from typing import Optional, Tuple, List, Any, Dict
 import requests
 from urllib.parse import urlencode, urlparse
 from urllib3.util import Retry
@@ -72,29 +72,51 @@ class Throttler:
         # List of fallback strategies to try, in order of preference
         self.fallback_strategies = self._get_fallback_strategies()
 
-    def _get_fallback_strategies(self):
-        """Get list of fallback strategies from settings, in order of preference."""
+    def _get_fallback_strategies(self) -> List[FallbackStrategy]:
+        """Get list of fallback strategies from settings,
+        ensuring each strategy appears at most once."""
         strategies = []
+        added_strategies = set()
         if hasattr(settings, "RATE_LIMIT_FALLBACK_STRATEGIES"):
             # Setting should be a comma-separated list like "ZENROWS,PROXY"
             for strategy_name in settings.RATE_LIMIT_FALLBACK_STRATEGIES.split(","):
+                strategy_name_clean = strategy_name.strip().upper()
                 try:
-                    strategy = FallbackStrategy[strategy_name.strip().upper()]
-                    strategies.append(strategy)
+                    strategy = FallbackStrategy[strategy_name_clean]
+                    if strategy not in added_strategies:
+                        strategies.append(strategy)
+                        added_strategies.add(strategy)
+                    else:
+                        # Fail fast if a duplicate strategy name is provided
+                        raise ValueError(
+                            f"Duplicate fallback strategy '{strategy.name}' found in "
+                            "RATE_LIMIT_FALLBACK_STRATEGIES."
+                            " Each strategy must be unique."
+                        )
                 except (KeyError, AttributeError):
-                    logger.warning(f"Unknown fallback strategy: {strategy_name}")
+                    # Fail fast if an unknown strategy name is provided
+                    raise ValueError(
+                        f"Unknown or invalid fallback strategy specified in "
+                        f"RATE_LIMIT_FALLBACK_STRATEGIES: '{strategy_name_clean}'"
+                    )
 
         # Default fallback to ZENROWS if strategies list is empty and ZENROWS is enabled
         if (
             not strategies
             and settings.RATE_LIMIT_USE_ZENROWS
             and settings.ZENROWS_API_KEY
+            and FallbackStrategy.ZENROWS
+            not in added_strategies  # Ensure default isn't added if already present
         ):
             strategies.append(FallbackStrategy.ZENROWS)
+            added_strategies.add(FallbackStrategy.ZENROWS)
 
+        logger.info(f"Effective fallback strategies: {[s.name for s in strategies]}")
         return strategies
 
-    def _check_rate_limit(self, host: str, fallback_strategy: FallbackStrategy):
+    def _check_rate_limit(
+        self, host: str, fallback_strategy: Optional[FallbackStrategy]
+    ) -> None:
         if fallback_strategy is not None:
             return
         if host in CHECK_RATE_LIMIT_EXCLUDED_HOSTS:
@@ -105,7 +127,7 @@ class Throttler:
             raise RateLimitException(next_call_time)
         time.sleep(random.uniform(0, settings.REQUEST_DELAY_MAX_SECONDS))
 
-    def _handle_response(self, response: requests.Response):
+    def _handle_response(self, response: requests.Response) -> requests.Response:
         all_responses = response.history + [response]
         for resp in all_responses:
             # Example response:
@@ -146,7 +168,9 @@ class Throttler:
 
         return response
 
-    def get_next_fallback_strategy(self, host, current_strategy=None):
+    def get_next_fallback_strategy(
+        self, host: str, current_strategy: Optional[FallbackStrategy] = None
+    ) -> Optional[FallbackStrategy]:
         """
         Get the next fallback strategy to try based on the current one.
         Returns None if no more strategies are available.
@@ -183,7 +207,7 @@ class SessionManager:
         # Initialize all proxy sessions at startup
         self._initialize_proxy_sessions()
 
-    def _get_retry_config(self):
+    def _get_retry_config(self) -> Retry:
         """Get retry configuration with fixed values."""
         return Retry(
             total=3,
@@ -193,7 +217,7 @@ class SessionManager:
             respect_retry_after_header=False,
         )
 
-    def _initialize_proxy_sessions(self):
+    def _initialize_proxy_sessions(self) -> None:
         """Create sessions for all configured proxies at startup."""
         # Check if proxies are configured
         if not settings.REQUESTS_PROXIES:
@@ -213,7 +237,7 @@ class SessionManager:
             self.proxy_sessions.append(session)
             logger.info(f"Initialized session for proxy #{i + 1}")
 
-    def _create_new_session(self):
+    def _create_new_session(self) -> requests.Session:
         """Create a new session with default settings."""
         session = requests.Session()
         # Set default headers
@@ -229,7 +253,7 @@ class SessionManager:
 
         return session
 
-    def get_session(self, proxy_index: Optional[int] = None):
+    def get_session(self, proxy_index: Optional[int] = None) -> requests.Session:
         """
         Get a session for the given proxy index.
 
@@ -255,79 +279,11 @@ class SessionManager:
 session_manager = SessionManager()
 
 
-def get_response_via_zenrows(url: str, **kwargs):
-    final_url = url
-    original_params = kwargs.pop("params", {})
-    if original_params:
-        if "?" in url:
-            final_url = f"{final_url}&{urlencode(original_params)}"
-        else:
-            final_url = f"{final_url}?{urlencode(original_params)}"
-    new_params = {
-        "url": final_url,
-        "apikey": settings.ZENROWS_API_KEY,
-        "custom_headers": "true",
-    }
-    kwargs["params"] = new_params
-    return get_response(
-        "https://api.zenrows.com/v1/",
-        fallback_strategy=FallbackStrategy.ZENROWS,
-        **kwargs,
-    )
-
-
-def get_response_via_proxy(url: str, **kwargs):
-    """Make a request using configured proxies."""
-    proxies = settings.REQUESTS_PROXIES
-
-    # Handle legacy single proxy configuration
-    if isinstance(proxies, dict):
-        proxies = [proxies]
-
-    # Select a random proxy from the list
-    proxy_index = random.randrange(len(proxies)) if len(proxies) > 1 else 0
-    proxy_id = f"#{proxy_index + 1}"
-
-    logger.info(f"Using proxy {proxy_id}/{len(proxies)} for request to {url}")
-
-    try:
-        return get_response(
-            url,
-            fallback_strategy=FallbackStrategy.PROXY,
-            proxy_index=proxy_index,
-            **kwargs,
-        )
-    except ProxyError as e:
-        # Record which proxy failed
-        proxy_failures_total.labels(proxy_id=proxy_id).inc()
-        logger.error(f"Proxy error with {proxy_id}: {str(e)}")
-        record_exception_metrics(e)
-        raise
-
-
-def can_use_fallback(strategy: FallbackStrategy, host: str):
-    """Check if a specific fallback strategy can be used."""
-    if strategy == FallbackStrategy.ZENROWS:
-        return (
-            settings.RATE_LIMIT_USE_ZENROWS
-            and settings.ZENROWS_API_KEY
-            and "zenrows" not in host
-        )
-    elif strategy == FallbackStrategy.PROXY:
-        return bool(settings.REQUESTS_PROXIES)
-    return False
-
-
-def get_response(url: str, fallback_strategy=None, **kwargs):
-    if app.utils.shutdown_flag:
-        raise ApplicationShutdownException(
-            "Application is shutting down. HTTP requests are forbidden."
-        )
-
+def _prepare_request_context(
+    url: str, proxy_index: Optional[int], **kwargs
+) -> Tuple[requests.Session, str, Dict[str, Any]]:
+    """Prepare session, cookies, and host for the request."""
     host = urlparse(url).netloc
-
-    # Get the appropriate session based on proxy configuration
-    proxy_index = kwargs.pop("proxy_index", None)
     session = session_manager.get_session(proxy_index)
 
     # Handle Douban cookies for this specific request
@@ -342,31 +298,18 @@ def get_response(url: str, fallback_strategy=None, **kwargs):
     if cookies:
         kwargs["cookies"] = cookies
 
+    return session, host, kwargs
+
+
+def _execute_request(
+    session: requests.Session,
+    url: str,
+    host: str,
+    fallback_strategy: Optional[FallbackStrategy],
+    **kwargs,
+) -> requests.Response:
+    """Executes the HTTP GET request and records basic metrics."""
     start_time = time.time()
-
-    # Check if this host is already known to be rate limited
-    try:
-        throttler._check_rate_limit(host, fallback_strategy)
-    except RateLimitException as e:
-        # If host is rate limited and we're not already using a fallback,
-        # try to find a suitable fallback strategy
-        if fallback_strategy is None:
-            next_strategy = throttler.get_next_fallback_strategy(host)
-
-            if next_strategy and can_use_fallback(next_strategy, host):
-                if next_strategy == FallbackStrategy.ZENROWS:
-                    return get_response_via_zenrows(url, **kwargs)
-                elif next_strategy == FallbackStrategy.PROXY:
-                    return get_response_via_proxy(url, **kwargs)
-
-        record_exception_metrics(e)
-        raise
-
-    if app.utils.shutdown_flag:
-        raise ApplicationShutdownException(
-            "Application is shutting down. HTTP requests are forbidden."
-        )
-
     try:
         logger.info(f"Accessing {url} with strategy {fallback_strategy}")
         response = session.get(url, timeout=60, **kwargs)
@@ -381,49 +324,6 @@ def get_response(url: str, fallback_strategy=None, **kwargs):
             status_code=str(response.status_code),
             strategy=fallback_strategy.name if fallback_strategy else "direct",
         ).inc()
-
-        try:
-            throttler._handle_response(response)
-        except RateLimitException as e:
-            throttler.next_call_time[host] = e.next_call_time
-
-            # Attempt fallback if this is not already a fallback request
-            if fallback_strategy is None:
-                next_strategy = throttler.get_next_fallback_strategy(host)
-
-                if next_strategy and can_use_fallback(next_strategy, host):
-                    response.close()
-                    logger.warning(
-                        f"The host {host} is now rate limited."
-                        f" Retry via {next_strategy.name}..."
-                    )
-
-                    if next_strategy == FallbackStrategy.ZENROWS:
-                        return get_response_via_zenrows(url, **kwargs)
-                    elif next_strategy == FallbackStrategy.PROXY:
-                        return get_response_via_proxy(url, **kwargs)
-
-            record_exception_metrics(e)
-            raise
-
-        try:
-            response.raise_for_status()
-        except requests.HTTPError as e:
-            record_exception_metrics(e)
-            raise
-
-        if _test_check_response_compression:
-            if urlparse(url).path.endswith(".gz"):
-                return response
-            content_encoding = response.headers.get("content-encoding")
-            assert content_encoding in [
-                "br",
-                "zstd",
-                "gzip",
-                "deflate",
-            ], f"Unexpected content encoding: {content_encoding}"
-            return response
-
         return response
     except requests.exceptions.RequestException as e:
         record_exception_metrics(e)
@@ -437,6 +337,182 @@ def get_response(url: str, fallback_strategy=None, **kwargs):
         raise
 
 
-def get_json(url, **kwargs):
+def _apply_zenrows_params(url: str, **kwargs) -> Tuple[str, Dict[str, Any]]:
+    """Modify URL and params for ZenRows proxy."""
+    final_url = url
+    original_params = kwargs.pop("params", {})
+    if original_params:
+        query_string = urlencode(original_params)
+        final_url = f"{final_url}{'?' if '?' not in url else '&'}{query_string}"
+
+    new_params = {
+        "url": final_url,
+        "apikey": settings.ZENROWS_API_KEY,
+        "custom_headers": "true",
+    }
+    kwargs["params"] = new_params
+    return "https://api.zenrows.com/v1/", kwargs
+
+
+def can_use_fallback(strategy: FallbackStrategy, host: str) -> bool:
+    """Check if a specific fallback strategy can be used."""
+    if strategy == FallbackStrategy.ZENROWS:
+        return (
+            settings.RATE_LIMIT_USE_ZENROWS
+            and settings.ZENROWS_API_KEY
+            # Avoid infinite loop if zenrows itself is rate limited
+            and "zenrows.com" not in host
+        )
+    elif strategy == FallbackStrategy.PROXY:
+        # Check if there are any proxies configured
+        return bool(session_manager.proxy_sessions)
+    return False
+
+
+# Rename original function to indicate internal use
+def _get_response_internal(
+    url: str,
+    current_strategy: Optional[FallbackStrategy] = None,
+    proxy_index: Optional[int] = None,
+    **kwargs,
+) -> requests.Response:
+    if app.utils.shutdown_flag:
+        raise ApplicationShutdownException(
+            "Application is shutting down. HTTP requests are forbidden."
+        )
+
+    request_url = url
+    request_kwargs = kwargs.copy()
+    request_proxy_index = proxy_index
+    strategy_for_logging = current_strategy
+
+    # Prepare ZenRows request if that's the strategy
+    if current_strategy == FallbackStrategy.ZENROWS:
+        request_url, request_kwargs = _apply_zenrows_params(url, **request_kwargs)
+        # ZenRows uses the default session, not a proxy session
+        request_proxy_index = None
+
+    # Prepare Proxy request if that's the strategy
+    elif current_strategy == FallbackStrategy.PROXY:
+        if request_proxy_index is None:  # Select random proxy if not specified
+            num_proxies = len(session_manager.proxy_sessions)
+            if num_proxies == 0:
+                logger.error("Proxy strategy selected but no proxies configured.")
+                raise ValueError("No proxies available for PROXY strategy.")
+            request_proxy_index = random.randrange(num_proxies)
+        proxy_id = f"#{request_proxy_index + 1}"
+        logger.info(
+            f"Using proxy {proxy_id}/{len(session_manager.proxy_sessions)}"
+            f" for request to {url}"
+        )
+
+    session, host, prepared_kwargs = _prepare_request_context(
+        request_url, request_proxy_index, **request_kwargs
+    )
+
+    # Check rate limit before making the request
+    try:
+        throttler._check_rate_limit(host, current_strategy)
+    except RateLimitException as e:
+        # If rate limited, attempt fallback only if this is the initial direct request
+        if current_strategy is None:
+            next_strategy = throttler.get_next_fallback_strategy(host)
+            if next_strategy and can_use_fallback(next_strategy, host):
+                # Don't print logs here
+                # Pass original URL and kwargs to the retry (call internal function)
+                return _get_response_internal(
+                    url, current_strategy=next_strategy, **kwargs
+                )
+
+        # If already using a fallback or no fallback available, re-raise
+        record_exception_metrics(e)
+        raise
+
+    # Execute the request
+    try:
+        response = _execute_request(
+            session, request_url, host, strategy_for_logging, **prepared_kwargs
+        )
+    except ProxyError as e:
+        # Handle proxy-specific errors
+        if current_strategy == FallbackStrategy.PROXY:
+            proxy_id = f"#{request_proxy_index + 1}"
+            proxy_failures_total.labels(proxy_id=proxy_id).inc()
+            logger.error(f"Proxy error with {proxy_id}: {str(e)}")
+            record_exception_metrics(e)
+
+            # Try next fallback strategy if available
+            next_strategy = throttler.get_next_fallback_strategy(
+                host, current_strategy=FallbackStrategy.PROXY
+            )
+            if next_strategy and can_use_fallback(next_strategy, host):
+                logger.warning(
+                    f"Proxy {proxy_id} failed for {url}."
+                    f" Retrying via {next_strategy.name}..."
+                )
+                # Pass original URL and kwargs (call internal function)
+                return _get_response_internal(
+                    url, current_strategy=next_strategy, **kwargs
+                )
+        # If not a proxy error, or no further fallbacks, raise
+        raise
+
+    # Handle response status and potential rate limits
+    try:
+        throttler._handle_response(response)
+        response.raise_for_status()  # Check for HTTP errors (4xx, 5xx)
+    except RateLimitException as e:
+        throttler.next_call_time[host] = e.next_call_time
+        response.close()  # Close the connection before retrying/raising
+
+        # Attempt fallback only if this was the initial direct request
+        if current_strategy is None:
+            next_strategy = throttler.get_next_fallback_strategy(host)
+            if next_strategy and can_use_fallback(next_strategy, host):
+                logger.warning(
+                    f"Host {host} rate limited (post-check)."
+                    f" Retrying via {next_strategy.name}..."
+                )
+                # Pass original URL and kwargs to the retry (call internal function)
+                return _get_response_internal(
+                    url, current_strategy=next_strategy, **kwargs
+                )
+
+        # If already using a fallback or no fallback available, re-raise
+        record_exception_metrics(e)
+        raise
+    except requests.HTTPError as e:
+        record_exception_metrics(e)
+        response.close()
+        raise
+    except NoPermissionException as e:
+        # Specific handling for permission errors detected by throttler
+        record_exception_metrics(e)
+        response.close()
+        raise
+
+    # Check response compression if test flag is enabled
+    if _test_check_response_compression:
+        if urlparse(request_url).path.endswith(".gz"):
+            return response
+        content_encoding = response.headers.get("content-encoding")
+        expected_encodings = ["br", "zstd", "gzip", "deflate"]
+        assert content_encoding in expected_encodings, (
+            f"URL: {url}, Strategy: {strategy_for_logging}, "
+            f"Encoding: {content_encoding}, Expected: {expected_encodings}"
+        )
+
+    return response
+
+
+# Public facing function
+def get_response(url: str, **kwargs) -> requests.Response:
+    """Makes an HTTP GET request with built-in retries,
+    rate limiting, and fallback strategies."""
+    return _get_response_internal(url, **kwargs)
+
+
+def get_json(url: str, **kwargs) -> Any:
+    # Use the public get_response function
     with get_response(url, **kwargs) as response:
         return response.json()

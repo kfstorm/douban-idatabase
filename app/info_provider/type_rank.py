@@ -29,40 +29,41 @@ def get_types() -> List[Tuple[str, str]]:
     logger.info("Fetching movie/TV types from Douban chart page...")
 
     try:
-        response = get_response(CHART_PAGE_URL, headers=COMMON_HEADERS)
+        # Wrap get_response in a with statement
+        with get_response(CHART_PAGE_URL, headers=COMMON_HEADERS) as response:
+            # Parse HTML content
+            soup = BeautifulSoup(response.text, "html.parser")
 
-        # Parse HTML content
-        soup = BeautifulSoup(response.text, "html.parser")
+            # Find all <a> tags with links containing "typerank"
+            type_links = soup.find_all("a", href=re.compile(r"/typerank\?"))
 
-        # Find all <a> tags with links containing "typerank"
-        type_links = soup.find_all("a", href=re.compile(r"/typerank\?"))
+            result = []
+            for link in type_links:
+                href = link.get("href", "")
+                # Parse the URL query parameters
+                parsed_url = urlparse(href)
+                query_params = parse_qs(parsed_url.query)
 
-        result = []
-        for link in type_links:
-            href = link.get("href", "")
-            # Parse the URL query parameters
-            parsed_url = urlparse(href)
-            query_params = parse_qs(parsed_url.query)
+                # Extract type_name and type_id
+                type_name = query_params.get("type_name", [""])[0]
+                type_id = query_params.get("type", [""])[0]
 
-            # Extract type_name and type_id
-            type_name = query_params.get("type_name", [""])[0]
-            type_id = query_params.get("type", [""])[0]
+                if type_name and type_id:
+                    result.append((type_name, type_id))
 
-            if type_name and type_id:
-                result.append((type_name, type_id))
+            # Remove duplicates while preserving order
+            seen = set()
+            unique_result = []
+            for item in result:
+                if item[1] not in seen:
+                    seen.add(item[1])
+                    unique_result.append(item)
 
-        # Remove duplicates while preserving order
-        seen = set()
-        unique_result = []
-        for item in result:
-            if item[1] not in seen:
-                seen.add(item[1])
-                unique_result.append(item)
-
-        logger.info(
-            f"Successfully fetched {len(unique_result)} movie/TV types from chart page"
-        )
-        return unique_result
+            logger.info(
+                f"Successfully fetched {len(unique_result)} movie/TV types"
+                " from chart page"
+            )
+            return unique_result
 
     except ApplicationShutdownException:
         raise
