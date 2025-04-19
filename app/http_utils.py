@@ -144,6 +144,11 @@ class Throttler:
         time.sleep(random.uniform(0, settings.REQUEST_DELAY_MAX_SECONDS))
 
     def _handle_response(self, response: requests.Response) -> requests.Response:
+        """
+        Inspects the response (and its history in case of redirects) for signs
+        of rate limiting or permission errors specific to Douban. Raises
+        RateLimitException or NoPermissionException if detected.
+        """
         all_responses = response.history + [response]
         for resp in all_responses:
             # Example response:
@@ -342,9 +347,10 @@ def _execute_request(
         ).inc()
         return response
     except requests.exceptions.RequestException as e:
+        # Record all request exceptions for general monitoring
         record_exception_metrics(e)
+        # Specifically record network-level failures (non-HTTP errors)
         if not isinstance(e, requests.HTTPError):
-            # Record network-level failures
             http_requests_total.labels(
                 host=host,
                 status_code="error",
@@ -385,6 +391,35 @@ def can_use_fallback(strategy: FallbackStrategy, host: str) -> bool:
     return False
 
 
+def _handle_fallback_or_raise(
+    url: str,
+    host: str,
+    current_strategy: Optional[FallbackStrategy],
+    exception: Exception,
+    reason: str,  # e.g., "pre-check rate limit", "post-check rate limit", "proxy error"
+    **kwargs,
+) -> requests.Response:
+    """
+    Attempts to switch to the next available fallback strategy. If successful,
+    makes a recursive call. If not, records the exception and re-raises it.
+    """
+    next_strategy = throttler.get_next_fallback_strategy(host, current_strategy)
+    if next_strategy and can_use_fallback(next_strategy, host):
+        logger.info(
+            f"Host {host} encountered {reason}."
+            f" Switching to fallback {next_strategy.name}..."
+        )
+        # Pass original URL and kwargs, reset retry count for new strategy chain
+        return _get_response_internal(
+            url, current_strategy=next_strategy, retry_count=0, **kwargs
+        )
+    else:
+        # No further fallbacks available or usable
+        logger.warning(f"Host {host} encountered {reason}. No usable fallbacks remain.")
+        record_exception_metrics(exception)
+        raise exception
+
+
 # Rename original function to indicate internal use
 def _get_response_internal(
     url: str,
@@ -393,6 +428,10 @@ def _get_response_internal(
     retry_count: int = 0,  # Tracks the number of retries already performed
     **kwargs,
 ) -> requests.Response:
+    """
+    Internal function to handle HTTP GET requests with retries, rate limiting,
+    and fallback strategies. This function is recursive.
+    """
     if app.utils.shutdown_flag:
         raise ApplicationShutdownException(
             "Application is shutting down. HTTP requests are forbidden."
@@ -414,6 +453,7 @@ def _get_response_internal(
         if request_proxy_index is None:  # Select random proxy if not specified
             num_proxies = len(session_manager.proxy_sessions)
             if num_proxies == 0:
+                # Fail fast if proxy strategy is chosen but no proxies are configured
                 logger.error("Proxy strategy selected but no proxies configured.")
                 raise ValueError("No proxies available for PROXY strategy.")
             request_proxy_index = random.randrange(num_proxies)
@@ -429,12 +469,17 @@ def _get_response_internal(
 
     # Before making a direct request (not using a fallback strategy),
     # check if we know we are rate-limited for this host.
-    # This avoids sending unnecessary direct traffic if we expect it to fail.
-    # Also adds a small random delay for direct requests.
     if current_strategy is None:
-        throttler._check_rate_limit(host)
+        try:
+            throttler._check_rate_limit(host)
+        except RateLimitException as e:
+            # Pre-check failed: Rate limited for direct request.
+            # Try fallbacks immediately.
+            return _handle_fallback_or_raise(
+                url, host, None, e, "pre-check rate limit", **kwargs
+            )
 
-    # Execute the request
+    # Execute the request (only reached if pre-check passed or using a fallback)
     try:
         response = _execute_request(
             session, request_url, host, strategy_for_logging, **prepared_kwargs
@@ -445,22 +490,11 @@ def _get_response_internal(
             proxy_id = f"#{request_proxy_index + 1}"
             proxy_failures_total.labels(proxy_id=proxy_id).inc()
             logger.error(f"Proxy error with {proxy_id}: {str(e)}")
-            record_exception_metrics(e)
-
-            # Try next fallback strategy if available
-            next_strategy = throttler.get_next_fallback_strategy(
-                host, current_strategy=FallbackStrategy.PROXY
+            # Attempt fallback or raise if none available
+            return _handle_fallback_or_raise(
+                url, host, current_strategy, e, f"proxy error ({proxy_id})", **kwargs
             )
-            if next_strategy and can_use_fallback(next_strategy, host):
-                logger.warning(
-                    f"Proxy {proxy_id} failed for {url}."
-                    f" Switching to {next_strategy.name}..."
-                )
-                # Pass original URL and kwargs, reset retry count
-                return _get_response_internal(
-                    url, current_strategy=next_strategy, retry_count=0, **kwargs
-                )
-        # If not a proxy error, or no further fallbacks, raise
+        # If not a proxy error (shouldn't happen here but for safety), re-raise
         raise
 
     # Handle response status and potential rate limits
@@ -495,30 +529,21 @@ def _get_response_internal(
                     **kwargs,
                 )
             else:
+                # Log that the retry limit for this specific strategy was reached
                 logger.warning(
                     f"Host {host} rate limited (post-check) with strategy "
                     f"{current_strategy.name}. Retry limit "
                     f"({MAX_RATE_LIMIT_RETRIES} retries) reached after "
                     f"{1 + MAX_RATE_LIMIT_RETRIES} total attempts."
                 )
-                # Fall through to try next strategy
+                # Fall through to try the next fallback strategy
 
-        # Try next fallback strategy (or if direct request was rate limited)
-        next_strategy = throttler.get_next_fallback_strategy(host, current_strategy)
-        if next_strategy and can_use_fallback(next_strategy, host):
-            logger.warning(
-                f"Host {host} rate limited (post-check)."
-                f" Switching to {next_strategy.name}..."
-            )
-            # Pass original URL and kwargs, reset retry count for new strategy
-            return _get_response_internal(
-                url, current_strategy=next_strategy, retry_count=0, **kwargs
-            )
-
-        # If no fallback available or applicable, re-raise
-        record_exception_metrics(e)
-        raise
+        # Attempt fallback or raise if none available/applicable
+        return _handle_fallback_or_raise(
+            url, host, current_strategy, e, "post-check rate limit", **kwargs
+        )
     except requests.HTTPError as e:
+        # Record HTTP errors (4xx, 5xx) and re-raise
         record_exception_metrics(e)
         response.close()
         raise
@@ -551,6 +576,7 @@ def get_response(url: str, **kwargs) -> requests.Response:
 
 
 def get_json(url: str, **kwargs) -> Any:
+    """Makes a GET request using get_response and returns the JSON response."""
     # Use the public get_response function
     with get_response(url, **kwargs) as response:
         return response.json()
