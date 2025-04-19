@@ -2,65 +2,107 @@ import re
 import gzip
 from io import BytesIO
 from typing import Iterator
-from lxml import etree
+import logging
 
 from app.http_utils import get_response
 
+logger = logging.getLogger(__name__)
 
-def _process_sitemap(sitemap_url: str, xpath_query: str) -> Iterator[str]:
+
+def _extract_content_by_regex(sitemap_url: str, pattern: str) -> Iterator[str]:
     """
-    Process a sitemap using streaming and extract values using the provided XPath query.
+    Fetch content from a URL, handle potential Gzip decompression, and extract
+    parts using regex, processing the response stream chunk by chunk.
 
     Args:
-        sitemap_url: URL of the sitemap
-        xpath_query: XPath query to extract values
+        sitemap_url: URL of the resource.
+        pattern: Regular expression pattern with one capturing group.
 
     Returns:
-        Iterator of extracted values
+        Iterator of matched strings.
     """
+    chunk_size = 8192
+    overlap_size = 512
+    compiled_pattern = re.compile(pattern)
+    buffer = ""
+
     with get_response(sitemap_url, stream=True) as response:
-        response.raise_for_status()  # Ensure we got a successful response
+        response.raise_for_status()
 
         # Determine if content is gzipped based on header or URL extension
-        is_gzipped = response.headers.get(
-            "Content-Type"
-        ) == "application/x-gzip" or sitemap_url.endswith(".gz")
-
-        # Create a file-like object for reading, potentially decompressing on the fly
-        stream = (
-            BytesIO(response.content)
-            if not is_gzipped
-            else gzip.GzipFile(fileobj=BytesIO(response.content))
+        content_type = response.headers.get("Content-Type", "").lower()
+        is_gzipped = (
+            content_type == "application/x-gzip"
+            or content_type == "application/gzip"
+            or sitemap_url.endswith(".gz")
         )
 
-        # The namespace used in sitemaps
-        namespace = {"ns": "http://www.sitemaps.org/schemas/sitemap/0.9"}
+        # Determine encoding
+        encoding = response.encoding if response.encoding else "utf-8"
 
-        # Use iterparse for streaming XML parsing
-        # We are interested in the text content of elements matching
-        # the xpath query's final step
-        # Example: //ns:sitemap/ns:loc/text() -> interested in 'loc' elements
-        # Example: //ns:url/ns:loc/text() -> interested in 'loc' elements
-        tag_match = re.search(r"/ns:(\w+)/text\(\)$", xpath_query)
-        if not tag_match:
-            raise ValueError("XPath query must end with /ns:<tag>/text()")
-        target_tag = f"{{{namespace['ns']}}}{tag_match.group(1)}"
+        # Create an iterator for byte chunks
+        byte_iterator = response.iter_content(chunk_size=chunk_size)
 
-        context = etree.iterparse(stream, events=("end",), tag=target_tag)
+        # Wrap the iterator with GzipFile if necessary for decompression
+        if is_gzipped:
+            # We need a file-like object for GzipFile. We can adapt the iterator.
+            # Create a file-like object from the iterator
+            class IterStream(BytesIO):
+                def __init__(self, iterator):
+                    self._iterator = iterator
+                    self._buffer = b""
 
-        for _, elem in context:
-            if elem.text:
-                yield elem.text
-            # It's safe to clear the element now that we're done with it
-            elem.clear()
-            # Also eliminate now-empty references from the root node to elem
-            while elem.getprevious() is not None:
-                del elem.getparent()[0]
+                def read(self, size=-1):
+                    while size < 0 or len(self._buffer) < size:
+                        try:
+                            chunk = next(self._iterator)
+                            if not chunk:
+                                break
+                            self._buffer += chunk
+                        except StopIteration:
+                            break
+                    result = self._buffer[:size]
+                    self._buffer = self._buffer[size:]
+                    return result
+
+            # Use GzipFile to wrap the streaming response
+            gzip_stream = gzip.GzipFile(fileobj=IterStream(byte_iterator))
+            # Now read decompressed chunks from gzip_stream
+            # Note: GzipFile.read() might not respect exact chunk_size, but reads blocks
+            # We adapt by reading in a loop until we have enough data or stream ends
+            decompressed_byte_iterator = iter(lambda: gzip_stream.read(chunk_size), b"")
+        else:
+            # If not gzipped, use the original byte iterator directly
+            decompressed_byte_iterator = byte_iterator
+
+        # Process the (potentially decompressed) byte chunks
+        for byte_chunk in decompressed_byte_iterator:
+            if not byte_chunk:
+                continue
+
+            # Decode the byte chunk to string
+            chunk_str = byte_chunk.decode(encoding)
+
+            current_data = buffer + chunk_str
+
+            last_match_end = 0
+            for match in compiled_pattern.finditer(current_data):
+                yield match.group(1)
+                last_match_end = match.end()
+
+            buffer = current_data[last_match_end:]
+            if len(buffer) > overlap_size * 2:
+                buffer = buffer[-overlap_size:]
+
+        # Process remaining buffer
+        if buffer:
+            for match in compiled_pattern.finditer(buffer):
+                yield match.group(1)
 
 
 def fetch_sitemap_urls_from_sitemap_index(sitemap_index_url: str) -> Iterator[str]:
     """
-    Fetch URLs from a sitemap index using streaming.
+    Fetch URLs from a sitemap index using regex.
 
     Args:
         sitemap_index_url: URL of the sitemap index
@@ -68,13 +110,17 @@ def fetch_sitemap_urls_from_sitemap_index(sitemap_index_url: str) -> Iterator[st
     Returns:
         Iterator of URLs found in the sitemap index
     """
-    # The XPath query targets the text content of the 'loc' element within 'sitemap'
-    yield from _process_sitemap(sitemap_index_url, "//ns:sitemap/ns:loc/text()")
+    # Regex to find content within <loc> tags, non-greedy match
+    # Handles potential attributes and whitespace within the loc tag itself
+    # Assumes <loc> tags are direct children of <sitemap> conceptually,
+    # but doesn't enforce strict hierarchy
+    loc_pattern = r"<loc>(.*?)<\/loc>"
+    yield from _extract_content_by_regex(sitemap_index_url, loc_pattern)
 
 
 def fetch_douban_ids_from_sitemap(sitemap_url: str) -> Iterator[str]:
     """
-    Fetch Douban IDs from a sitemap using streaming.
+    Fetch Douban IDs from a sitemap using regex.
 
     Args:
         sitemap_url: URL of the sitemap
@@ -82,15 +128,16 @@ def fetch_douban_ids_from_sitemap(sitemap_url: str) -> Iterator[str]:
     Returns:
         Iterator of Douban IDs
     """
-    # The XPath query targets the text content of the 'loc' element within 'url'
-    urls_iterator = _process_sitemap(sitemap_url, "//ns:url/ns:loc/text()")
+    # First, extract all URLs using the same <loc> pattern
+    loc_pattern = r"<loc>(.*?)<\/loc>"
+    urls_iterator = _extract_content_by_regex(sitemap_url, loc_pattern)
 
-    # Pattern to match Douban IDs in URLs
-    pattern = r"movie\.douban\.com/subject/(\d+)"
+    # Pattern to match Douban IDs specifically within the extracted URLs
+    douban_id_pattern = r"movie\.douban\.com/subject/(\d+)"
 
-    # Extract and yield IDs
+    # Extract and yield IDs from the URLs
     for url in urls_iterator:
-        match = re.search(pattern, url)
+        match = re.search(douban_id_pattern, url)
         if match:
             douban_id = match.group(1)
             yield douban_id
