@@ -563,7 +563,7 @@ def process_explore(db: Session, queue_item: Queue) -> None:
     # If reported total is >= NARROW_THRESHOLD,
     # add narrower conditions to the queue.
     if reported_total >= NARROW_THRESHOLD:
-        if not _add_narrower_conditions(db, conditions):
+        if not _add_narrower_conditions(db, conditions, item_type):
             logger.warning(
                 f"All conditions already present in queue item: {queue_id}."
                 " No narrower conditions added."
@@ -592,7 +592,7 @@ def process_explore(db: Session, queue_item: Queue) -> None:
     )
 
 
-def _add_narrower_conditions(db: Session, conditions: dict) -> bool:
+def _add_narrower_conditions(db: Session, conditions: dict, item_type: str) -> bool:
     """
     Add narrower conditions based on the hierarchy:
     score_range -> year -> type -> region
@@ -604,7 +604,7 @@ def _add_narrower_conditions(db: Session, conditions: dict) -> bool:
     # Determine which level of condition to add
     if not year:
         # Add year condition
-        for year in _get_years():
+        for year in _get_years(item_type):
             new_conditions = conditions.copy()
             new_conditions["year"] = year
             new_id = encode_explore_queue_id(new_conditions)
