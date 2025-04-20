@@ -1,12 +1,18 @@
 from datetime import datetime
 import logging
 from sqlalchemy.orm import Session
-from typing import Dict, List
+from typing import List
 
 from app.model_utils import add_placeholder_item, add_to_queue
-from app.models import Queue
+from app.models import Queue, ExploreConditions
 from app.info_provider.explore import explore
-from app.queue_processor.common import try_to_save_item_to_db_with_detail
+from app.queue_processor.common import (
+    try_to_save_item_to_db_with_detail,
+    allow_update_explore_conditions,
+    encode_explore_conditions,
+    decode_explore_conditions,
+)
+from app.utils import now_timestamp
 
 logger = logging.getLogger(__name__)
 
@@ -462,44 +468,6 @@ REGION_KEYWORDS = [
 ]
 
 
-def encode_explore_queue_id(conditions: Dict[str, str]) -> str:
-    """
-    Convert a dictionary of conditions to a queue ID string.
-
-    Args:
-        conditions: Dictionary of condition key-value pairs
-
-    Returns:
-        A formatted queue ID string in the format "key1:value1/key2:value2/..."
-        with all keys sorted alphabetically
-    """
-    # Sort all keys alphabetically
-    sorted_keys = sorted(conditions.keys())
-
-    # Build parts with all keys in sorted order
-    parts = [f"{key}:{conditions[key]}" for key in sorted_keys]
-
-    return "/".join(parts)
-
-
-def decode_explore_queue_id(queue_id: str) -> Dict[str, str]:
-    """
-    Parse a queue ID string into a dictionary of conditions.
-
-    Args:
-        queue_id: A string in the format "key1:value1/key2:value2/..."
-
-    Returns:
-        Dictionary of condition key-value pairs
-    """
-    conditions = {}
-    for condition in queue_id.split("/"):
-        if ":" in condition:
-            key, value = condition.split(":", 1)
-            conditions[key] = value
-    return conditions
-
-
 def process_explore(db: Session, queue_item: Queue) -> None:
     """
     Process a queue item of type 'explore'.
@@ -513,7 +481,7 @@ def process_explore(db: Session, queue_item: Queue) -> None:
     logger.info(f"Processing explore queue item: {queue_id}")
 
     # Parse conditions from queue_id
-    conditions = decode_explore_queue_id(queue_id)
+    conditions = decode_explore_conditions(queue_id)
 
     # Extract item_type
     item_type = conditions.get("item_type", "movie")
@@ -553,6 +521,7 @@ def process_explore(db: Session, queue_item: Queue) -> None:
     logger.info(
         f"Found {len(items)} items (reported total {reported_total}) for {queue_id}"
     )
+
     if not items or reported_total == 0:
         logger.info(
             f"No items/reported total found for explore queue item: {queue_id}."
@@ -586,6 +555,16 @@ def process_explore(db: Session, queue_item: Queue) -> None:
         if try_to_save_item_to_db_with_detail(db, item_detail):
             processed_count += 1
 
+    # Record or update the explore conditions in the database
+    # after successful processing
+    current_time = now_timestamp()
+    explore_conditions = ExploreConditions(
+        conditions=queue_id, total=reported_total, update_time=current_time
+    )
+
+    db.merge(explore_conditions)
+    db.commit()
+
     logger.info(
         f"Completed processing explore queue item: {queue_id}."
         f" Processed {processed_count} items."
@@ -596,41 +575,53 @@ def _add_narrower_conditions(db: Session, conditions: dict, item_type: str) -> b
     """
     Add narrower conditions based on the hierarchy:
     score_range -> year -> type -> region
+
+    Only adds narrower conditions if each new condition is allowed to be updated.
+
+    Args:
+        db: Database session
+        conditions: The current conditions dictionary
+        item_type: The type of item (movie or tv)
+
+    Returns:
+        Boolean indicating if any narrower conditions were added
     """
     year = conditions.get("year")
     type_ = conditions.get("type")
     region = conditions.get("region")
 
-    # Determine which level of condition to add
+    # Determine which level of condition to add and what values to use
+    values_to_add = []
+    key_to_add = None
+
     if not year:
-        # Add year condition
-        for year in _get_years(item_type):
-            new_conditions = conditions.copy()
-            new_conditions["year"] = year
-            new_id = encode_explore_queue_id(new_conditions)
-            add_to_queue(db, "explore", new_id)
-            logger.info(f"Added narrower explore queue item: {new_id}")
-        return True
+        key_to_add = "year"
+        values_to_add = _get_years(item_type)
+    elif not type_:
+        key_to_add = "type"
+        values_to_add = TYPES
+    elif not region:
+        key_to_add = "region"
+        values_to_add = REGION_KEYWORDS
+    else:
+        # If we already have all conditions, no need to add more
+        return False
 
-    if not type_:
-        # Add type condition
-        for type_val in TYPES:
-            new_conditions = conditions.copy()
-            new_conditions["type"] = type_val
-            new_id = encode_explore_queue_id(new_conditions)
-            add_to_queue(db, "explore", new_id)
-            logger.info(f"Added narrower explore queue item: {new_id}")
-        return True
+    # Add the narrower conditions that pass validation
+    added_any = False
+    for value in values_to_add:
+        new_conditions = conditions.copy()
+        new_conditions[key_to_add] = value
+        new_conditions_str = encode_explore_conditions(new_conditions)
 
-    if not region:
-        # Add region condition
-        for region_val in REGION_KEYWORDS:
-            new_conditions = conditions.copy()
-            new_conditions["region"] = region_val
-            new_id = encode_explore_queue_id(new_conditions)
-            add_to_queue(db, "explore", new_id)
-            logger.info(f"Added narrower explore queue item: {new_id}")
-        return True
+        # Validate the new condition before adding
+        if allow_update_explore_conditions(db, new_conditions_str):
+            add_to_queue(db, "explore", new_conditions_str)
+            logger.info(f"Added narrower explore queue item: {new_conditions_str}")
+            added_any = True
+        else:
+            logger.info(
+                f"Skipping explore conditions recently updated: {new_conditions_str}"
+            )
 
-    # If we already have all conditions, no need to add more
-    return False
+    return added_any

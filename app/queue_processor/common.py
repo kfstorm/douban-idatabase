@@ -9,7 +9,7 @@ from sqlalchemy.exc import IntegrityError
 from app.config import settings
 from app.http_utils import NoPermissionException
 from app.info_provider.imdb import fetch_imdb_id
-from app.models import Blacklist, History, Item, List, Tag
+from app.models import Blacklist, ExploreConditions, History, Item, List, Tag
 from app.utils import now_timestamp
 from app.metrics import item_operations
 
@@ -364,5 +364,97 @@ def try_to_save_item_to_db_with_detail(
     # Merge item data and save to database
     item = merge_item(detail_info, imdb_info)
     save_item_to_db(db, item)
+
+    return True
+
+
+def encode_explore_conditions(conditions: Dict[str, str]) -> str:
+    """
+    Convert a dictionary of conditions to a conditions string.
+
+    Args:
+        conditions: Dictionary of condition key-value pairs
+
+    Returns:
+        A formatted conditions string in the format "key1:value1/key2:value2/..."
+        with all keys sorted alphabetically
+    """
+    # Sort all keys alphabetically
+    sorted_keys = sorted(conditions.keys())
+
+    # Build parts with all keys in sorted order
+    parts = [f"{key}:{conditions[key]}" for key in sorted_keys]
+
+    return "/".join(parts)
+
+
+def decode_explore_conditions(conditions_str: str) -> Dict[str, str]:
+    """
+    Parse an explore conditions string into a dictionary of conditions.
+
+    Args:
+        conditions_str: A string in the format "key1:value1/key2:value2/..."
+
+    Returns:
+        Dictionary of conditions key-value pairs
+    """
+    conditions = {}
+    for condition in conditions_str.split("/"):
+        if ":" in condition:
+            key, value = condition.split(":", 1)
+            conditions[key] = value
+    return conditions
+
+
+def allow_update_explore_conditions(db: Session, conditions_str: str) -> bool:
+    """
+    Determine if explore conditions should be processed.
+
+    Args:
+        db: Database session
+        conditions: The explore conditions string
+
+    Returns:
+        Boolean indicating whether processing should proceed
+    """
+    # Check if conditions already exist in database
+    existing_entry = (
+        db.query(ExploreConditions)
+        .filter(ExploreConditions.conditions == conditions_str)
+        .first()
+    )
+
+    if existing_entry is None:
+        # Conditions don't exist in DB yet
+        return True
+
+    # Parse the conditions
+    conditions_dict = decode_explore_conditions(conditions_str)
+
+    # Don't update conditions that have year specified
+    if "year" not in conditions_dict:
+        return True
+
+    # For years not in [previous year, current year, next year],
+    # the minimal update interval is 30 days.
+    current_year = datetime.now().year
+    year = int(conditions_dict["year"])
+    if year < current_year - 1 or year > current_year + 1:
+        min_update_interval = 30 * 24 * 60 * 60
+        if existing_entry.update_time + min_update_interval > now_timestamp():
+            return False
+
+    # For score range `0,1`, the minimal update interval is 30 days.
+    if "score_range" in conditions_dict:
+        score_range = conditions_dict["score_range"]
+        if score_range == "0,1":
+            min_update_interval = 30 * 24 * 60 * 60
+            if existing_entry.update_time + min_update_interval > now_timestamp():
+                return False
+
+    # The default minimal update interval is 7 days.
+    min_update_interval = 7 * 24 * 60 * 60
+    if existing_entry.update_time + min_update_interval > now_timestamp():
+        return False
 
     return True

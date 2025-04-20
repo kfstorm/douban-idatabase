@@ -116,3 +116,11 @@ class DbStatistics(Base):
     key = Column(String(64), primary_key=True)
     value = Column(Integer, nullable=False)
     update_time = Column(Float, nullable=False)
+
+
+class ExploreConditions(Base):
+    __tablename__ = "explore_conditions"
+
+    conditions = Column(String(256), primary_key=True)
+    total = Column(Integer, nullable=False)
+    update_time = Column(Float, nullable=False)
