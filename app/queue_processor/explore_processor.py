@@ -1,7 +1,7 @@
 from datetime import datetime
 import logging
 from sqlalchemy.orm import Session
-from typing import Dict
+from typing import Dict, List
 
 from app.model_utils import add_placeholder_item, add_to_queue
 from app.models import Queue
@@ -19,11 +19,34 @@ SCORE_RANGES = [f"{i},{i+1}" for i in range(9, -1, -1)]
 # Predefined conditions for narrowing down exploration
 
 
-def _get_years():
-    # Years from 1980 to current year + 5. Later years come first.
-    years = [str(year) for year in range(datetime.now().year + 5, 1979, -1)]
-    # Years before 1980. We expect fewer items in these ranges.
-    years += ["70年代", "60年代", "更早"]
+def _get_years(item_type: str) -> List[str]:
+    """
+    Get a list of years for filtering items.
+    """
+    if item_type == "movie":
+        # The known oldest movie on douban: https://movie.douban.com/subject/25813414/
+        start_year = 1874
+        # 10 years before the first movie
+        start_year -= 10
+    elif item_type == "tv":
+        # The known oldest tv show on douban: https://movie.douban.com/subject/3231354/
+        # start_year = 1907
+        # However, there are a lot of tv shows without year info
+        # which can be found by searching 1900
+        start_year = 1900
+    else:
+        raise ValueError(f"Unknown item_type: {item_type}")
+    # TODO:
+    # - `更早` contains items without year
+    # - Some items can be found by searching year 1000 or 0000.
+
+    # NOTE:
+    # Latest year of movies can be found by explore API: 2034
+    # Latest year of tv shows can be found by explore API: 2033
+    end_year = datetime.now().year + 20
+
+    # Later years come first.
+    years = [str(year) for year in range(end_year, start_year - 1, -1)]
     return years
 
 

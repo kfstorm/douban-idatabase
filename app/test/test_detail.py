@@ -438,6 +438,76 @@ def test_extract_from_explore():
     _test_extract_base(json_text, source, expected_result)
 
 
+def test_extract_invalid_item_doulist_from_explore():
+    """Test extracting item details from an explore API response.
+    The item is actually a doulist."""
+    source = "dummy"
+    json_text = """
+    {
+        "subtitle": "豆瓣片单",
+        "is_follow": false,
+        "owner": {
+            "kind": "user",
+            "name": "Clyde",
+            "url": "https://www.douban.com/people/2140785/",
+            "uri": "douban://douban.com/user/2140785",
+            "avatar": "https://img3.doubanio.com/icon/up2140785-3.jpg",
+            "is_club": false,
+            "type": "user",
+            "id": "2140785",
+            "uid": "chenhuayang"
+        },
+        "id": "2604791",
+        "category": "movie",
+        "title": "不妨一看的外国纪录片",
+        "is_subject_selection": false,
+        "followers_count": 3209,
+        "tile_cover": true,
+        "color_scheme": {
+            "is_dark": true,
+            "primary_color_light": "999ca5",
+            "secondary_color": "f4f6f9",
+            "primary_color_dark": "76787f"
+        },
+        "type": "playlist",
+        "alg_json": "...",
+        "tags": [],
+        "syncing_note": null,
+        "use_image_cover": true,
+        "cover_url": "https://img9.doubanio.com/dae/screenshot/image/v2/html/cos_1b2f1a93d60ced01/profile/subjects_cover",
+        "bg_image": "https://img9.doubanio.com/view/photo/photo/public/p2543787426.jpg",
+        "doulist_type": "",
+        "card": "doulist",
+        "items_count": 264,
+        "sharing_url": "https://www.douban.com/doulist/2604791/",
+        "url": "https://www.douban.com/doulist/2604791/",
+        "uri": "douban://douban.com/doulist/2604791",
+        "item_type": "movie",
+        "list_type": "ugc_doulist"
+    }
+    """  # noqa: B950
+    expected_result = None
+    _test_extract_base(json_text, source, expected_result)
+
+
+def test_extract_invalid_item_ad_from_explore():
+    """Test extracting item details from an explore API response.
+    The item is actually an ad."""
+    source = "dummy"
+    json_text = """
+    {
+        "data": {
+            "type": "movie",
+            "unit": "dale_movie_ad_second_banner"
+        },
+        "alg_json": "",
+        "type": "ad"
+    }
+    """  # noqa: B950
+    expected_result = None
+    _test_extract_base(json_text, source, expected_result)
+
+
 def test_fetch_douban_item_detail():
     """Test fetching item details from Douban API."""
     # Test with a movie

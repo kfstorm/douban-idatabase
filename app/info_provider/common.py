@@ -1,4 +1,4 @@
-from typing import Any, Iterator
+from typing import Any, Iterator, Optional
 from urllib.parse import urlparse
 from tqdm import tqdm
 
@@ -40,7 +40,7 @@ def read_pages(read_one_page, get_total, get_items, items_per_page) -> Iterator[
             progress_bar.close()
 
 
-def extract_douban_item_detail(item: dict, source: str) -> dict:
+def extract_douban_item_detail(item: dict, source: str) -> Optional[dict]:
     """
     Extract relevant fields from a Douban item detail response
     """

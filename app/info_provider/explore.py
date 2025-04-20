@@ -111,7 +111,10 @@ def explore(
 
         # Process the items
         for item in items:
-            result_items.append(extract_douban_item_detail(item, source_context))
+            detail_info = extract_douban_item_detail(item, source_context)
+            if detail_info is None:
+                continue
+            result_items.append(detail_info)
 
         fetched_count += len(items)
 

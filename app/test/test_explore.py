@@ -21,6 +21,7 @@ def check_explore_result(
     max_count: Optional[int],
     item_check_func,
     allow_no_results: bool = False,
+    allow_count_mismatch: bool = False,
     **kwargs,
 ):
     logger.info(f"Items count: {len(result['items'])}, Total: {result['total']}")
@@ -31,9 +32,9 @@ def check_explore_result(
         assert len(result["items"]) <= max_count
         if result["total"] >= max_count:
             assert len(result["items"]) == max_count
-        else:
+        elif not allow_count_mismatch:
             assert len(result["items"]) == result["total"]
-    else:
+    elif not allow_count_mismatch:
         assert len(result["items"]) == result["total"]
 
     if not allow_no_results:
@@ -42,7 +43,8 @@ def check_explore_result(
     douban_ids = set()
     for item in result["items"]:
         check_detail(item, **kwargs)
-        item_check_func(item)
+        if item_check_func:
+            item_check_func(item)
         assert item["douban_id"] not in douban_ids
         douban_ids.add(item["douban_id"])
 
@@ -321,4 +323,16 @@ def test_explore_all():
         and item["year"] == 2000
         and 7.0 <= item["rating"] <= 8.0
         and "喜剧" in item["raw_data"]["detail"]["card_subtitle"],
+    )
+
+
+def test_explore_api_return_invalid_items():
+    """Test the explore function to check if it returns invalid items"""
+    result = explore("movie", "0,10", tags=["", ""], max_count=DEFAULT_TEST_COUNT)
+    check_explore_result(
+        result,
+        DEFAULT_TEST_COUNT,
+        None,
+        allow_no_rating=True,
+        allow_count_mismatch=True,
     )
