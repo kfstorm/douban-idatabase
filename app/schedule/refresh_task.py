@@ -51,15 +51,11 @@ class RefreshTask(BaseTask):
 
         # Base query for items not already in the queue
         # and whose next_update_time has passed or is NULL
-        items_base_query = (
-            db.query(Item)
-            .filter(
-                or_(
-                    Item.next_update_time <= current_time,
-                    Item.next_update_time == None,  # noqa: E711
-                )
+        items_base_query = db.query(Item).filter(
+            or_(
+                Item.next_update_time <= current_time,
+                Item.next_update_time == None,  # noqa: E711
             )
-            .order_by(Item.douban_id)
         )
 
         # Process item callback
@@ -87,7 +83,7 @@ class RefreshTask(BaseTask):
         logger.info("Starting refresh from list table...")
 
         # Base query for lists not already in the queue
-        lists_base_query = db.query(List).order_by(List.list_id)  # noqa: E711
+        lists_base_query = db.query(List)
 
         # Process list callback
         def process_list(list_: List):
@@ -114,7 +110,7 @@ class RefreshTask(BaseTask):
         logger.info("Starting refresh from tag table...")
 
         # Base query for tags not already in the queue
-        tags_base_query = db.query(Tag).order_by(Tag.tag_name)  # noqa: E711
+        tags_base_query = db.query(Tag)
 
         # Process tag callback
         def process_tag(tag: Tag):
