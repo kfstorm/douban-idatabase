@@ -522,13 +522,6 @@ def process_explore(db: Session, queue_item: Queue) -> None:
         f"Found {len(items)} items (reported total {reported_total}) for {queue_id}"
     )
 
-    if not items or reported_total == 0:
-        logger.info(
-            f"No items/reported total found for explore queue item: {queue_id}."
-            f" Items: {items}. Reported total: {reported_total}"
-        )
-        return
-
     # If reported total is >= NARROW_THRESHOLD,
     # add narrower conditions to the queue.
     if reported_total >= NARROW_THRESHOLD:
