@@ -8,7 +8,7 @@ from typing import Optional
 import pytest
 import pycountry
 from app.info_provider.explore import PAGE_SIZE, explore
-from app.queue_processor.explore_processor import REGION_KEYWORDS, TYPES
+from app.queue_processor.explore_processor import REGION_KEYWORDS, SORTS, TYPES
 from app.test.common import check_detail
 
 logger = logging.getLogger(__name__)
@@ -324,6 +324,23 @@ def test_explore_all():
         and 7.0 <= item["rating"] <= 8.0
         and "喜剧" in item["raw_data"]["detail"]["card_subtitle"],
     )
+
+
+def test_explore_with_sort():
+    """Test the explore function with sort parameter"""
+    douban_id_sets = []
+    for sort in SORTS:
+        result = explore("movie", "9,10", sort=sort, max_count=DEFAULT_TEST_COUNT)
+        check_explore_result(
+            result,
+            DEFAULT_TEST_COUNT,
+            lambda item: item["type"] == "movie",
+        )
+        douban_id_sets.append(set(item["douban_id"] for item in result["items"]))
+    # Check if the sets of douban_ids are different for different sorts
+    for i in range(len(douban_id_sets)):
+        for j in range(i + 1, len(douban_id_sets)):
+            assert douban_id_sets[i] != douban_id_sets[j]
 
 
 def test_explore_api_return_invalid_items():

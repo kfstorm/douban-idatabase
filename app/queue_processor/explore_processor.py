@@ -467,6 +467,13 @@ REGION_KEYWORDS = [
     "俄羅斯Russia",  # 5
 ]
 
+SORTS = [
+    "T",  # 综合排序
+    "U",  # 近期热度
+    "R",  # 首映时间
+    "S",  # 高分优先
+]
+
 
 def process_explore(db: Session, queue_item: Queue) -> None:
     """
@@ -498,6 +505,7 @@ def process_explore(db: Session, queue_item: Queue) -> None:
     year_range = conditions.get("year")
     type_ = conditions.get("type")
     region = conditions.get("region")
+    sort = conditions.get("sort")
 
     # Prepare tags for explore API
     tags = []
@@ -513,7 +521,7 @@ def process_explore(db: Session, queue_item: Queue) -> None:
         f"Calling explore API with item_type={item_type},"
         f" score_range={score_range}, tags={tags}"
     )
-    result = explore(item_type, score_range, tags)
+    result = explore(item_type, score_range, tags=tags, sort=sort)
 
     reported_total = result["total"]
     items = result["items"]
@@ -582,6 +590,7 @@ def _add_narrower_conditions(db: Session, conditions: dict, item_type: str) -> b
     year = conditions.get("year")
     type_ = conditions.get("type")
     region = conditions.get("region")
+    sort = conditions.get("sort")
 
     # Determine which level of condition to add and what values to use
     values_to_add = []
@@ -596,6 +605,9 @@ def _add_narrower_conditions(db: Session, conditions: dict, item_type: str) -> b
     elif not region:
         key_to_add = "region"
         values_to_add = REGION_KEYWORDS
+    elif not sort:
+        key_to_add = "sort"
+        values_to_add = SORTS
     else:
         # If we already have all conditions, no need to add more
         return False

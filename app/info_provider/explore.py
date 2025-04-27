@@ -19,6 +19,7 @@ def explore(
     item_type: str,
     score_range: str,
     tags: Optional[List[str]] = None,
+    sort: Optional[str] = None,
     max_count: Optional[int] = None,
 ) -> Dict[str, Any]:
     """
@@ -28,6 +29,7 @@ def explore(
         item_type (str): Type of item to fetch ('movie' or 'tv').
         score_range (str): Score range for filtering movies/tvs.
         tags (List[str]): List of tags to filter movies/tvs.
+        sort (Optional[str]): Sorting method for the results.
         max_count (Optional[int]): Maximum number of items to fetch.
             If None, all available items will be fetched.
 
@@ -68,6 +70,8 @@ def explore(
             "score_range": score_range,
             "tags": tags_str,
         }
+        if sort:
+            params["sort"] = sort
 
         response = get_json(url, headers=COMMON_HEADERS, params=params)
         items = response.get("items", [])
