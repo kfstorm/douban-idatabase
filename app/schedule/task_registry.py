@@ -17,6 +17,15 @@ def register_task(task_class: Type[BaseTask]) -> Type[BaseTask]:
     try:
         task_instance = task_class()  # Instantiate to verify properties
         task_type = task_instance.task_type
+
+        # Check if this task type is disabled
+        disabled_task_types = [
+            t.strip() for t in settings.DISABLED_TASK_TYPES.split(",") if t.strip()
+        ]
+        if task_type in disabled_task_types:
+            logger.info(f"Task {task_type} is disabled by configuration")
+            return task_class
+
         _TASK_REGISTRY[task_type] = task_class
         logger.info(f"Registered task: {task_type}")  # For debugging
         return task_class

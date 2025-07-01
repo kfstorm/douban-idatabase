@@ -36,8 +36,10 @@ class RefreshTask(BaseTask):
         Periodically refresh data from item/list/tag table
             by adding them back to the queue
         """
-        self._refresh_tags(db)
-        self._refresh_lists(db)
+        if not settings.DISABLE_TAG_REFRESH:
+            self._refresh_tags(db)
+        if not settings.DISABLE_LIST_REFRESH:
+            self._refresh_lists(db)
         if not settings.DISABLE_INDIVIDUAL_ITEM_FETCH:
             self._refresh_items(db)
 

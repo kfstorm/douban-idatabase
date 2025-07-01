@@ -96,6 +96,10 @@ class Settings(BaseSettings):
         "DISABLE_INDIVIDUAL_ITEM_FETCH", False
     )
 
+    DISABLE_LIST_REFRESH: bool = _parse_bool_env_var("DISABLE_LIST_REFRESH", True)
+
+    DISABLE_TAG_REFRESH: bool = _parse_bool_env_var("DISABLE_TAG_REFRESH", True)
+
     DISCOVER_LISTS_BY_TAG_MIN_FAVORITES: int = int(
         os.getenv("DISCOVER_LISTS_BY_TAG_MIN_FAVORITES", "10")
     )
@@ -103,6 +107,12 @@ class Settings(BaseSettings):
     DISABLE_SCHEDULER: bool = _parse_bool_env_var(
         "DISABLE_SCHEDULER", False
     )  # Disable scheduler for testing purposes
+
+    # Comma-separated list of task types to disable
+    DISABLED_TASK_TYPES: str = os.getenv(
+        "DISABLED_TASK_TYPES",
+        "google_search,discover_items_by_type_rank,discover_lists_by_google,bootstrap_lists,discover_tags_by_google,fetch_sitemap",
+    )
 
     # Anonymous API access settings
     ALLOW_ANONYMOUS_API_ACCESS: bool = _parse_bool_env_var(
