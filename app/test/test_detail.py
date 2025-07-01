@@ -5,12 +5,12 @@ from app.info_provider.detail import DOUBAN_REXXAR_API_URL, fetch_douban_item_de
 from app.test.common import check_detail
 
 
-def _test_extract_base(json_text: str, source: str, expected_result: dict):
+def _test_extract_base(json_text: str, source: str, expected_result: dict, **kwargs):
     """Test extracting item details from a JSON string."""
     obj = json.loads(json_text)
     detail = extract_douban_item_detail(obj, source)
     if expected_result:
-        check_detail(detail)
+        check_detail(detail, **kwargs)
         expected_result["raw_data"] = {
             "detail": obj,
             "detail_source": source,
@@ -305,6 +305,158 @@ def test_extract_from_subject_collection():
         "in_blacklist": False,
     }
     _test_extract_base(json_text, source, expected_result)
+
+
+def test_extract_from_subject_collection_2():
+    """Test extracting item details from a subject collection API response."""
+    source = "https://m.douban.com/rexxar/api/v2/subject_collection/movie_real_time_hotest/items"
+    json_text = """
+    {
+        "original_price": "",
+        "type_name": "电影",
+        "rating": {
+            "count": 66613,
+            "max": 10,
+            "star_count": 4.5,
+            "value": 9.1
+        },
+        "rank_value": 8,
+        "pic": {
+            "large": "https://img3.doubanio.com/view/photo/m_ratio_poster/public/p2922328832.jpg",
+            "normal": "https://img3.doubanio.com/view/photo/s_ratio_poster/public/p2922328832.jpg"
+        },
+        "is_new": false,
+        "actions": [
+            "可播放",
+            "可购票"
+        ],
+        "uri": "douban://douban.com/movie/1958667",
+        "related_search_terms": [],
+        "vendor_icons": [
+            "https://img9.doubanio.com/f/frodo/fbc90f355fc45d5d2056e0d88c697f9414b56b44/pics/vendors/tencent.png",
+            "https://img9.doubanio.com/f/frodo/6c7b857e6b2255201e73bf83732d95d572f3f9f7/pics/vendors/iqiyi.png"
+        ],
+        "year": "2001",
+        "card_subtitle": "2001 / 日本 / 喜剧 动画 / 原惠一 / 矢岛晶子 楢桥美纪",
+        "trend_up": false,
+        "id": "1958667",
+        "recommended_reason": "",
+        "trend_down": false,
+        "title": "蜡笔小新：大人王国的反击",
+        "trend_equal": true,
+        "rank_value_changed": 0,
+        "label": "",
+        "score": 130700,
+        "interest": null,
+        "type": "movie",
+        "description": "",
+        "has_linewatch": true,
+        "price": "",
+        "rank": 8,
+        "date": null,
+        "info": "日本 / 喜剧 动画 / 原惠一 / 矢岛晶子 楢桥美纪",
+        "url": "https://m.douban.com/movie/subject/1958667/",
+        "release_date": "06.28",
+        "cover": {
+            "url": "https://img3.doubanio.com/view/photo/m_ratio_poster/public/p2922328832.jpg",
+            "width": 3624,
+            "shape": "rectangle",
+            "height": 5098
+        },
+        "honor_infos": [],
+        "subtype": "",
+        "reviewer_name": "",
+        "null_rating_reason": ""
+    }
+    """  # noqa: B950
+    expected_result = {
+        "douban_id": "1958667",
+        "douban_title": "蜡笔小新：大人王国的反击",
+        "year": 2001,
+        "rating": 9.1,
+        "type": "movie",
+        "in_blacklist": False,
+    }
+    _test_extract_base(json_text, source, expected_result)
+
+
+def test_extract_from_subject_collection_3():
+    """Test extracting item details from a subject collection API response."""
+    source = "https://m.douban.com/rexxar/api/v2/subject_collection/movie_real_time_hotest/items"
+    json_text = """
+    {
+        "original_price": "",
+        "type_name": "电影",
+        "rating": {
+        "count": 0,
+        "max": 10,
+        "star_count": {
+            "source": "0.0",
+            "parsedValue": 0
+        },
+        "value": 0
+        },
+        "rank_value": 9,
+        "pic": {
+        "large": "https://img1.doubanio.com/view/photo/m_ratio_poster/public/p2922813510.jpg",
+        "normal": "https://img1.doubanio.com/view/photo/s_ratio_poster/public/p2922813510.jpg"
+        },
+        "is_new": false,
+        "actions": [],
+        "uri": "douban://douban.com/movie/36767956",
+        "related_search_terms": [
+        {
+            "name": "姜文《英雄出少年》定档",
+            "uri": "douban://douban.com/search/result?q=%23%E5%A7%9C%E6%96%87%E3%80%8A%E8%8B%B1%E9%9B%84%E5%87%BA%E5%B0%91%E5%B9%B4%E3%80%8B%E5%AE%9A%E6%A1%A3%23"
+        },
+        {
+            "name": "姜文新片《你行！你上！》定档",
+            "uri": "douban://douban.com/search/result?q=%23%E5%A7%9C%E6%96%87%E6%96%B0%E7%89%87%E3%80%8A%E4%BD%A0%E8%A1%8C%EF%BC%81%E4%BD%A0%E4%B8%8A%EF%BC%81%E3%80%8B%E5%AE%9A%E6%A1%A3%23"
+        }
+        ],
+        "vendor_icons": [],
+        "year": "2025",
+        "card_subtitle": "2025 / 中国大陆 / 剧情 喜剧 / 姜文 / 姜文 马丽",
+        "trend_up": true,
+        "id": "36767956",
+        "recommended_reason": "",
+        "trend_down": false,
+        "title": "你行！你上！",
+        "trend_equal": false,
+        "rank_value_changed": 1,
+        "label": "",
+        "score": 119300,
+        "interest": null,
+        "type": "movie",
+        "description": "",
+        "has_linewatch": false,
+        "price": "",
+        "rank": 9,
+        "date": null,
+        "info": "中国大陆 / 剧情 喜剧 / 姜文 / 姜文 马丽",
+        "url": "https://m.douban.com/movie/subject/36767956/",
+        "release_date": "07.25",
+        "cover": {
+        "url": "https://img1.doubanio.com/view/photo/m_ratio_poster/public/p2922813510.jpg",
+        "width": 3001,
+        "shape": "rectangle",
+        "height": 4313
+        },
+        "honor_infos": [],
+        "subtype": "",
+        "reviewer_name": "",
+        "null_rating_reason": "尚未上映"
+    }
+    """  # noqa: B950
+    expected_result = {
+        "douban_id": "36767956",
+        "douban_title": "你行！你上！",
+        "year": 2025,
+        "rating": None,
+        "type": "movie",
+        "in_blacklist": False,
+    }
+    _test_extract_base(json_text, source, expected_result, allow_no_rating=True)
 
 
 def test_extract_from_rexxar_movie():

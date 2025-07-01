@@ -112,16 +112,20 @@ def extract_douban_item_detail(item: dict, source: str) -> Optional[dict]:
             rating = float(item["rating"][0])
         except (ValueError, TypeError):
             pass
+    # Handle standard format with rating.value
+    if rating is None and item.get("rating") and "value" in item["rating"]:
+        value = item["rating"]["value"]
+        if value is not None:
+            try:
+                rating = float(value)
+            except (ValueError, TypeError):
+                pass
+        else:
+            rating = 0
     # Handle direct score field from type_rank API
-    if not rating and "score" in item:
+    if rating is None and "score" in item:
         try:
             rating = float(item["score"])
-        except (ValueError, TypeError):
-            pass
-    # Handle standard format with rating.value
-    if not rating and item.get("rating") and item["rating"].get("value"):
-        try:
-            rating = float(item["rating"]["value"])
         except (ValueError, TypeError):
             pass
 
@@ -129,6 +133,9 @@ def extract_douban_item_detail(item: dict, source: str) -> Optional[dict]:
         in_blacklist = bool(item["in_blacklist"])
     else:
         in_blacklist = False if year or rating else None
+
+    if rating == 0:
+        rating = None  # Treat 0 rating as None
 
     return {
         "douban_id": douban_id,
