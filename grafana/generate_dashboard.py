@@ -256,7 +256,7 @@ class DashboardGenerator:
         return result
 
 
-# flake8: noqa: B950
+# flake8: noqa: E501
 def generate_dashboard():
     """Generate the complete Douban iDatabase dashboard"""
     generator = DashboardGenerator()

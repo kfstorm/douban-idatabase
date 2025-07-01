@@ -40,7 +40,7 @@ def test_extract_from_doulist_movie():
         "type": "movie",
         "id": "183031984"
     }
-    """  # noqa: B950
+    """  # noqa: E501
     expected_result = {
         "douban_id": "1987675",
         "douban_title": "咖啡约会",
@@ -74,7 +74,7 @@ def test_extract_from_doulist_tv():
         "type": "tv",
         "id": "182396166"
     }
-    """  # noqa: B950
+    """  # noqa: E501
     expected_result = {
         "douban_id": "26101735",
         "douban_title": "他在我身边 第一季",
@@ -103,7 +103,7 @@ def test_extract_from_doulist_note():
         "type": "note",
         "id": "244849241"
     }
-    """  # noqa: B950
+    """  # noqa: E501
     expected_result = None
     _test_extract_base(json_text, source, expected_result)
 
@@ -130,7 +130,7 @@ def test_extract_from_doulist_music():
         "type": "music",
         "id": "1226329026"
     }
-    """  # noqa: B950
+    """  # noqa: E501
     expected_result = None
     _test_extract_base(json_text, source, expected_result)
 
@@ -157,7 +157,7 @@ def test_extract_from_doulist_drama():
         "type": "drama",
         "id": "868704088"
     }
-    """  # noqa: B950
+    """  # noqa: E501
     expected_result = None
     _test_extract_base(json_text, source, expected_result)
 
@@ -184,7 +184,7 @@ def test_extract_from_doulist_book():
         "type": "book",
         "id": "200141679"
     }
-    """  # noqa: B950
+    """  # noqa: E501
     expected_result = None
     _test_extract_base(json_text, source, expected_result)
 
@@ -221,7 +221,7 @@ def test_extract_from_type_rank_movie():
         ],
         "is_watched": true
     }
-    """  # noqa: B950
+    """  # noqa: E501
     expected_result = {
         "douban_id": "1292052",
         "douban_title": "肖申克的救赎",
@@ -295,7 +295,7 @@ def test_extract_from_subject_collection():
       "subtype": "movie",
       "null_rating_reason": ""
     }
-    """  # noqa: B950
+    """  # noqa: E501
     expected_result = {
         "douban_id": "4844730",
         "douban_title": "好景在望",
@@ -368,7 +368,7 @@ def test_extract_from_subject_collection_2():
         "reviewer_name": "",
         "null_rating_reason": ""
     }
-    """  # noqa: B950
+    """  # noqa: E501
     expected_result = {
         "douban_id": "1958667",
         "douban_title": "蜡笔小新：大人王国的反击",
@@ -447,7 +447,7 @@ def test_extract_from_subject_collection_3():
         "reviewer_name": "",
         "null_rating_reason": "尚未上映"
     }
-    """  # noqa: B950
+    """  # noqa: E501
     expected_result = {
         "douban_id": "36767956",
         "douban_title": "你行！你上！",
@@ -490,7 +490,7 @@ def test_extract_from_rexxar_movie():
         "null_rating_reason": "",
         "sharing_url": ""
         }
-    """  # noqa: B950
+    """  # noqa: E501
     expected_result = {
         "douban_id": "2158666",
         "douban_title": "未知电影",
@@ -578,7 +578,7 @@ def test_extract_from_explore():
         "episodes_info": "",
         "item_type": "movie"
     }
-    """  # noqa: B950
+    """  # noqa: E501
     expected_result = {
         "douban_id": "35448539",
         "douban_title": "奇美拉",
@@ -637,7 +637,7 @@ def test_extract_invalid_item_doulist_from_explore():
         "item_type": "movie",
         "list_type": "ugc_doulist"
     }
-    """  # noqa: B950
+    """  # noqa: E501
     expected_result = None
     _test_extract_base(json_text, source, expected_result)
 
@@ -655,7 +655,7 @@ def test_extract_invalid_item_ad_from_explore():
         "alg_json": "",
         "type": "ad"
     }
-    """  # noqa: B950
+    """  # noqa: E501
     expected_result = None
     _test_extract_base(json_text, source, expected_result)
 

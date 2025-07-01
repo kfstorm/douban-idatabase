@@ -507,7 +507,7 @@ def migrate_add_metrics_indices():
             logger.info("Adding composite index for Item table...")
             session.execute(
                 text(
-                    "CREATE INDEX IF NOT EXISTS idx_item_type_update_time ON item(type, update_time)"  # noqa: B950
+                    "CREATE INDEX IF NOT EXISTS idx_item_type_update_time ON item(type, update_time)"  # noqa: E501
                 )
             )
 
@@ -521,7 +521,7 @@ def migrate_add_metrics_indices():
             logger.info("Ensuring index for List.last_check_time exists...")
             session.execute(
                 text(
-                    "CREATE INDEX IF NOT EXISTS idx_list_last_check_time ON list(last_check_time)"  # noqa: B950
+                    "CREATE INDEX IF NOT EXISTS idx_list_last_check_time ON list(last_check_time)"  # noqa: E501
                 )
             )
 
@@ -532,12 +532,12 @@ def migrate_add_metrics_indices():
             )
             session.execute(
                 text(
-                    "CREATE INDEX IF NOT EXISTS idx_tag_last_check_time ON tag(last_check_time)"  # noqa: B950
+                    "CREATE INDEX IF NOT EXISTS idx_tag_last_check_time ON tag(last_check_time)"  # noqa: E501
                 )
             )
             session.execute(
                 text(
-                    "CREATE INDEX IF NOT EXISTS idx_tag_fetch_last_check ON tag(fetch, last_check_time)"  # noqa: B950
+                    "CREATE INDEX IF NOT EXISTS idx_tag_fetch_last_check ON tag(fetch, last_check_time)"  # noqa: E501
                 )
             )
 

@@ -4,28 +4,28 @@ version = "0.1.0"
 requires-python = ">=3.11"
 
 dependencies = [
-    "fastapi==0.109.2",
-    "uvicorn[standard]==0.27.1",
-    "pydantic-settings==2.2.0",
-    "pydantic==2.10.6",
-    "SQLAlchemy==2.0.39",
-    "requests==2.31.0",
-    "python-dotenv==1.0.1",
+    "fastapi>=0.109.2",
+    "uvicorn[standard]>=0.27.1",
+    "pydantic-settings>=2.2.0",
+    "pydantic>=2.10.6",
+    "SQLAlchemy>=2.0.39",
+    "requests>=2.31.0",
+    "python-dotenv>=1.0.1",
     "pytz",
-    "tqdm==4.67.1",
-    "prometheus-client==0.21.1",
-    "beautifulsoup4==4.13.3",
-    "lxml==5.3.1",
-    "redis==5.2.1",
-    "brotli==1.1.0",
-    "zstandard==0.23.0",
-    "concurrent-log-handler==0.9.25",
+    "tqdm>=4.67.1",
+    "prometheus-client>=0.21.1",
+    "beautifulsoup4>=4.13.3",
+    "lxml>=5.3.1",
+    "redis>=5.2.1",
+    "brotli>=1.1.0",
+    "zstandard>=0.23.0",
+    "concurrent-log-handler>=0.9.25",
 ]
 
 [project.optional-dependencies]
 dev = [
     "pytest",
-    "pycountry==24.6.1",
+    "pycountry>=24.6.1",
     "ruff",
 ]
 

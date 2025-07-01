@@ -31,7 +31,7 @@ def parse_time(time_str):
 
 if __name__ == "__main__":
     # import items from
-    # `sqlite3 <DATABASE_PATH> -cmd ".mode tabs" 'select * from item' > <OUTPUT_FILE_PATH>`  # noqa: B950
+    # `sqlite3 <DATABASE_PATH> -cmd ".mode tabs" 'select * from item' > <OUTPUT_FILE_PATH>`  # noqa: E501
     parser = argparse.ArgumentParser(description="Import items from a file.")
     parser.add_argument(
         "--file",

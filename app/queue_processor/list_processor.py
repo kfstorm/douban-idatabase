@@ -61,7 +61,7 @@ def process_list(db: Session, queue_item: Queue) -> None:
             need_to_update_douban_time = True
             logger.info(
                 f"Updating Douban update time for list {list_type}/{list_id} from "
-                f"{timestamp_to_local_time_str(list_record.douban_update_time) if list_record.douban_update_time else 'None'} to "  # noqa: B950
+                f"{timestamp_to_local_time_str(list_record.douban_update_time) if list_record.douban_update_time else 'None'} to "  # noqa: E501
                 f"{timestamp_to_local_time_str(douban_update_time)}"
             )
 
@@ -107,7 +107,7 @@ def process_list(db: Session, queue_item: Queue) -> None:
                     else ""
                 )
                 + (
-                    f", douban_update_time to {timestamp_to_local_time_str(douban_update_time)}"  # noqa: B950
+                    f", douban_update_time to {timestamp_to_local_time_str(douban_update_time)}"  # noqa: E501
                     if need_to_update_douban_time
                     else ""
                 )
@@ -124,6 +124,6 @@ def process_list(db: Session, queue_item: Queue) -> None:
         db.commit()
         logger.info(
             f"Created new list record for {list_type}/{list_id}"
-            f", last_check_time={timestamp_to_local_time_str(now) if need_to_update_items else 'None'}"  # noqa: B950
-            f", douban_update_time={timestamp_to_local_time_str(douban_update_time) if douban_update_time else 'None'}"  # noqa: B950
+            f", last_check_time={timestamp_to_local_time_str(now) if need_to_update_items else 'None'}"  # noqa: E501
+            f", douban_update_time={timestamp_to_local_time_str(douban_update_time) if douban_update_time else 'None'}"  # noqa: E501
         )
