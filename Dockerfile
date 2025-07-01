@@ -1,14 +1,14 @@
 FROM python:3.11.8-alpine3.19
 
 # Install uv
-RUN pip install uv
+RUN --mount=type=cache,target=/root/.cache/pip pip install uv
 
 # Copy dependency files first for better caching
 COPY pyproject.toml /pyproject.toml
 COPY uv.lock /uv.lock
 
 # Install dependencies before copying source code
-RUN uv sync --frozen
+RUN --mount=type=cache,target=/root/.cache/uv uv sync --frozen
 
 # Copy application code and scripts
 COPY app/ /app/
