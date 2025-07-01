@@ -10,6 +10,9 @@ COPY uv.lock /uv.lock
 # Install dependencies before copying source code
 RUN --mount=type=cache,target=/root/.cache/uv uv sync --frozen
 
+# Create UV cache directory with proper permissions for non-root users
+RUN mkdir -p /.cache/uv && chmod 777 /.cache/uv
+
 # Copy application code and scripts
 COPY app/ /app/
 COPY run.sh /run.sh
