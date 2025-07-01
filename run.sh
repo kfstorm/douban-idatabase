@@ -13,4 +13,4 @@ trap 'rm -rf "$PROMETHEUS_MULTIPROC_DIR"' EXIT
 # Run the application
 # Use exec to replace the shell with the Python process,
 # so that the Python process can exit gracefully on `docker stop`
-exec python -m app.main
+exec uv run python -m app.main

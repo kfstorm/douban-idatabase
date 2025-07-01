@@ -18,5 +18,5 @@ fi
 # find all Python files
 python_files=$(git ls-files | grep '\.py$' || true)
 
-black "${black_args[@]}" $python_files
-flake8 $python_files
+uv run black "${black_args[@]}" $python_files
+uv run flake8 $python_files

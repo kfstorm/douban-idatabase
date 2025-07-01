@@ -4,3 +4,7 @@ __pycache__/
 logs/
 .env
 .vscode/
+
+# uv
+.venv/
+.python-version

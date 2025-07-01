@@ -2,4 +2,4 @@
 
 set -euo pipefail
 
-python -m pytest -v -s app/test
+uv run pytest

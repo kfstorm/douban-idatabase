@@ -1,6 +1,6 @@
 from typing import Iterator
 from app.info_provider.type_rank import TYPE_RANK_INTERVALS, get_rank_details, get_types
-from app.test.common import check_detail
+from common import check_detail
 
 TEST_TYPE_ID = "11"
 

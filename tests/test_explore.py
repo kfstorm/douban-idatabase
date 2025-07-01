@@ -9,7 +9,7 @@ import pytest
 import pycountry
 from app.info_provider.explore import PAGE_SIZE, explore
 from app.queue_processor.explore_processor import REGION_KEYWORDS, SORTS, TYPES
-from app.test.common import check_detail
+from common import check_detail
 
 logger = logging.getLogger(__name__)
 

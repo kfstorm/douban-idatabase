@@ -2,7 +2,7 @@ import json
 
 from app.info_provider.common import extract_douban_item_detail
 from app.info_provider.detail import DOUBAN_REXXAR_API_URL, fetch_douban_item_detail
-from app.test.common import check_detail
+from common import check_detail
 
 
 def _test_extract_base(json_text: str, source: str, expected_result: dict, **kwargs):

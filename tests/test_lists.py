@@ -7,7 +7,7 @@ from app.info_provider.lists import (
     extract_update_time,
     get_list_api_by_list_type,
 )
-from app.test.common import check_detail
+from common import check_detail
 
 
 def _test_get_list_info(list_type: str, list_id: str):
