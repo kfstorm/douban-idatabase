@@ -35,15 +35,6 @@ wheels = [
 ]
 
 [[package]]
-name = "attrs"
-version = "25.3.0"
-source = { registry = "https://mirrors.ustc.edu.cn/pypi/simple" }
-sdist = { url = "https://mirrors.ustc.edu.cn/pypi/packages/5a/b0/1367933a8532ee6ff8d63537de4f1177af4bff9f3e829baf7331f595bb24/attrs-25.3.0.tar.gz", hash = "sha256:75d7cefc7fb576747b2c81b4442d4d4a1ce0900973527c011d1030fd3bf4af1b", size = 812032 }
-wheels = [
-    { url = "https://mirrors.ustc.edu.cn/pypi/packages/77/06/bb80f5f86020c4551da315d78b3ab75e8228f89f0162f2c3a819e407941a/attrs-25.3.0-py3-none-any.whl", hash = "sha256:427318ce031701fea540783410126f03899a97ffc6f61596ad581ac2e40e3bc3", size = 63815 },
-]
-
-[[package]]
 name = "beautifulsoup4"
 version = "4.13.3"
 source = { registry = "https://mirrors.ustc.edu.cn/pypi/simple" }
@@ -54,27 +45,6 @@ dependencies = [
 sdist = { url = "https://mirrors.ustc.edu.cn/pypi/packages/f0/3c/adaf39ce1fb4afdd21b611e3d530b183bb7759c9b673d60db0e347fd4439/beautifulsoup4-4.13.3.tar.gz", hash = "sha256:1bd32405dacc920b42b83ba01644747ed77456a65760e285fbc47633ceddaf8b", size = 619516 }
 wheels = [
     { url = "https://mirrors.ustc.edu.cn/pypi/packages/f9/49/6abb616eb3cbab6a7cca303dc02fdf3836de2e0b834bf966a7f5271a34d8/beautifulsoup4-4.13.3-py3-none-any.whl", hash = "sha256:99045d7d3f08f91f0d656bc9b7efbae189426cd913d830294a15eefa0ea4df16", size = 186015 },
-]
-
-[[package]]
-name = "black"
-version = "23.3.0"
-source = { registry = "https://mirrors.ustc.edu.cn/pypi/simple" }
-dependencies = [
-    { name = "click" },
-    { name = "mypy-extensions" },
-    { name = "packaging" },
-    { name = "pathspec" },
-    { name = "platformdirs" },
-]
-sdist = { url = "https://mirrors.ustc.edu.cn/pypi/packages/d6/36/66370f5017b100225ec4950a60caeef60201a10080da57ddb24124453fba/black-23.3.0.tar.gz", hash = "sha256:1c7b8d606e728a41ea1ccbd7264677e494e87cf630e399262ced92d4a8dac940", size = 582156 }
-wheels = [
-    { url = "https://mirrors.ustc.edu.cn/pypi/packages/d7/6f/d3832960a3b646b333b7f0d80d336a3c123012e9d9d5dba4a622b2b6181d/black-23.3.0-cp311-cp311-macosx_10_16_arm64.whl", hash = "sha256:a8a968125d0a6a404842fa1bf0b349a568634f856aa08ffaff40ae0dfa52e7c6", size = 1326112 },
-    { url = "https://mirrors.ustc.edu.cn/pypi/packages/eb/a5/17b40bfd9b607b69fa726b0b3a473d14b093dcd5191ea1a1dd664eccfee3/black-23.3.0-cp311-cp311-macosx_10_16_universal2.whl", hash = "sha256:c7ab5790333c448903c4b721b59c0d80b11fe5e9803d8703e84dcb8da56fec1b", size = 2643808 },
-    { url = "https://mirrors.ustc.edu.cn/pypi/packages/69/49/7e1f0cf585b0d607aad3f971f95982cc4208fc77f92363d632d23021ee57/black-23.3.0-cp311-cp311-macosx_10_16_x86_64.whl", hash = "sha256:a6f6886c9869d4daae2d1715ce34a19bbc4b95006d20ed785ca00fa03cba312d", size = 1503287 },
-    { url = "https://mirrors.ustc.edu.cn/pypi/packages/c0/53/42e312c17cfda5c8fc4b6b396a508218807a3fcbb963b318e49d3ddd11d5/black-23.3.0-cp311-cp311-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:6f3c333ea1dd6771b2d3777482429864f8e258899f6ff05826c3a4fcc5ce3f70", size = 1638625 },
-    { url = "https://mirrors.ustc.edu.cn/pypi/packages/3f/0d/81dd4194ce7057c199d4f28e4c2a885082d9d929e7a55c514b23784f7787/black-23.3.0-cp311-cp311-win_amd64.whl", hash = "sha256:11c410f71b876f961d1de77b9699ad19f939094c3a677323f43d7a29855fe326", size = 1293585 },
-    { url = "https://mirrors.ustc.edu.cn/pypi/packages/ad/e7/4642b7f462381799393fbad894ba4b32db00870a797f0616c197b07129a9/black-23.3.0-py3-none-any.whl", hash = "sha256:ec751418022185b0c1bb7d7736e6933d40bbb14c14a0abcf9123d1b159f98dd4", size = 180965 },
 ]
 
 [[package]]
@@ -291,22 +261,17 @@ dependencies = [
 
 [package.optional-dependencies]
 dev = [
-    { name = "black" },
-    { name = "flake8" },
-    { name = "flake8-bugbear" },
     { name = "pycountry" },
     { name = "pytest" },
+    { name = "ruff" },
 ]
 
 [package.metadata]
 requires-dist = [
     { name = "beautifulsoup4", specifier = "==4.13.3" },
-    { name = "black", marker = "extra == 'dev'", specifier = "==23.3.0" },
     { name = "brotli", specifier = "==1.1.0" },
     { name = "concurrent-log-handler", specifier = "==0.9.25" },
     { name = "fastapi", specifier = "==0.109.2" },
-    { name = "flake8", marker = "extra == 'dev'", specifier = "==6.1.0" },
-    { name = "flake8-bugbear", marker = "extra == 'dev'", specifier = "==24.2.6" },
     { name = "lxml", specifier = "==5.3.1" },
     { name = "prometheus-client", specifier = "==0.21.1" },
     { name = "pycountry", marker = "extra == 'dev'", specifier = "==24.6.1" },
@@ -317,6 +282,7 @@ requires-dist = [
     { name = "pytz" },
     { name = "redis", specifier = "==5.2.1" },
     { name = "requests", specifier = "==2.31.0" },
+    { name = "ruff", marker = "extra == 'dev'" },
     { name = "sqlalchemy", specifier = "==2.0.39" },
     { name = "tqdm", specifier = "==4.67.1" },
     { name = "uvicorn", extras = ["standard"], specifier = "==0.27.1" },
@@ -336,33 +302,6 @@ dependencies = [
 sdist = { url = "https://mirrors.ustc.edu.cn/pypi/packages/01/d5/33a8992fe0e811211cd1cbc219cefa4732f9fb0555921346a59d1fec0040/fastapi-0.109.2.tar.gz", hash = "sha256:f3817eac96fe4f65a2ebb4baa000f394e55f5fccdaf7f75250804bc58f354f73", size = 11720963 }
 wheels = [
     { url = "https://mirrors.ustc.edu.cn/pypi/packages/bf/97/60351307ab4502908d29f64f2801a36709a3f1888447bb328bc373d6ca0e/fastapi-0.109.2-py3-none-any.whl", hash = "sha256:2c9bab24667293b501cad8dd388c05240c850b58ec5876ee3283c47d6e1e3a4d", size = 92071 },
-]
-
-[[package]]
-name = "flake8"
-version = "6.1.0"
-source = { registry = "https://mirrors.ustc.edu.cn/pypi/simple" }
-dependencies = [
-    { name = "mccabe" },
-    { name = "pycodestyle" },
-    { name = "pyflakes" },
-]
-sdist = { url = "https://mirrors.ustc.edu.cn/pypi/packages/cf/f8/bbe24f43695c0c480181e39ce910c2650c794831886ec46ddd7c40520e6a/flake8-6.1.0.tar.gz", hash = "sha256:d5b3857f07c030bdb5bf41c7f53799571d75c4491748a3adcd47de929e34cd23", size = 48767 }
-wheels = [
-    { url = "https://mirrors.ustc.edu.cn/pypi/packages/b0/24/bbf7175ffc47cb3d3e1eb523ddb23272968359dfcf2e1294707a2bf12fc4/flake8-6.1.0-py2.py3-none-any.whl", hash = "sha256:ffdfce58ea94c6580c77888a86506937f9a1a227dfcd15f245d694ae20a6b6e5", size = 58260 },
-]
-
-[[package]]
-name = "flake8-bugbear"
-version = "24.2.6"
-source = { registry = "https://mirrors.ustc.edu.cn/pypi/simple" }
-dependencies = [
-    { name = "attrs" },
-    { name = "flake8" },
-]
-sdist = { url = "https://mirrors.ustc.edu.cn/pypi/packages/e3/bc/07225e7ce0089e91f1b334102ac4526fb8cf894235e27ca1f252bd9d5c83/flake8-bugbear-24.2.6.tar.gz", hash = "sha256:f9cb5f2a9e792dd80ff68e89a14c12eed8620af8b41a49d823b7a33064ac9658", size = 64626 }
-wheels = [
-    { url = "https://mirrors.ustc.edu.cn/pypi/packages/e4/cc/739a2718705bb7e7cab3b017bbabf7e39b2643d8a8cc6f8f18022b513ecc/flake8_bugbear-24.2.6-py3-none-any.whl", hash = "sha256:663ef5de80cd32aacd39d362212983bc4636435a6f83700b4ed35acbd0b7d1b8", size = 32862 },
 ]
 
 [[package]]
@@ -523,48 +462,12 @@ wheels = [
 ]
 
 [[package]]
-name = "mccabe"
-version = "0.7.0"
-source = { registry = "https://mirrors.ustc.edu.cn/pypi/simple" }
-sdist = { url = "https://mirrors.ustc.edu.cn/pypi/packages/e7/ff/0ffefdcac38932a54d2b5eed4e0ba8a408f215002cd178ad1df0f2806ff8/mccabe-0.7.0.tar.gz", hash = "sha256:348e0240c33b60bbdf4e523192ef919f28cb2c3d7d5c7794f74009290f236325", size = 9658 }
-wheels = [
-    { url = "https://mirrors.ustc.edu.cn/pypi/packages/27/1a/1f68f9ba0c207934b35b86a8ca3aad8395a3d6dd7921c0686e23853ff5a9/mccabe-0.7.0-py2.py3-none-any.whl", hash = "sha256:6c2d30ab6be0e4a46919781807b4f0d834ebdd6c6e3dca0bda5a15f863427b6e", size = 7350 },
-]
-
-[[package]]
-name = "mypy-extensions"
-version = "1.1.0"
-source = { registry = "https://mirrors.ustc.edu.cn/pypi/simple" }
-sdist = { url = "https://mirrors.ustc.edu.cn/pypi/packages/a2/6e/371856a3fb9d31ca8dac321cda606860fa4548858c0cc45d9d1d4ca2628b/mypy_extensions-1.1.0.tar.gz", hash = "sha256:52e68efc3284861e772bbcd66823fde5ae21fd2fdb51c62a211403730b916558", size = 6343 }
-wheels = [
-    { url = "https://mirrors.ustc.edu.cn/pypi/packages/79/7b/2c79738432f5c924bef5071f933bcc9efd0473bac3b4aa584a6f7c1c8df8/mypy_extensions-1.1.0-py3-none-any.whl", hash = "sha256:1be4cccdb0f2482337c4743e60421de3a356cd97508abadd57d47403e94f5505", size = 4963 },
-]
-
-[[package]]
 name = "packaging"
 version = "25.0"
 source = { registry = "https://mirrors.ustc.edu.cn/pypi/simple" }
 sdist = { url = "https://mirrors.ustc.edu.cn/pypi/packages/a1/d4/1fc4078c65507b51b96ca8f8c3ba19e6a61c8253c72794544580a7b6c24d/packaging-25.0.tar.gz", hash = "sha256:d443872c98d677bf60f6a1f2f8c1cb748e8fe762d2bf9d3148b5599295b0fc4f", size = 165727 }
 wheels = [
     { url = "https://mirrors.ustc.edu.cn/pypi/packages/20/12/38679034af332785aac8774540895e234f4d07f7545804097de4b666afd8/packaging-25.0-py3-none-any.whl", hash = "sha256:29572ef2b1f17581046b3a2227d5c611fb25ec70ca1ba8554b24b0e69331a484", size = 66469 },
-]
-
-[[package]]
-name = "pathspec"
-version = "0.12.1"
-source = { registry = "https://mirrors.ustc.edu.cn/pypi/simple" }
-sdist = { url = "https://mirrors.ustc.edu.cn/pypi/packages/ca/bc/f35b8446f4531a7cb215605d100cd88b7ac6f44ab3fc94870c120ab3adbf/pathspec-0.12.1.tar.gz", hash = "sha256:a482d51503a1ab33b1c67a6c3813a26953dbdc71c31dacaef9a838c4e29f5712", size = 51043 }
-wheels = [
-    { url = "https://mirrors.ustc.edu.cn/pypi/packages/cc/20/ff623b09d963f88bfde16306a54e12ee5ea43e9b597108672ff3a408aad6/pathspec-0.12.1-py3-none-any.whl", hash = "sha256:a0d503e138a4c123b27490a4f7beda6a01c6f288df0e4a8b79c7eb0dc7b4cc08", size = 31191 },
-]
-
-[[package]]
-name = "platformdirs"
-version = "4.3.8"
-source = { registry = "https://mirrors.ustc.edu.cn/pypi/simple" }
-sdist = { url = "https://mirrors.ustc.edu.cn/pypi/packages/fe/8b/3c73abc9c759ecd3f1f7ceff6685840859e8070c4d947c93fae71f6a0bf2/platformdirs-4.3.8.tar.gz", hash = "sha256:3d512d96e16bcb959a814c9f348431070822a6496326a4be0911c40b5a74c2bc", size = 21362 }
-wheels = [
-    { url = "https://mirrors.ustc.edu.cn/pypi/packages/fe/39/979e8e21520d4e47a0bbe349e2713c0aac6f3d853d0e5b34d76206c439aa/platformdirs-4.3.8-py3-none-any.whl", hash = "sha256:ff7059bb7eb1179e2685604f4aaf157cfd9535242bd23742eadc3c13542139b4", size = 18567 },
 ]
 
 [[package]]
@@ -595,15 +498,6 @@ source = { registry = "https://mirrors.ustc.edu.cn/pypi/simple" }
 sdist = { url = "https://mirrors.ustc.edu.cn/pypi/packages/62/14/7d0f567991f3a9af8d1cd4f619040c93b68f09a02b6d0b6ab1b2d1ded5fe/prometheus_client-0.21.1.tar.gz", hash = "sha256:252505a722ac04b0456be05c05f75f45d760c2911ffc45f2a06bcaed9f3ae3fb", size = 78551 }
 wheels = [
     { url = "https://mirrors.ustc.edu.cn/pypi/packages/ff/c2/ab7d37426c179ceb9aeb109a85cda8948bb269b7561a0be870cc656eefe4/prometheus_client-0.21.1-py3-none-any.whl", hash = "sha256:594b45c410d6f4f8888940fe80b5cc2521b305a1fafe1c58609ef715a001f301", size = 54682 },
-]
-
-[[package]]
-name = "pycodestyle"
-version = "2.11.1"
-source = { registry = "https://mirrors.ustc.edu.cn/pypi/simple" }
-sdist = { url = "https://mirrors.ustc.edu.cn/pypi/packages/34/8f/fa09ae2acc737b9507b5734a9aec9a2b35fa73409982f57db1b42f8c3c65/pycodestyle-2.11.1.tar.gz", hash = "sha256:41ba0e7afc9752dfb53ced5489e89f8186be00e599e712660695b7a75ff2663f", size = 38974 }
-wheels = [
-    { url = "https://mirrors.ustc.edu.cn/pypi/packages/b1/90/a998c550d0ddd07e38605bb5c455d00fcc177a800ff9cc3dafdcb3dd7b56/pycodestyle-2.11.1-py2.py3-none-any.whl", hash = "sha256:44fe31000b2d866f2e41841b18528a505fbd7fef9017b04eff4e2648a0fadc67", size = 31132 },
 ]
 
 [[package]]
@@ -702,15 +596,6 @@ dependencies = [
 sdist = { url = "https://mirrors.ustc.edu.cn/pypi/packages/19/1c/01fabe019d6b813e9ebd945d9457fcd572d572116ffbb8fde364b3405c85/pydantic_settings-2.2.0.tar.gz", hash = "sha256:648d0a76673e69c51278979cba2e83cf16a23d57519bfd7e553d1c3f37db5560", size = 35643 }
 wheels = [
     { url = "https://mirrors.ustc.edu.cn/pypi/packages/b1/06/ec58f4deef618541f8285bb722bc888d152f4a92a54443d8c9b808661020/pydantic_settings-2.2.0-py3-none-any.whl", hash = "sha256:5f7bcaf9ad4419559dc5ac155c0324a9aeb2547c60471ee7c7d026f467a6b515", size = 13146 },
-]
-
-[[package]]
-name = "pyflakes"
-version = "3.1.0"
-source = { registry = "https://mirrors.ustc.edu.cn/pypi/simple" }
-sdist = { url = "https://mirrors.ustc.edu.cn/pypi/packages/8b/fb/7251eaec19a055ec6aafb3d1395db7622348130d1b9b763f78567b2aab32/pyflakes-3.1.0.tar.gz", hash = "sha256:a0aae034c444db0071aa077972ba4768d40c830d9539fd45bf4cd3f8f6992efc", size = 63636 }
-wheels = [
-    { url = "https://mirrors.ustc.edu.cn/pypi/packages/00/e9/1e1fd7fae559bfd07704991e9a59dd1349b72423c904256c073ce88a9940/pyflakes-3.1.0-py2.py3-none-any.whl", hash = "sha256:4132f6d49cb4dae6819e5379898f2b8cce3c5f23994194c24b77d5da2e36f774", size = 62616 },
 ]
 
 [[package]]
@@ -832,6 +717,31 @@ dependencies = [
 sdist = { url = "https://mirrors.ustc.edu.cn/pypi/packages/9d/be/10918a2eac4ae9f02f6cfe6414b7a155ccd8f7f9d4380d62fd5b955065c3/requests-2.31.0.tar.gz", hash = "sha256:942c5a758f98d790eaed1a29cb6eefc7ffb0d1cf7af05c3d2791656dbd6ad1e1", size = 110794 }
 wheels = [
     { url = "https://mirrors.ustc.edu.cn/pypi/packages/70/8e/0e2d847013cb52cd35b38c009bb167a1a26b2ce6cd6965bf26b47bc0bf44/requests-2.31.0-py3-none-any.whl", hash = "sha256:58cd2187c01e70e6e26505bca751777aa9f2ee0b7f4300988b709f44e013003f", size = 62574 },
+]
+
+[[package]]
+name = "ruff"
+version = "0.12.1"
+source = { registry = "https://mirrors.ustc.edu.cn/pypi/simple" }
+sdist = { url = "https://mirrors.ustc.edu.cn/pypi/packages/97/38/796a101608a90494440856ccfb52b1edae90de0b817e76bfade66b12d320/ruff-0.12.1.tar.gz", hash = "sha256:806bbc17f1104fd57451a98a58df35388ee3ab422e029e8f5cf30aa4af2c138c", size = 4413426 }
+wheels = [
+    { url = "https://mirrors.ustc.edu.cn/pypi/packages/06/bf/3dba52c1d12ab5e78d75bd78ad52fb85a6a1f29cc447c2423037b82bed0d/ruff-0.12.1-py3-none-linux_armv6l.whl", hash = "sha256:6013a46d865111e2edb71ad692fbb8262e6c172587a57c0669332a449384a36b", size = 10305649 },
+    { url = "https://mirrors.ustc.edu.cn/pypi/packages/8c/65/dab1ba90269bc8c81ce1d499a6517e28fe6f87b2119ec449257d0983cceb/ruff-0.12.1-py3-none-macosx_10_12_x86_64.whl", hash = "sha256:b3f75a19e03a4b0757d1412edb7f27cffb0c700365e9d6b60bc1b68d35bc89e0", size = 11120201 },
+    { url = "https://mirrors.ustc.edu.cn/pypi/packages/3f/3e/2d819ffda01defe857fa2dd4cba4d19109713df4034cc36f06bbf582d62a/ruff-0.12.1-py3-none-macosx_11_0_arm64.whl", hash = "sha256:9a256522893cb7e92bb1e1153283927f842dea2e48619c803243dccc8437b8be", size = 10466769 },
+    { url = "https://mirrors.ustc.edu.cn/pypi/packages/63/37/bde4cf84dbd7821c8de56ec4ccc2816bce8125684f7b9e22fe4ad92364de/ruff-0.12.1-py3-none-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:069052605fe74c765a5b4272eb89880e0ff7a31e6c0dbf8767203c1fbd31c7ff", size = 10660902 },
+    { url = "https://mirrors.ustc.edu.cn/pypi/packages/0e/3a/390782a9ed1358c95e78ccc745eed1a9d657a537e5c4c4812fce06c8d1a0/ruff-0.12.1-py3-none-manylinux_2_17_armv7l.manylinux2014_armv7l.whl", hash = "sha256:a684f125a4fec2d5a6501a466be3841113ba6847827be4573fddf8308b83477d", size = 10167002 },
+    { url = "https://mirrors.ustc.edu.cn/pypi/packages/6d/05/f2d4c965009634830e97ffe733201ec59e4addc5b1c0efa035645baa9e5f/ruff-0.12.1-py3-none-manylinux_2_17_i686.manylinux2014_i686.whl", hash = "sha256:bdecdef753bf1e95797593007569d8e1697a54fca843d78f6862f7dc279e23bd", size = 11751522 },
+    { url = "https://mirrors.ustc.edu.cn/pypi/packages/35/4e/4bfc519b5fcd462233f82fc20ef8b1e5ecce476c283b355af92c0935d5d9/ruff-0.12.1-py3-none-manylinux_2_17_ppc64.manylinux2014_ppc64.whl", hash = "sha256:70d52a058c0e7b88b602f575d23596e89bd7d8196437a4148381a3f73fcd5010", size = 12520264 },
+    { url = "https://mirrors.ustc.edu.cn/pypi/packages/85/b2/7756a6925da236b3a31f234b4167397c3e5f91edb861028a631546bad719/ruff-0.12.1-py3-none-manylinux_2_17_ppc64le.manylinux2014_ppc64le.whl", hash = "sha256:84d0a69d1e8d716dfeab22d8d5e7c786b73f2106429a933cee51d7b09f861d4e", size = 12133882 },
+    { url = "https://mirrors.ustc.edu.cn/pypi/packages/dd/00/40da9c66d4a4d51291e619be6757fa65c91b92456ff4f01101593f3a1170/ruff-0.12.1-py3-none-manylinux_2_17_s390x.manylinux2014_s390x.whl", hash = "sha256:6cc32e863adcf9e71690248607ccdf25252eeeab5193768e6873b901fd441fed", size = 11608941 },
+    { url = "https://mirrors.ustc.edu.cn/pypi/packages/91/e7/f898391cc026a77fbe68dfea5940f8213622474cb848eb30215538a2dadf/ruff-0.12.1-py3-none-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:7fd49a4619f90d5afc65cf42e07b6ae98bb454fd5029d03b306bd9e2273d44cc", size = 11602887 },
+    { url = "https://mirrors.ustc.edu.cn/pypi/packages/f6/02/0891872fc6aab8678084f4cf8826f85c5d2d24aa9114092139a38123f94b/ruff-0.12.1-py3-none-musllinux_1_2_aarch64.whl", hash = "sha256:ed5af6aaaea20710e77698e2055b9ff9b3494891e1b24d26c07055459bb717e9", size = 10521742 },
+    { url = "https://mirrors.ustc.edu.cn/pypi/packages/2a/98/d6534322c74a7d47b0f33b036b2498ccac99d8d8c40edadb552c038cecf1/ruff-0.12.1-py3-none-musllinux_1_2_armv7l.whl", hash = "sha256:801d626de15e6bf988fbe7ce59b303a914ff9c616d5866f8c79eb5012720ae13", size = 10149909 },
+    { url = "https://mirrors.ustc.edu.cn/pypi/packages/34/5c/9b7ba8c19a31e2b6bd5e31aa1e65b533208a30512f118805371dbbbdf6a9/ruff-0.12.1-py3-none-musllinux_1_2_i686.whl", hash = "sha256:2be9d32a147f98a1972c1e4df9a6956d612ca5f5578536814372113d09a27a6c", size = 11136005 },
+    { url = "https://mirrors.ustc.edu.cn/pypi/packages/dc/34/9bbefa4d0ff2c000e4e533f591499f6b834346025e11da97f4ded21cb23e/ruff-0.12.1-py3-none-musllinux_1_2_x86_64.whl", hash = "sha256:49b7ce354eed2a322fbaea80168c902de9504e6e174fd501e9447cad0232f9e6", size = 11648579 },
+    { url = "https://mirrors.ustc.edu.cn/pypi/packages/6f/1c/20cdb593783f8f411839ce749ec9ae9e4298c2b2079b40295c3e6e2089e1/ruff-0.12.1-py3-none-win32.whl", hash = "sha256:d973fa626d4c8267848755bd0414211a456e99e125dcab147f24daa9e991a245", size = 10519495 },
+    { url = "https://mirrors.ustc.edu.cn/pypi/packages/cf/56/7158bd8d3cf16394928f47c637d39a7d532268cd45220bdb6cd622985760/ruff-0.12.1-py3-none-win_amd64.whl", hash = "sha256:9e1123b1c033f77bd2590e4c1fe7e8ea72ef990a85d2484351d408224d603013", size = 11547485 },
+    { url = "https://mirrors.ustc.edu.cn/pypi/packages/91/d0/6902c0d017259439d6fd2fd9393cea1cfe30169940118b007d5e0ea7e954/ruff-0.12.1-py3-none-win_arm64.whl", hash = "sha256:78ad09a022c64c13cc6077707f036bab0fac8cd7088772dcd1e5be21c5002efc", size = 10691209 },
 ]
 
 [[package]]

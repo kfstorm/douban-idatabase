@@ -16,7 +16,7 @@ CHART_PAGE_URL = "https://movie.douban.com/chart"
 CHART_TOP_LIST_API_URL = "https://movie.douban.com/j/chart/top_list"
 
 # Generate percentile intervals from 100% to 0% by steps of 10%
-TYPE_RANK_INTERVALS = [f"{i}:{i-10}" for i in range(100, 0, -10)]
+TYPE_RANK_INTERVALS = [f"{i}:{i - 10}" for i in range(100, 0, -10)]
 
 
 def get_types() -> List[Tuple[str, str]]:

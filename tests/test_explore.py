@@ -74,7 +74,9 @@ def test_explore_with_year_filter():
 def test_explore_with_type_filter():
     """Test the explore function with a score range, year,
     and a specific type filter."""
-    result = explore("movie", "9,10", tags=["2023", "喜剧"], max_count=DEFAULT_TEST_COUNT)
+    result = explore(
+        "movie", "9,10", tags=["2023", "喜剧"], max_count=DEFAULT_TEST_COUNT
+    )
     check_explore_result(
         result,
         DEFAULT_TEST_COUNT,

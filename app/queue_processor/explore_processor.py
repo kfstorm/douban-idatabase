@@ -20,7 +20,7 @@ logger = logging.getLogger(__name__)
 NARROW_THRESHOLD = 500
 
 # Score ranges for exploration. Higher scores come first.
-SCORE_RANGES = [f"{i},{i+1}" for i in range(9, -1, -1)]
+SCORE_RANGES = [f"{i},{i + 1}" for i in range(9, -1, -1)]
 
 # Predefined conditions for narrowing down exploration
 

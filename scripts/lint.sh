@@ -10,13 +10,12 @@ fi
 
 cd "$(dirname "${BASH_SOURCE[0]}")/.."
 
-black_args=()
 if [[ "$check" == "true" ]]; then
-  black_args+=(--check --diff)
+  # Check formatting and linting without making changes
+  uv run ruff check .
+  uv run ruff format --check .
+else
+  # Fix issues and format code
+  uv run ruff check --fix .
+  uv run ruff format .
 fi
-
-# find all Python files
-python_files=$(git ls-files | grep '\.py$' || true)
-
-uv run black "${black_args[@]}" $python_files
-uv run flake8 $python_files

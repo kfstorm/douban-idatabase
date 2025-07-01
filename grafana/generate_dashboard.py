@@ -6,7 +6,7 @@ This script reduces boilerplate by using templates and helper functions.
 
 import json
 import os
-from typing import Dict, Union
+from typing import Dict
 
 # Base dashboard structure
 DASHBOARD_BASE = {
