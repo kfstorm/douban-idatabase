@@ -20,9 +20,6 @@ from app.schedule.task_registry import (
     register_all_tasks,
 )
 
-# Register all tasks at module load time
-register_all_tasks()
-
 logger = logging.getLogger(__name__)
 
 # Flags to control the scheduler thread
@@ -128,6 +125,9 @@ def execute_scheduled_task(db: Session, schedule_type: str) -> Optional[float]:
 def unified_scheduler():
     """Background thread that handles scheduled tasks"""
     global running
+
+    # Register all tasks now that logging is properly set up
+    register_all_tasks()
 
     logger.info("Unified scheduler started")
 
