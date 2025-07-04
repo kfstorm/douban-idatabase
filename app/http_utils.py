@@ -88,7 +88,10 @@ class Throttler:
         ensuring each strategy appears at most once."""
         strategies = []
         added_strategies = set()
-        if hasattr(settings, "RATE_LIMIT_FALLBACK_STRATEGIES"):
+        if (
+            hasattr(settings, "RATE_LIMIT_FALLBACK_STRATEGIES")
+            and settings.RATE_LIMIT_FALLBACK_STRATEGIES
+        ):
             # Setting should be a comma-separated list like "ZENROWS,PROXY"
             for strategy_name in settings.RATE_LIMIT_FALLBACK_STRATEGIES.split(","):
                 strategy_name_clean = strategy_name.strip().upper()
