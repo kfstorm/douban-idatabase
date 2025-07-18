@@ -96,6 +96,7 @@ class DashboardGenerator:
         threshold_mode: str = "absolute",
         show_percentage: bool = True,
         aggregation: str = "max",  # Added aggregation parameter with default "max"
+        legend_format: str = "",  # Added legend format parameter
     ) -> int:
         """Add a stat panel to the dashboard"""
         panel_id = self.next_panel_id
@@ -141,7 +142,7 @@ class DashboardGenerator:
                     "exemplar": True,
                     "expr": metric,
                     "interval": "",
-                    "legendFormat": "",
+                    "legendFormat": legend_format,
                     "refId": "A",
                 }
             ],
@@ -275,6 +276,42 @@ def generate_dashboard():
         unit="s",
         show_percentage=False,
         aggregation="min",
+    )
+
+    # Add cumulative panels to overview section
+    generator.add_stat_panel(
+        "Total Item Operations by Type",
+        "sum by (type, operation) (increase(douban_idatabase_item_operations_total[$__range]))",
+        height=4,
+        width=12,
+        unit="short",
+        color_mode="value",
+        show_percentage=False,
+        aggregation=None,
+        legend_format="{{type}} - {{operation}}",
+    )
+
+    generator.add_stat_panel(
+        "Total Change of Items by Type and State",
+        "sum by (type, state) (douban_idatabase_items) - sum by (type, state) (douban_idatabase_items offset $__range_s)",
+        height=4,
+        width=12,
+        unit="short",
+        color_mode="value",
+        show_percentage=False,
+        aggregation=None,
+        legend_format="{{type}} - {{state}}",
+    )
+
+    generator.add_stat_panel(
+        "Total Exceptions",
+        "sum(increase(douban_idatabase_exceptions_total[$__range]))",
+        height=4,
+        width=4,
+        unit="short",
+        color_mode="value",
+        show_percentage=False,
+        aggregation=None,
     )
 
     # Database Metrics
@@ -500,6 +537,7 @@ def generate_dashboard():
 
     # Exceptions
     generator.add_row("Exceptions")
+
     generator.add_graph_panel(
         "Exception Rate by Type and Module",
         [
