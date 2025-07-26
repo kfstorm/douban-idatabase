@@ -152,6 +152,78 @@ class DashboardGenerator:
 
         self.panels.append(panel)
 
+    def add_bar_gauge_panel(
+        self,
+        title: str,
+        metric: str,
+        height: int = 8,
+        width: int = 12,
+        orientation: str = "horizontal",
+        legend_format: str = "",
+        unit: str = "short",
+    ) -> int:
+        """Add a bar gauge panel to the dashboard"""
+        panel_id = self.next_panel_id
+        self.next_panel_id += 1
+
+        panel = {
+            "datasource": None,
+            "fieldConfig": {
+                "defaults": {
+                    "color": {"mode": "palette-classic"},
+                    "custom": {
+                        "axisLabel": "",
+                        "axisPlacement": "auto",
+                        "barAlignment": 0,
+                        "drawStyle": "line",
+                        "fillOpacity": 0,
+                        "gradientMode": "none",
+                        "hideFrom": {"legend": False, "tooltip": False, "vis": False},
+                        "lineInterpolation": "linear",
+                        "lineWidth": 1,
+                        "pointSize": 5,
+                        "scaleDistribution": {"type": "linear"},
+                        "showPoints": "auto",
+                        "spanNulls": False,
+                        "stacking": {"group": "A", "mode": "none"},
+                        "thresholdsStyle": {"mode": "off"},
+                    },
+                    "mappings": [],
+                    "thresholds": {
+                        "mode": "absolute",
+                        "steps": [{"color": "green", "value": None}],
+                    },
+                    "unit": unit,
+                },
+                "overrides": [],
+            },
+            "gridPos": self._get_next_panel_pos(height, width),
+            "id": panel_id,
+            "options": {
+                "orientation": orientation,
+                "reduceOptions": {
+                    "values": False,
+                    "calcs": ["lastNotNull"],
+                    "fields": "",
+                },
+                "showUnfilled": True,
+            },
+            "pluginVersion": "7.5.5",
+            "targets": [
+                {
+                    "exemplar": True,
+                    "expr": metric,
+                    "interval": "",
+                    "legendFormat": legend_format,
+                    "refId": "A",
+                }
+            ],
+            "title": title,
+            "type": "bargauge",
+        }
+
+        self.panels.append(panel)
+
     def add_graph_panel(
         self,
         title: str,
@@ -398,6 +470,17 @@ def generate_dashboard():
 
     # User Metrics
     generator.add_row("User Metrics")
+
+    # Total API Requests by User (Bar Gauge)
+    generator.add_bar_gauge_panel(
+        "Total API Requests by User",
+        "sum by (user_id) (increase(douban_idatabase_user_requests_total[$__range]))",
+        height=8,
+        width=12,
+        orientation="horizontal",
+        legend_format="User {{user_id}}",
+        unit="short",
+    )
 
     # User API Requests
     generator.add_graph_panel(
