@@ -69,7 +69,7 @@ class DashboardGenerator:
             "y": y,
         }
 
-    def add_row(self, title: str) -> int:
+    def add_row(self, title: str) -> None:
         """Add a row panel to the dashboard"""
         panel_id = self.next_panel_id
         self.next_panel_id += 1
@@ -95,15 +95,16 @@ class DashboardGenerator:
         color_mode: str = "value",
         threshold_mode: str = "absolute",
         show_percentage: bool = True,
-        aggregation: str = "max",  # Added aggregation parameter with default "max"
+        aggregation: str
+        | None = "max",  # Added aggregation parameter with default "max"
         legend_format: str = "",  # Added legend format parameter
-    ) -> int:
+    ) -> None:
         """Add a stat panel to the dashboard"""
         panel_id = self.next_panel_id
         self.next_panel_id += 1
 
         # Apply aggregation to the metric
-        if aggregation:
+        if aggregation is not None:
             metric = f"{aggregation}({metric})"
 
         panel = {
@@ -161,7 +162,7 @@ class DashboardGenerator:
         orientation: str = "horizontal",
         legend_format: str = "",
         unit: str = "short",
-    ) -> int:
+    ) -> None:
         """Add a bar gauge panel to the dashboard"""
         panel_id = self.next_panel_id
         self.next_panel_id += 1
@@ -230,9 +231,9 @@ class DashboardGenerator:
         metrics: list,
         height: int = 8,
         width: int = 8,
-        y_axis_label: str = None,
+        y_axis_label: str | None = None,
         y_axis_format: str = "short",
-    ) -> int:
+    ) -> None:
         """Add a time series graph panel to the dashboard"""
         panel_id = self.next_panel_id
         self.next_panel_id += 1
