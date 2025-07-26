@@ -125,7 +125,7 @@ class DashboardGenerator:
             "id": panel_id,
             "options": {
                 "colorMode": color_mode,
-                "graphMode": "area",
+                "graphMode": "none",
                 "justifyMode": "auto",
                 "orientation": "auto",
                 "reduceOptions": {
@@ -349,6 +349,13 @@ def generate_dashboard():
         unit="s",
         show_percentage=False,
         aggregation="min",
+    )
+    generator.add_stat_panel(
+        "Total User Requests",
+        "sum(increase(douban_idatabase_user_requests_total[$__range]))",
+        unit="short",
+        show_percentage=False,
+        aggregation=None,
     )
 
     # Add cumulative panels to overview section
