@@ -4,6 +4,32 @@ import os
 from concurrent_log_handler import ConcurrentTimedRotatingFileHandler
 from app.config import settings
 
+
+class SizeLimitedTimedRotatingFileHandler(ConcurrentTimedRotatingFileHandler):
+    """
+    A timed rotating file handler that also enforces a maximum file size.
+    If the file exceeds maxBytes before the timed rotation, it will be rotated immediately.
+    """
+
+    def __init__(self, *args, maxBytes=0, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.maxBytes = maxBytes
+
+    def shouldRollover(self, record):
+        # First check if we should roll over due to time
+        time_rollover = super().shouldRollover(record)
+
+        # Then check if we should roll over due to size
+        size_rollover = False
+        if self.maxBytes > 0:
+            if self.stream is None:
+                self.stream = self._open()
+            if self.stream.tell() + len(self.format(record)) >= self.maxBytes:
+                size_rollover = True
+
+        return time_rollover or size_rollover
+
+
 # Create logs directory if it doesn't exist
 logs_dir = os.path.abspath(settings.LOGS_DIRECTORY)
 os.makedirs(logs_dir, exist_ok=True)
@@ -32,11 +58,13 @@ def setup_logging():
     console_handler.setFormatter(formatter)
 
     # File handler with rotation - INFO level using multiprocessing-safe handler
-    file_handler = ConcurrentTimedRotatingFileHandler(
+    # Rotate daily at midnight OR when file exceeds 10MB, whichever comes first
+    file_handler = SizeLimitedTimedRotatingFileHandler(
         filename=log_file,
         when="midnight",  # Rotate at midnight each day
         interval=1,  # Rotate every day
-        backupCount=30,  # Keep 30 days of logs
+        backupCount=5,  # Keep 5 days of logs
+        maxBytes=10 * 1024 * 1024,  # 10MB size limit per file
         encoding="utf-8",
     )
     file_handler.setLevel(logging.INFO)
