@@ -139,12 +139,12 @@ class Throttler:
         if host in CHECK_RATE_LIMIT_EXCLUDED_HOSTS:
             return
         next_call_time = self.next_call_time[host]
-        now = now_timestamp()
-        if now < next_call_time:
-            raise RateLimitException(next_call_time)
         # Introduce a small random delay for direct requests to mimic human behavior
         # and potentially avoid hitting rate limits proactively.
         time.sleep(random.uniform(0, settings.REQUEST_DELAY_MAX_SECONDS))
+        now = now_timestamp()
+        if now < next_call_time:
+            raise RateLimitException(next_call_time)
 
     def _handle_response(self, response: requests.Response) -> requests.Response:
         """
