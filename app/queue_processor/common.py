@@ -318,9 +318,6 @@ def wrap_fetch_item(
         raise
 
 
-IMDB_ID_UPDATE_INTERVAL = 3 * 30 * 24 * 60 * 60  # 3 months
-
-
 def try_to_save_item_to_db_with_detail(
     db: Session, detail_info: Dict[str, Any]
 ) -> bool:
@@ -339,13 +336,34 @@ def try_to_save_item_to_db_with_detail(
     )
     if should_update_item(existing_item):
         allow_update_imdb_id = True
-    elif (
-        not existing_imdb_update_time
-        or existing_imdb_update_time + IMDB_ID_UPDATE_INTERVAL < now_timestamp()
-    ):
+    elif not existing_imdb_update_time:
         allow_update_imdb_id = True
     else:
-        allow_update_imdb_id = False
+        # Calculate year-based interval for IMDB ID updates
+        year = detail_info.get("year") or (
+            existing_item.year if existing_item else None
+        )
+        if year:
+            imdb_interval_seconds = calculate_year_based_interval_seconds(
+                year,
+                settings.IMDB_ID_BASE_INTERVAL_DAYS,
+                settings.IMDB_ID_BASE_INTERVAL_DAYS,
+                settings.IMDB_ID_MAX_INTERVAL_DAYS,
+            )
+        else:
+            # If year is not available, use the average of base and max intervals
+            imdb_interval_seconds = (
+                (
+                    settings.IMDB_ID_BASE_INTERVAL_DAYS
+                    + settings.IMDB_ID_MAX_INTERVAL_DAYS
+                )
+                / 2
+                * 86400
+            )
+
+        allow_update_imdb_id = (
+            existing_imdb_update_time + imdb_interval_seconds < now_timestamp()
+        )
 
     if not allow_update_imdb_id:
         existing_raw_data = json.loads(existing_item.raw_data)
