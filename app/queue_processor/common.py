@@ -447,7 +447,10 @@ def allow_update_explore_conditions(db: Session, conditions_str: str) -> bool:
     # Use distance-based interval calculation for year-based conditions
     year = int(conditions_dict["year"])
     year_based_interval = calculate_year_based_interval_seconds(
-        year, settings.EXPLORE_CONDITIONS_BASE_INTERVAL_DAYS
+        year,
+        settings.EXPLORE_CONDITIONS_BASE_INTERVAL_DAYS,
+        settings.EXPLORE_CONDITIONS_BASE_INTERVAL_DAYS,
+        settings.EXPLORE_CONDITIONS_MAX_INTERVAL_DAYS,
     )
 
     if existing_entry.update_time + year_based_interval > now_timestamp():
