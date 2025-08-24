@@ -80,8 +80,10 @@ class Settings(BaseSettings):
         os.getenv("EXPLORE_CONDITIONS_MAX_INTERVAL_DAYS", "365")
     )
 
-    IMDB_ID_BASE_INTERVAL_DAYS: int = int(os.getenv("IMDB_ID_BASE_INTERVAL_DAYS", "90"))
-    IMDB_ID_MAX_INTERVAL_DAYS: int = int(os.getenv("IMDB_ID_MAX_INTERVAL_DAYS", "730"))
+    IMDB_ID_BASE_INTERVAL_DAYS: int = int(
+        os.getenv("IMDB_ID_BASE_INTERVAL_DAYS", "365")
+    )
+    IMDB_ID_MAX_INTERVAL_DAYS: int = int(os.getenv("IMDB_ID_MAX_INTERVAL_DAYS", "1825"))
 
     IMDB_CSV_PATH: str = os.getenv("IMDB_CSV_PATH", "")
 
