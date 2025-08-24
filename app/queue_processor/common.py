@@ -16,11 +16,27 @@ from app.metrics import item_operations
 logger = logging.getLogger(__name__)
 
 
+def apply_bias(base: float, douban_id: str) -> float:
+    """
+    Apply douban_id based bias to a base value for randomization.
+
+    Args:
+        base: The base value to apply bias to
+        douban_id: The douban ID to calculate bias for
+
+    Returns:
+        Base value multiplied by bias (between 1.0 and 1.2)
+    """
+    bias = ((int)(douban_id) % 10000) / 10000 * 0.2 + 1
+    return base * bias
+
+
 def calculate_year_based_interval_seconds(
     year: int,
     base_interval_days: int,
     min_interval_days: int = None,
     max_interval_days: int = None,
+    douban_id: str = None,
 ) -> int:
     """
     Calculate interval in seconds based on year distance from current year.
@@ -32,9 +48,10 @@ def calculate_year_based_interval_seconds(
         base_interval_days: Base interval in days
         min_interval_days: Minimum interval in days (optional)
         max_interval_days: Maximum interval in days (optional)
+        douban_id: Douban ID for bias calculation (optional)
 
     Returns:
-        Interval in seconds based on year distance
+        Interval in seconds based on year distance, with optional douban_id bias
     """
     current_year = datetime.now().year
     year_distance = abs(year - current_year)
@@ -45,6 +62,10 @@ def calculate_year_based_interval_seconds(
         interval_seconds = max(interval_seconds, min_interval_days * 86400)
     if max_interval_days is not None:
         interval_seconds = min(interval_seconds, max_interval_days * 86400)
+
+    # Apply douban_id based bias if provided
+    if douban_id is not None:
+        interval_seconds = apply_bias(interval_seconds, douban_id)
 
     return interval_seconds
 
@@ -70,6 +91,7 @@ def fill_next_update_time(item: Item) -> None:
             settings.ITEM_REFRESH_INTERVAL_DEFAULT_DAYS,
             settings.ITEM_REFRESH_INTERVAL_DEFAULT_DAYS,
             settings.ITEM_REFRESH_INTERVAL_MAX_DAYS,
+            item.douban_id,
         )
     else:
         # If year is not available, use the average interval of two setting values.
@@ -81,9 +103,8 @@ def fill_next_update_time(item: Item) -> None:
             / 2
             * 86400
         )
-    # The bias is a random value between 1 and 1.2
-    bias = ((int)(item.douban_id) % 10000) / 10000 * 0.2 + 1
-    interval_seconds *= bias
+        # Apply douban_id based bias for non-year cases
+        interval_seconds = apply_bias(interval_seconds, item.douban_id)
 
     item.next_update_time = item.update_time + interval_seconds
 
@@ -349,6 +370,7 @@ def try_to_save_item_to_db_with_detail(
                 settings.IMDB_ID_BASE_INTERVAL_DAYS,
                 settings.IMDB_ID_BASE_INTERVAL_DAYS,
                 settings.IMDB_ID_MAX_INTERVAL_DAYS,
+                douban_id,
             )
         else:
             # If year is not available, use the average of base and max intervals
@@ -360,6 +382,8 @@ def try_to_save_item_to_db_with_detail(
                 / 2
                 * 86400
             )
+            # Apply douban_id based bias for non-year cases
+            imdb_interval_seconds = apply_bias(imdb_interval_seconds, douban_id)
 
         allow_update_imdb_id = (
             existing_imdb_update_time + imdb_interval_seconds < now_timestamp()
