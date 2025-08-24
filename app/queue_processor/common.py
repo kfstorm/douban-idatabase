@@ -1,7 +1,7 @@
 import json
 import logging
 from datetime import datetime
-from typing import Any, Dict, Optional
+from typing import Any, Dict
 from requests.exceptions import HTTPError
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
@@ -61,24 +61,8 @@ def fill_next_update_time(item: Item) -> None:
     item.next_update_time = item.update_time + interval_seconds
 
 
-def allow_update_item(
-    existing_item: Item, detail_info: Optional[Dict[str, Any]] = None
-) -> bool:
+def should_update_item(existing_item: Item) -> bool:
     if existing_item and existing_item.next_update_time:
-        if detail_info:
-            if detail_info["douban_title"] != existing_item.douban_title:
-                # If the title has changed, allow immediate update
-                return True
-            if detail_info["rating"] != existing_item.rating:
-                # If the rating has changed, allow immediate update
-                return True
-            if detail_info["year"] != existing_item.year:
-                # If the year has changed, allow immediate update
-                return True
-            if detail_info["type"] != existing_item.type:
-                # If the type has changed, allow immediate update
-                return True
-
         current_time = now_timestamp()
         if current_time < existing_item.next_update_time:
             return False
@@ -315,8 +299,6 @@ def try_to_save_item_to_db_with_detail(
 ) -> bool:
     douban_id = detail_info["douban_id"]
     existing_item = db.query(Item).filter(Item.douban_id == douban_id).first()
-    if not allow_update_item(existing_item, detail_info):
-        return False
 
     existing_raw_data = (
         json.loads(existing_item.raw_data)
@@ -328,7 +310,7 @@ def try_to_save_item_to_db_with_detail(
         if existing_raw_data
         else None
     )
-    if allow_update_item(existing_item, None):
+    if should_update_item(existing_item):
         allow_update_imdb_id = True
     elif (
         not existing_imdb_update_time

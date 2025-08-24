@@ -7,7 +7,7 @@ from app.info_provider.detail import fetch_douban_item_detail
 from app.info_provider.imdb import fetch_imdb_id
 from app.models import Item, Queue
 from app.queue_processor.common import (
-    allow_update_item,
+    should_update_item,
     merge_item,
     save_item_to_db,
     wrap_fetch_item,
@@ -31,7 +31,7 @@ def process_douban_id(db: Session, queue_item: Queue) -> None:
     if not force:
         # Check if item already exists and was updated within the refresh interval
         existing_item = db.query(Item).filter(Item.douban_id == douban_id).first()
-        if not allow_update_item(existing_item):
+        if not should_update_item(existing_item):
             return
 
     # Fetch data from Douban and create Item object

@@ -6,7 +6,7 @@ from app.config import settings
 from app.model_utils import add_to_queue
 from app.models import Item, List, Tag
 from app.queue_processor.common import (
-    allow_update_item,
+    should_update_item,
     allow_update_list,
     allow_update_tag,
 )
@@ -62,7 +62,7 @@ class RefreshTask(BaseTask):
 
         # Process item callback
         def process_item(item: Item):
-            if allow_update_item(item):
+            if should_update_item(item):
                 self._add_to_queue(db, "douban_id", item.douban_id)
                 return True
             return False
