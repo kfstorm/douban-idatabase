@@ -73,6 +73,10 @@ class Settings(BaseSettings):
     )
     TAG_REFRESH_INTERVAL_DAYS: int = int(os.getenv("TAG_REFRESH_INTERVAL_DAYS", "30"))
 
+    EXPLORE_CONDITIONS_BASE_INTERVAL_DAYS: int = int(
+        os.getenv("EXPLORE_CONDITIONS_BASE_INTERVAL_DAYS", "7")
+    )
+
     IMDB_CSV_PATH: str = os.getenv("IMDB_CSV_PATH", "")
 
     # Backup settings

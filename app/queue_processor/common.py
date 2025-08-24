@@ -16,6 +16,39 @@ from app.metrics import item_operations
 logger = logging.getLogger(__name__)
 
 
+def calculate_year_based_interval_seconds(
+    year: int,
+    base_interval_days: int,
+    min_interval_days: int = None,
+    max_interval_days: int = None,
+) -> int:
+    """
+    Calculate interval in seconds based on year distance from current year.
+
+    The closer the year is to the current year, the shorter the interval.
+
+    Args:
+        year: The year to calculate interval for
+        base_interval_days: Base interval in days
+        min_interval_days: Minimum interval in days (optional)
+        max_interval_days: Maximum interval in days (optional)
+
+    Returns:
+        Interval in seconds based on year distance
+    """
+    current_year = datetime.now().year
+    year_distance = abs(year - current_year)
+    interval_seconds = base_interval_days * 86400 * (year_distance + 1)
+
+    # Apply min/max bounds if specified
+    if min_interval_days is not None:
+        interval_seconds = max(interval_seconds, min_interval_days * 86400)
+    if max_interval_days is not None:
+        interval_seconds = min(interval_seconds, max_interval_days * 86400)
+
+    return interval_seconds
+
+
 def fill_next_update_time(item: Item) -> None:
     """
     Calculate and set the next_update_time property on the item based on its properties.
@@ -32,10 +65,11 @@ def fill_next_update_time(item: Item) -> None:
     # the more frequently it will be updated.
     year = item.year
     if year:
-        now_year = datetime.now().year
-        diff_year = abs(year - now_year)
-        interval_seconds = (
-            settings.ITEM_REFRESH_INTERVAL_DEFAULT_DAYS * 86400 * (diff_year + 1)
+        interval_seconds = calculate_year_based_interval_seconds(
+            year,
+            settings.ITEM_REFRESH_INTERVAL_DEFAULT_DAYS,
+            settings.ITEM_REFRESH_INTERVAL_DEFAULT_DAYS,
+            settings.ITEM_REFRESH_INTERVAL_MAX_DAYS,
         )
     else:
         # If year is not available, use the average interval of two setting values.
@@ -50,13 +84,6 @@ def fill_next_update_time(item: Item) -> None:
     # The bias is a random value between 1 and 1.2
     bias = ((int)(item.douban_id) % 10000) / 10000 * 0.2 + 1
     interval_seconds *= bias
-    interval_seconds = max(
-        interval_seconds, settings.ITEM_REFRESH_INTERVAL_DEFAULT_DAYS * 86400
-    )
-    interval_seconds = min(
-        interval_seconds,
-        settings.ITEM_REFRESH_INTERVAL_MAX_DAYS * 86400,
-    )
 
     item.next_update_time = item.update_time + interval_seconds
 
@@ -417,26 +444,21 @@ def allow_update_explore_conditions(db: Session, conditions_str: str) -> bool:
     if "year" not in conditions_dict:
         return True
 
-    # For years not in [previous year, current year, next year],
-    # the minimal update interval is 30 days.
-    current_year = datetime.now().year
+    # Use distance-based interval calculation for year-based conditions
     year = int(conditions_dict["year"])
-    if year < current_year - 1 or year > current_year + 1:
-        min_update_interval = 30 * 24 * 60 * 60
-        if existing_entry.update_time + min_update_interval > now_timestamp():
-            return False
+    year_based_interval = calculate_year_based_interval_seconds(
+        year, settings.EXPLORE_CONDITIONS_BASE_INTERVAL_DAYS
+    )
 
-    # For score range `0,1`, the minimal update interval is 30 days.
+    if existing_entry.update_time + year_based_interval > now_timestamp():
+        return False
+
+    # For score range `0,1`, apply additional minimum interval of 30 days
     if "score_range" in conditions_dict:
         score_range = conditions_dict["score_range"]
         if score_range == "0,1":
             min_update_interval = 30 * 24 * 60 * 60
             if existing_entry.update_time + min_update_interval > now_timestamp():
                 return False
-
-    # The default minimal update interval is 7 days.
-    min_update_interval = 7 * 24 * 60 * 60
-    if existing_entry.update_time + min_update_interval > now_timestamp():
-        return False
 
     return True
