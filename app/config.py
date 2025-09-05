@@ -1,6 +1,6 @@
 import json
 import os
-from typing import Optional, Union
+from typing import Optional, Union, Dict
 from pydantic_settings import BaseSettings
 from dotenv import load_dotenv
 
@@ -161,6 +161,15 @@ class Settings(BaseSettings):
     # Example: [{"http":"http://proxy1:8080"}, {"http":"http://proxy2:8080"}]
     REQUESTS_PROXIES: Optional[Union[dict, list]] = json.loads(
         os.getenv("REQUESTS_PROXIES", "null")
+    )
+
+    # Per-URL prefix delay configuration
+    # JSON mapping URL prefixes to delay ranges
+    # Example: {"https://movie.douban.com/subject/":{"min":2.0,"max":5.0}}
+    REQUEST_DELAY_CONFIG: Optional[Dict[str, Dict[str, float]]] = (
+        json.loads(os.getenv("REQUEST_DELAY_CONFIG", "null"))
+        if os.getenv("REQUEST_DELAY_CONFIG")
+        else None
     )
 
     # Blacklist settings

@@ -128,20 +128,42 @@ class Throttler:
         logger.info(f"Effective fallback strategies: {[s.name for s in strategies]}")
         return strategies
 
-    def _check_rate_limit(self, host: str) -> None:
+    def _get_delay_for_url(self, url: str) -> Tuple[float, float]:
         """
-        Checks if a direct request to the host is allowed based on the last known
+        Return (min_delay, max_delay) for the given URL based on configured prefixes.
+        Uses longest matching prefix. Falls back to global default if no match.
+        """
+        # Check if we have a configuration and find the longest matching prefix
+        best_match = None
+        if settings.REQUEST_DELAY_CONFIG:
+            best_length = 0
+            for prefix, config in settings.REQUEST_DELAY_CONFIG.items():
+                if url.startswith(prefix) and len(prefix) > best_length:
+                    best_match = config
+                    best_length = len(prefix)
+
+        # Return matched config or fall back to global default
+        if best_match:
+            return (best_match["min"], best_match["max"])
+        else:
+            return (0, settings.REQUEST_DELAY_MAX_SECONDS)
+
+    def _check_rate_limit(self, url: str) -> None:
+        """
+        Checks if a direct request to the URL is allowed based on the last known
         rate limit time for that host. If the host is currently rate-limited,
-        raises RateLimitException. Otherwise, introduces a small random delay
-        before allowing the request to proceed. This check is skipped for hosts
-        in CHECK_RATE_LIMIT_EXCLUDED_HOSTS.
+        raises RateLimitException. Otherwise, introduces a delay based on URL
+        prefix configuration before allowing the request to proceed. This check
+        is skipped for hosts in CHECK_RATE_LIMIT_EXCLUDED_HOSTS.
         """
+        host = urlparse(url).netloc
         if host in CHECK_RATE_LIMIT_EXCLUDED_HOSTS:
             return
         next_call_time = self.next_call_time[host]
-        # Introduce a small random delay for direct requests to mimic human behavior
+        # Introduce delay based on URL prefix configuration to mimic human behavior
         # and potentially avoid hitting rate limits proactively.
-        time.sleep(random.uniform(0, settings.REQUEST_DELAY_MAX_SECONDS))
+        min_delay, max_delay = self._get_delay_for_url(url)
+        time.sleep(random.uniform(min_delay, max_delay))
         now = now_timestamp()
         if now < next_call_time:
             raise RateLimitException(next_call_time)
@@ -474,7 +496,7 @@ def _get_response_internal(
     # check if we know we are rate-limited for this host.
     if current_strategy is None:
         try:
-            throttler._check_rate_limit(host)
+            throttler._check_rate_limit(url)
         except RateLimitException as e:
             # Pre-check failed: Rate limited for direct request.
             # Try fallbacks immediately.
