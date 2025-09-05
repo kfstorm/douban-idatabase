@@ -123,7 +123,7 @@ class Settings(BaseSettings):
     # Comma-separated list of task types to disable
     DISABLED_TASK_TYPES: str = os.getenv(
         "DISABLED_TASK_TYPES",
-        "google_search,discover_items_by_type_rank,discover_lists_by_google,bootstrap_lists,discover_tags_by_google,fetch_sitemap",
+        "google_search,discover_items_by_type_rank,discover_lists_by_google,bootstrap_lists,discover_tags_by_google,fetch_sitemap,refresh",
     )
 
     # Anonymous API access settings
