@@ -44,6 +44,9 @@ class BackupTask(BaseTask):
         # Create backup directory
         backup_dir = self._create_backup_directory()
 
+        # Clean up old backups before creating new one
+        self._cleanup_old_backups(backup_dir)
+
         # Get database path
         db_path = self._get_database_path()
         if not db_path:
