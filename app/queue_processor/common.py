@@ -9,7 +9,7 @@ from sqlalchemy.exc import IntegrityError
 from app.config import settings
 from app.http_utils import NoPermissionException
 from app.info_provider.imdb import fetch_imdb_id
-from app.models import Blacklist, ExploreConditions, History, Item, List, Tag
+from app.models import Blacklist, ExploreConditions, Item, List, Tag
 from app.utils import now_timestamp
 from app.metrics import item_operations
 
@@ -199,7 +199,7 @@ def _update_existing_item_columns(
 
 def save_item_to_db(db: Session, item: Item):
     """
-    Save or update item in database and log history
+    Save or update item in database
     Now accepts an Item object directly instead of raw data
     """
     # Track operation type for metrics - will only be used after successful commit
@@ -207,19 +207,6 @@ def save_item_to_db(db: Session, item: Item):
 
     # Calculate next_update_time
     fill_next_update_time(item)
-
-    # Also add an entry to history
-    history = History(
-        douban_id=item.douban_id,
-        imdb_id=item.imdb_id,
-        douban_title=item.douban_title,
-        year=item.year,
-        rating=item.rating,
-        type=item.type,
-        update_time=item.update_time,
-        raw_data=item.raw_data,
-    )
-    db.add(history)
 
     existing_blacklist_entry = (
         db.query(Blacklist)
@@ -258,9 +245,6 @@ def save_item_to_db(db: Session, item: Item):
                 f"Item {item.douban_id} already added"
                 f" by another thread, updating instead"
             )
-
-            # Re-add the history entry that was rolled back
-            db.add(history)
 
             # Fetch the item that was added by another thread and update it
             existing_item = (
