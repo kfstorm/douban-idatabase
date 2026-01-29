@@ -445,10 +445,6 @@ def generate_dashboard():
         [{"expr": "douban_idatabase_queue_size", "legendFormat": "{{type}}"}],
     )
 
-    generator.add_stat_panel(
-        "History Entries", "douban_idatabase_history_total", show_percentage=True
-    )
-
     # API Metrics
     generator.add_row("API Metrics")
     generator.add_graph_panel(

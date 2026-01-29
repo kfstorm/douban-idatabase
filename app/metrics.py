@@ -11,7 +11,7 @@ from prometheus_client import (
 from sqlalchemy.orm import Session
 
 from app.config import settings
-from app.models import Item, Queue, History, List, Tag, DbStatistics
+from app.models import Item, Queue, List, Tag, DbStatistics
 from app.utils import record_exception_metrics, now_timestamp
 
 logger = logging.getLogger(__name__)
@@ -81,10 +81,6 @@ db_tags = Gauge("douban_idatabase_tags", "Number of tags in the database", ["sta
 # Keep these as they serve different purposes
 db_queue_size = Gauge(
     "douban_idatabase_queue_size", "Current size of the queue", ["type"]
-)
-db_history_total = Gauge(
-    "douban_idatabase_history_total",
-    "Total number of history entries",
 )
 
 # Worker metrics
@@ -285,11 +281,6 @@ def update_db_metrics(db: Session):
                 DbStatistics(key=f"queue_{queue_type}", value=count, update_time=now)
             )
 
-        history_total = db.query(func.count(History.change_id)).scalar() or 0
-        db.merge(
-            DbStatistics(key="history_total", value=history_total, update_time=now)
-        )
-
         db.commit()
 
         # Delete old statistics after successful commit
@@ -369,9 +360,6 @@ def get_metrics(db: Session):
             elif stat.key.startswith("queue_"):
                 queue_type = stat.key[len("queue_") :]
                 db_queue_size.labels(type=queue_type).set(stat.value)
-            # Handle history total
-            elif stat.key == "history_total":
-                db_history_total.set(stat.value)
             # Handle database size
             elif stat.key == "database_size_bytes":
                 database_size.set(stat.value)

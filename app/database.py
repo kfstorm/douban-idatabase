@@ -59,7 +59,6 @@ def migrate_datetime_to_float():
     tables_to_check = [
         "item",
         "queue",
-        "history",
         "schedule",
         "known_douban_id",
         "list",
@@ -67,7 +66,6 @@ def migrate_datetime_to_float():
     datetime_columns = {
         "item": ["update_time"],
         "queue": ["upsert_time"],
-        "history": ["update_time"],
         "schedule": ["next_run"],
         "known_douban_id": ["discover_time"],
         "list": ["last_check_time"],
@@ -248,7 +246,7 @@ def migrate_douban_id_to_string():
     logger.info("Checking if douban_id migration from int to string is needed...")
 
     inspector = inspect(engine)
-    tables_to_check = ["item", "history"]
+    tables_to_check = ["item"]
 
     # Check if tables exist
     existing_tables = inspector.get_table_names()
@@ -465,38 +463,6 @@ def migrate_item_add_type_column():
             raise
 
 
-def migrate_history_add_type_column():
-    """Add type column to history table"""
-    logger.info("Checking if history table needs type column...")
-
-    inspector = inspect(engine)
-
-    # Check if history table exists
-    if "history" not in inspector.get_table_names():
-        logger.info("history table doesn't exist, skipping migration.")
-        return False
-
-    # Check if type column already exists
-    columns = {col["name"]: col for col in inspector.get_columns("history")}
-    if "type" in columns:
-        logger.info("type column already exists in history table.")
-        return False
-
-    with SessionLocal() as session:
-        try:
-            # Add the type column with string type
-            logger.info("Adding type column to history table...")
-            session.execute(text("ALTER TABLE history ADD COLUMN type VARCHAR(16)"))
-            session.commit()
-            logger.info("Successfully added type column to history table")
-            return True
-        except Exception as e:
-            record_exception_metrics(e)
-            session.rollback()
-            logger.error(f"Error during history table type column migration: {str(e)}")
-            raise
-
-
 def migrate_add_metrics_indices():
     """Add indices for metrics query optimization to existing tables"""
     logger.info("Adding optimized indices for metrics queries...")
@@ -675,9 +641,9 @@ def migrate_delete_deleted_item_table():
             return False
 
 
-def migrate_history_add_douban_id_index():
-    """Add index on douban_id column in history table if it doesn't exist"""
-    logger.info("Checking if history table needs douban_id index...")
+def migrate_drop_history_table():
+    """Drop the history table to save disk space"""
+    logger.info("Checking if history table needs to be dropped...")
 
     inspector = inspect(engine)
 
@@ -686,30 +652,18 @@ def migrate_history_add_douban_id_index():
         logger.info("history table doesn't exist, skipping migration.")
         return False
 
-    # Check if index already exists
-    indices = inspector.get_indexes("history")
-    for index in indices:
-        if len(index["column_names"]) == 1 and index["column_names"][0] == "douban_id":
-            logger.info("Index on douban_id already exists in history table.")
-            return False
-
     with SessionLocal() as session:
         try:
-            # Create the index
-            logger.info("Creating index on douban_id column in history table...")
-            session.execute(
-                text("CREATE INDEX idx_history_douban_id ON history(douban_id)")
-            )
+            logger.info("Dropping history table...")
+            session.execute(text("DROP TABLE history"))
             session.commit()
-            logger.info(
-                "Successfully created index on douban_id column in history table"
-            )
+            logger.info("Successfully dropped history table")
             return True
         except Exception as e:
             record_exception_metrics(e)
             session.rollback()
-            logger.error(f"Error creating douban_id index on history table: {str(e)}")
-            raise
+            logger.error(f"Error dropping history table: {str(e)}")
+            return False
 
 
 def init_db():
@@ -727,8 +681,7 @@ def init_db():
     migrate_douban_id_to_string()
     migrate_list_add_douban_update_time()
     migrate_item_add_type_column()
-    migrate_history_add_type_column()
     migrate_add_metrics_indices()
     migrate_item_add_next_update_time()
     migrate_delete_deleted_item_table()
-    migrate_history_add_douban_id_index()
+    migrate_drop_history_table()
