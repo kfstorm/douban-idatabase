@@ -663,7 +663,7 @@ def migrate_drop_history_table():
             record_exception_metrics(e)
             session.rollback()
             logger.error(f"Error dropping history table: {str(e)}")
-            raise
+            return False
 
 
 def init_db():
