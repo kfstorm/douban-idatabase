@@ -84,15 +84,15 @@ Each info provider handles its own API specifics:
 
 ## Important Files
 
-- `app/config/settings.py`: Centralized configuration management
+- `app/config.py`: Centralized configuration management (Pydantic Settings)
 - `app/database.py`: Database connection and session management
 - `app/schemas.py`: Pydantic models for API request/response validation
-- `docker-compose.yml`: Development environment with Redis
+- `Dockerfile`: Container configuration for deployment
 - `.env.sample`: Template for environment configuration
 
 ## Background Tasks
 
-The queue processor handles various task types defined in `app/queue_processor/task_type.py`:
+The queue processor handles various task types defined in `app/queue_processor/worker.py`:
 - Item fetching and updating
 - List processing for bulk operations
 - Sitemap crawling for systematic discovery
