@@ -80,6 +80,9 @@ def verify_api_key(
     api_key_query: Optional[str] = Security(api_key_query),
     db: Session = Depends(get_db),
 ):
+    if request.url.path == "/api/health":
+        return {}
+
     # Get API key from header or query
     api_key = api_key_header or api_key_query
 
@@ -177,6 +180,11 @@ async def global_middleware(request: Request, call_next):
     )
 
     return response
+
+
+@my_app.get("/api/health")
+def health_check():
+    return {"status": "ok"}
 
 
 @my_app.get("/api/item", response_model=List[schemas.Item])

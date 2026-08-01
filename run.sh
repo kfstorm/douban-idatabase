@@ -10,7 +10,6 @@ echo "Using Prometheus multiprocess directory: $PROMETHEUS_MULTIPROC_DIR"
 # Clean up the metrics directory when the script exits
 trap 'rm -rf "$PROMETHEUS_MULTIPROC_DIR"' EXIT
 
-# Run the application
-# Use exec to replace the shell with the Python process,
-# so that the Python process can exit gracefully on `docker stop`
-exec uv run python -m app.main
+# Run the application with the environment built into the image. Do not invoke
+# uv here, because it may synchronize the environment and require write access.
+exec /.venv/bin/python -m app.main
