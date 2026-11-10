@@ -4,8 +4,10 @@ import sqlite3
 import gzip
 import shutil
 import time
+from contextlib import closing
 from datetime import datetime
 from pathlib import Path
+from uuid import uuid4
 from sqlalchemy.orm import Session
 
 from app.config import settings
@@ -65,10 +67,14 @@ class BackupTask(BaseTask):
 
         # Generate backup filename with timestamp
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        temp_backup_filename = f"backup_{timestamp}.sqlite3"
+        staging_id = uuid4().hex
+        temp_backup_filename = f".backup_{timestamp}.{staging_id}.sqlite3.tmp"
         compressed_backup_filename = f"backup_{timestamp}.sqlite3.gz"
         temp_backup_path = backup_dir / temp_backup_filename
         compressed_backup_path = backup_dir / compressed_backup_filename
+        compressed_temp_path = (
+            backup_dir / f".{compressed_backup_filename}.{staging_id}.tmp"
+        )
 
         temp_backup_abs_path = os.path.abspath(str(temp_backup_path))
 
@@ -85,28 +91,23 @@ class BackupTask(BaseTask):
         backup_start_time = time.time()
 
         try:
-            # Connect to source database
-            source_conn = sqlite3.connect(db_path)
-
-            # Connect to destination database (temporary backup file)
-            dest_conn = sqlite3.connect(str(temp_backup_path))
-
-            # Perform backup using SQLite's backup API
             logger.info(f"Starting database backup to {temp_backup_path}")
             start_time = now_timestamp()
-
-            with source_conn:
-                source_conn.backup(dest_conn)
-
-            # Close connections
-            dest_conn.close()
-            source_conn.close()
+            with (
+                closing(sqlite3.connect(db_path)) as source_conn,
+                closing(sqlite3.connect(str(temp_backup_path))) as dest_conn,
+            ):
+                with source_conn:
+                    source_conn.backup(dest_conn)
 
             # Compress the backup file
             logger.info(f"Compressing backup file to {compressed_backup_path}")
             with open(temp_backup_path, "rb") as f_in:
-                with gzip.open(compressed_backup_path, "wb") as f_out:
+                with gzip.open(compressed_temp_path, "wb") as f_out:
                     shutil.copyfileobj(f_in, f_out)
+
+            # Publish only after gzip has written its trailer and closed successfully.
+            os.replace(compressed_temp_path, compressed_backup_path)
 
             # Remove the temporary uncompressed backup
             os.remove(temp_backup_path)
@@ -131,8 +132,9 @@ class BackupTask(BaseTask):
             record_exception_metrics(e)
             logger.error(f"SQLite error during backup: {e}")
             backup_operations.labels(status="error").inc()
-            # Try to clean up partial backup files if they exist
-            for path in [temp_backup_path, compressed_backup_path]:
+        finally:
+            # Interrupted compression must never leave a discoverable final backup.
+            for path in [temp_backup_path, compressed_temp_path]:
                 if os.path.exists(path):
                     try:
                         os.remove(path)

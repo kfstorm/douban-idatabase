@@ -1,16 +1,65 @@
 import os
+import gzip
 import sqlite3
 import tempfile
 import time
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
+import pytest
+
 from app.schedule.backup_task import BackupTask
 from app.config import settings
 
 
+def create_database(path):
+    with sqlite3.connect(path) as conn:
+        conn.execute("CREATE TABLE test (id INTEGER PRIMARY KEY, value TEXT)")
+        conn.execute("INSERT INTO test (value) VALUES ('test')")
+
+
 class TestBackupTask:
     """Test cases for BackupTask"""
+
+    def test_compression_failure_never_publishes_backup(self, tmp_path, monkeypatch):
+        source = tmp_path / "source.sqlite3"
+        with sqlite3.connect(source) as db:
+            db.execute("CREATE TABLE example (value TEXT)")
+        backups = tmp_path / "backups"
+        monkeypatch.setattr(settings, "SQLALCHEMY_DATABASE_URL", f"sqlite:///{source}")
+        monkeypatch.setattr(settings, "BACKUP_DIRECTORY", str(backups))
+        monkeypatch.setattr(settings, "BACKUP_ENABLED", True)
+
+        def interrupted(source, destination):
+            destination.write(b"partial")
+            assert not list(backups.glob("*.gz"))
+            raise OSError("synthetic compression failure")
+
+        monkeypatch.setattr("app.schedule.backup_task.shutil.copyfileobj", interrupted)
+        with pytest.raises(OSError, match="synthetic compression failure"):
+            BackupTask().execute(MagicMock())
+        assert list(backups.iterdir()) == []
+
+    def test_published_backup_can_be_decompressed_and_opened(
+        self, tmp_path, monkeypatch
+    ):
+        source = tmp_path / "source.sqlite3"
+        with sqlite3.connect(source) as db:
+            db.execute("CREATE TABLE example (value TEXT)")
+            db.execute("INSERT INTO example VALUES ('synthetic')")
+        backups = tmp_path / "backups"
+        monkeypatch.setattr(settings, "SQLALCHEMY_DATABASE_URL", f"sqlite:///{source}")
+        monkeypatch.setattr(settings, "BACKUP_DIRECTORY", str(backups))
+        monkeypatch.setattr(settings, "BACKUP_ENABLED", True)
+        BackupTask().execute(MagicMock())
+        [published] = backups.iterdir()
+        assert published.name.endswith(".sqlite3.gz")
+        restored = tmp_path / "restored.sqlite3"
+        restored.write_bytes(gzip.decompress(published.read_bytes()))
+        with sqlite3.connect(restored) as db:
+            assert db.execute("SELECT value FROM example").fetchall() == [
+                ("synthetic",)
+            ]
 
     def test_cleanup_called_before_backup(self):
         """Test that cleanup is called before creating a new backup"""
@@ -18,11 +67,7 @@ class TestBackupTask:
         with tempfile.TemporaryDirectory() as temp_dir:
             # Create a temporary database
             db_path = os.path.join(temp_dir, "test_db.sqlite3")
-            conn = sqlite3.connect(db_path)
-            conn.execute("CREATE TABLE test (id INTEGER PRIMARY KEY, value TEXT)")
-            conn.execute("INSERT INTO test (value) VALUES ('test')")
-            conn.commit()
-            conn.close()
+            create_database(db_path)
 
             # Create an old backup file
             backup_dir = Path(temp_dir)
@@ -81,11 +126,7 @@ class TestBackupTask:
         with tempfile.TemporaryDirectory() as temp_dir:
             # Create a temporary database
             db_path = os.path.join(temp_dir, "test_db.sqlite3")
-            conn = sqlite3.connect(db_path)
-            conn.execute("CREATE TABLE test (id INTEGER PRIMARY KEY, value TEXT)")
-            conn.execute("INSERT INTO test (value) VALUES ('test')")
-            conn.commit()
-            conn.close()
+            create_database(db_path)
 
             # Create some old backup files
             backup_dir = Path(temp_dir)
